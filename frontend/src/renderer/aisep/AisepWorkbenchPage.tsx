@@ -103,6 +103,9 @@ function ElementSection({
 	);
 }
 
+/** AO pushes session changes over SSE to its own views; this area polls the same endpoint instead (ADR-013: read-only). */
+export const AGENT_SESSIONS_REFRESH_MS = 5_000;
+
 const BUCKET_ORDER: Record<AgentSessionBucket, number> = { needsYou: 0, inProgress: 1, inReview: 2, finished: 3 };
 
 const BUCKET_LABEL: Record<AgentSessionBucket, AisepMessageKey> = {
@@ -122,6 +125,7 @@ function AiActivitySection({ source }: { source: AgentSessionSource }) {
 	const sessions = useQuery({
 		queryKey: ["aisep", "agent-sessions"],
 		queryFn: async () => orderAgentSessions(await source.list()),
+		refetchInterval: AGENT_SESSIONS_REFRESH_MS,
 	});
 	return (
 		<Section titleKey="section.aiActivity.title">

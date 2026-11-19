@@ -1,7 +1,7 @@
 {
 	"nav.title": "AISEP",
 	"page.title": "AISEP 워크벤치",
-	"page.fixtureNotice": "로컬 픽스처의 임시 데이터입니다(잠정 인터페이스). 아직 모델 서버에 연결되지 않았습니다.",
+	"page.fixtureNotice": "‘아키텍처 전체 보기’와 ‘승인 대기 게이트’는 로컬 픽스처의 임시 데이터입니다(잠정 인터페이스). 아직 모델 서버에 연결되지 않았습니다. ‘AI 진행 중’은 오케스트레이터의 세션을 실시간으로 읽습니다.",
 	"page.notFound": "이 AISEP 페이지는 존재하지 않습니다.",
 	"section.architecture.title": "아키텍처 전체 보기",
 	"section.gates.title": "승인 대기 게이트",

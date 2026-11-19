@@ -1,7 +1,7 @@
 {
 	"nav.title": "AISEP",
 	"page.title": "Bancada AISEP",
-	"page.fixtureNotice": "Dados provisórios de fixtures locais (interface provisória). Ainda não conectado ao servidor de modelos.",
+	"page.fixtureNotice": "“Visão geral da arquitetura” e “Portões aguardando aprovação” mostram dados provisórios de fixtures locais (interface provisória) e ainda não estão conectados ao servidor de modelos. “IA em andamento” lê as sessões ao vivo do orquestrador.",
 	"page.notFound": "Esta página do AISEP não existe.",
 	"section.architecture.title": "Visão geral da arquitetura",
 	"section.gates.title": "Portões aguardando aprovação",

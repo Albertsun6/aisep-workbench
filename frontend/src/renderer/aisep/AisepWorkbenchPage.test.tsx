@@ -1,8 +1,8 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, cleanup, render, screen, within } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { appI18n } from "../i18n";
-import { AisepWorkbenchPage } from "./AisepWorkbenchPage";
+import { AGENT_SESSIONS_REFRESH_MS, AisepWorkbenchPage } from "./AisepWorkbenchPage";
 import type { AgentSessionRow, AgentSessionSource } from "./data/ao-sessions";
 import type { AisepModelClient } from "./data/client";
 import { fixtureClient } from "./data/fixture-client";
@@ -49,6 +49,13 @@ describe("AisepWorkbenchPage", () => {
 
 		const ai = screen.getByRole("region", { name: en["section.aiActivity.title"] });
 		expect(await within(ai).findByText(en["section.aiActivity.empty"])).toBeInTheDocument();
+	});
+
+	it("does not tell the user the whole page is placeholder data, since the AI area is live", () => {
+		renderPage();
+		const notice = screen.getByText(aisepCatalogs.en["page.fixtureNotice"]);
+		expect(notice.textContent).toContain(aisepCatalogs.en["section.aiActivity.title"]);
+		expect(notice.textContent).toContain("orchestrator");
 	});
 
 	it("re-renders in the selected app language", async () => {
@@ -118,6 +125,31 @@ describe("AisepWorkbenchPage AI activity area", () => {
 	it("shows explicit error text when the orchestrator is unreachable", async () => {
 		renderPage(fixtureClient, { list: () => Promise.reject(new Error("ECONNREFUSED")) });
 		expect(await within(aiRegion()).findByRole("alert")).toHaveTextContent(en["section.aiActivity.error"]);
+	});
+
+	it("picks up session changes after mount without a reload", async () => {
+		vi.useFakeTimers({ shouldAdvanceTime: true });
+		try {
+			let current: AgentSessionRow[] = [sampleRows[0]];
+			renderPage(fixtureClient, { list: () => Promise.resolve(current) });
+			const ai = aiRegion();
+			const row = (await within(ai).findByText("补报价单字段")).closest("tr") as HTMLElement;
+			expect(within(row).getAllByRole("cell")[2].textContent).toBe(en["section.aiActivity.bucket.inProgress"]);
+
+			// AO moves the session to needs_input and a new session starts.
+			current = [{ ...sampleRows[0], bucket: "needsYou", rawStatus: "needs_input" }, sampleRows[1]];
+			await act(() => vi.advanceTimersByTimeAsync(AGENT_SESSIONS_REFRESH_MS));
+			expect(await within(ai).findByText("审批流程建模")).toBeInTheDocument();
+			const updated = within(ai).getByText("补报价单字段").closest("tr") as HTMLElement;
+			expect(within(updated).getAllByRole("cell")[2].textContent).toBe(en["section.aiActivity.bucket.needsYou"]);
+
+			// The session ends (archived), so it leaves the list.
+			current = [sampleRows[1]];
+			await act(() => vi.advanceTimersByTimeAsync(AGENT_SESSIONS_REFRESH_MS));
+			await vi.waitFor(() => expect(within(ai).queryByText("补报价单字段")).toBeNull());
+		} finally {
+			vi.useRealTimers();
+		}
 	});
 
 	it("shows explicit empty text when there are no sessions", async () => {

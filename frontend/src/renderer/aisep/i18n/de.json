@@ -1,7 +1,7 @@
 {
 	"nav.title": "AISEP",
 	"page.title": "AISEP-Werkbank",
-	"page.fixtureNotice": "Platzhalterdaten aus lokalen Fixtures (vorläufige Schnittstelle). Noch nicht mit dem Modellserver verbunden.",
+	"page.fixtureNotice": "„Architekturüberblick“ und „Ausstehende Freigaben“ zeigen Platzhalterdaten aus lokalen Fixtures (vorläufige Schnittstelle) und sind noch nicht mit dem Modellserver verbunden. „KI in Arbeit“ liest Live-Sitzungen vom Orchestrator.",
 	"page.notFound": "Diese AISEP-Seite existiert nicht.",
 	"section.architecture.title": "Architekturüberblick",
 	"section.gates.title": "Ausstehende Freigaben",

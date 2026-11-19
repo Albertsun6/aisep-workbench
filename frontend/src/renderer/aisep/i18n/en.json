@@ -1,7 +1,7 @@
 {
 	"nav.title": "AISEP",
 	"page.title": "AISEP workbench",
-	"page.fixtureNotice": "Placeholder data from local fixtures (provisional interface). Not connected to the model server yet.",
+	"page.fixtureNotice": "“Architecture overview” and “Pending approval gates” show placeholder data from local fixtures (provisional interface) and are not connected to the model server yet. “AI in progress” reads live sessions from the orchestrator.",
 	"page.notFound": "This AISEP page does not exist.",
 	"section.architecture.title": "Architecture overview",
 	"section.gates.title": "Pending approval gates",

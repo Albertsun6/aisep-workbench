@@ -1,7 +1,7 @@
 {
 	"nav.title": "AISEP",
 	"page.title": "Atelier AISEP",
-	"page.fixtureNotice": "Données provisoires issues de fixtures locales (interface provisoire). Pas encore connecté au serveur de modèles.",
+	"page.fixtureNotice": "« Vue d’ensemble de l’architecture » et « Validations en attente » affichent des données provisoires issues de fixtures locales (interface provisoire) et ne sont pas encore connectées au serveur de modèles. « IA en cours » lit les sessions en direct de l’orchestrateur.",
 	"page.notFound": "Cette page AISEP n’existe pas.",
 	"section.architecture.title": "Vue d’ensemble de l’architecture",
 	"section.gates.title": "Validations en attente",

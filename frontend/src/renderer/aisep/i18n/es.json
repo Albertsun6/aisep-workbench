@@ -1,7 +1,7 @@
 {
 	"nav.title": "AISEP",
 	"page.title": "Banco de trabajo AISEP",
-	"page.fixtureNotice": "Datos provisionales de fixtures locales (interfaz provisional). Aún no está conectado al servidor de modelos.",
+	"page.fixtureNotice": "«Panorama de la arquitectura» y «Puertas pendientes de aprobación» muestran datos provisionales de fixtures locales (interfaz provisional) y aún no están conectadas al servidor de modelos. «IA en curso» lee las sesiones en vivo del orquestador.",
 	"page.notFound": "Esta página de AISEP no existe.",
 	"section.architecture.title": "Panorama de la arquitectura",
 	"section.gates.title": "Puertas pendientes de aprobación",

@@ -1,7 +1,7 @@
 {
 	"nav.title": "AISEP",
 	"page.title": "AISEP 工作台",
-	"page.fixtureNotice": "占位数据来自本地假数据(接口为临时版本),尚未连接模型服务。",
+	"page.fixtureNotice": "“架构全景”和“待批准关口”的占位数据来自本地假数据(接口为临时版本),尚未连接模型服务;“AI 进行中”实时读取编排器会话。",
 	"page.notFound": "该 AISEP 页面不存在。",
 	"section.architecture.title": "架构全景",
 	"section.gates.title": "待批准关口",

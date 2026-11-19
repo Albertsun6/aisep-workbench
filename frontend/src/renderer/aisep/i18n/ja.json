@@ -1,7 +1,7 @@
 {
 	"nav.title": "AISEP",
 	"page.title": "AISEP ワークベンチ",
-	"page.fixtureNotice": "ローカルのフィクスチャによる仮データです(暫定インターフェース)。モデルサーバーにはまだ接続されていません。",
+	"page.fixtureNotice": "「アーキテクチャ全体像」と「承認待ちのゲート」はローカルのフィクスチャによる仮データです(暫定インターフェース)。モデルサーバーにはまだ接続されていません。「AI 実行中」はオーケストレーターのセッションをリアルタイムで読み取ります。",
 	"page.notFound": "この AISEP ページは存在しません。",
 	"section.architecture.title": "アーキテクチャ全体像",
 	"section.gates.title": "承認待ちのゲート",
