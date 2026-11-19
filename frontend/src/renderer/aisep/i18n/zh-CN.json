@@ -1,0 +1,14 @@
+{
+	"nav.title": "AISEP",
+	"page.title": "AISEP 工作台",
+	"page.fixtureNotice": "占位数据来自本地假数据(接口为临时版本),尚未连接模型服务。",
+	"page.notFound": "该 AISEP 页面不存在。",
+	"section.architecture.title": "架构全景",
+	"section.gates.title": "待批准关口",
+	"section.aiActivity.title": "AI 进行中",
+	"section.aiActivity.unsourced": "暂无数据来源:元模型草案尚未定义 AI 活动。",
+	"section.count": "共 {{count}} 项",
+	"section.loading": "加载中…",
+	"section.error": "无法加载数据。",
+	"section.empty": "暂无内容。"
+}

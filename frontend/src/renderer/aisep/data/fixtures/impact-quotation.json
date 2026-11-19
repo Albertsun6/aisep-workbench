@@ -1,0 +1,38 @@
+{
+	"_source": "spec §9 depends mode on the am4 part of the procurement model; the spec reports 5 elements for this case",
+	"focus": "https://aisep.example/model/procurement/quotation",
+	"mode": "depends",
+	"depth": 3,
+	"items": [
+		{
+			"iri": "https://aisep.example/model/procurement/quoteApproval",
+			"depth": 1,
+			"via": "https://meta.linked.archi/archimate4/onto#Access",
+			"dependency": "Backward"
+		},
+		{
+			"iri": "https://aisep.example/model/procurement/submitQuotation",
+			"depth": 1,
+			"via": "https://meta.linked.archi/archimate4/onto#Access",
+			"dependency": "Backward"
+		},
+		{
+			"iri": "https://aisep.example/model/procurement/supplier",
+			"depth": 2,
+			"via": "https://meta.linked.archi/archimate4/onto#Assignment",
+			"dependency": "Both"
+		},
+		{
+			"iri": "https://aisep.example/model/procurement/procurementManager",
+			"depth": 2,
+			"via": "https://meta.linked.archi/archimate4/onto#Assignment",
+			"dependency": "Both"
+		},
+		{
+			"iri": "https://aisep.example/model/procurement/reqTwoLevelApproval",
+			"depth": 2,
+			"via": "https://meta.linked.archi/archimate4/onto#Realization",
+			"dependency": "Both"
+		}
+	]
+}

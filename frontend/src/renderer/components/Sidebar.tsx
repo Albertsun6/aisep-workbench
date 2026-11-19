@@ -168,6 +168,7 @@ import type { RemoteHost } from "../hooks/useRemoteHosts";
 import { sessionNavigateTarget } from "../lib/navigate-to-session";
 import { sessionUiKey } from "../lib/hosts";
 import { RemoteHostsSection } from "./RemoteHostsSection";
+import { AisepSidebarItems } from "../aisep/AisepSidebarItems";
 
 // macOS paints framed chrome: the fixed TitlebarNav cluster carries the
 // sidebar toggle + history arrows above this surface. Windows hangs the sidebar
@@ -1172,6 +1173,7 @@ export const Sidebar = memo(function Sidebar({
 							trailing={artifactTotal > 0 ? String(artifactTotal) : undefined}
 						/>
 					</SidebarMenuItem>
+					<AisepSidebarItems isCollapsed={isCollapsed} />
 					{developerMode ? (
 						<SidebarMenuItem>
 							<SidebarTopNavRow
@@ -3609,7 +3611,7 @@ function SectionDisclosure({
 
 /** Search + Automations share this one row so their hover/focus/active treatment
  * (NavRowHighlight pill, foreground text, instant) cannot drift apart. */
-function SidebarTopNavRow({
+export function SidebarTopNavRow({
 	active = false,
 	disabled,
 	icon,

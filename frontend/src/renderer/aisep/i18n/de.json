@@ -1,0 +1,14 @@
+{
+	"nav.title": "AISEP",
+	"page.title": "AISEP-Werkbank",
+	"page.fixtureNotice": "Platzhalterdaten aus lokalen Fixtures (vorläufige Schnittstelle). Noch nicht mit dem Modellserver verbunden.",
+	"page.notFound": "Diese AISEP-Seite existiert nicht.",
+	"section.architecture.title": "Architekturüberblick",
+	"section.gates.title": "Ausstehende Freigaben",
+	"section.aiActivity.title": "KI in Arbeit",
+	"section.aiActivity.unsourced": "Noch keine Datenquelle: Der Metamodell-Entwurf definiert keine KI-Aktivität.",
+	"section.count": "Gesamt: {{count}}",
+	"section.loading": "Wird geladen…",
+	"section.error": "Daten konnten nicht geladen werden.",
+	"section.empty": "Nichts vorhanden."
+}

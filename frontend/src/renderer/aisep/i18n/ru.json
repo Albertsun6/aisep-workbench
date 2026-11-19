@@ -1,0 +1,14 @@
+{
+	"nav.title": "AISEP",
+	"page.title": "Рабочее место AISEP",
+	"page.fixtureNotice": "Временные данные из локальных фикстур (предварительный интерфейс). Сервер модели пока не подключён.",
+	"page.notFound": "Такой страницы AISEP нет.",
+	"section.architecture.title": "Обзор архитектуры",
+	"section.gates.title": "Ожидают утверждения",
+	"section.aiActivity.title": "ИИ в работе",
+	"section.aiActivity.unsourced": "Источник данных не задан: в черновике метамодели нет активности ИИ.",
+	"section.count": "Всего: {{count}}",
+	"section.loading": "Загрузка…",
+	"section.error": "Не удалось загрузить данные.",
+	"section.empty": "Здесь пока пусто."
+}

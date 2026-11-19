@@ -1,0 +1,14 @@
+{
+	"nav.title": "AISEP",
+	"page.title": "AISEP ワークベンチ",
+	"page.fixtureNotice": "ローカルのフィクスチャによる仮データです(暫定インターフェース)。モデルサーバーにはまだ接続されていません。",
+	"page.notFound": "この AISEP ページは存在しません。",
+	"section.architecture.title": "アーキテクチャ全体像",
+	"section.gates.title": "承認待ちのゲート",
+	"section.aiActivity.title": "AI 実行中",
+	"section.aiActivity.unsourced": "データソース未定義:メタモデル草案は AI アクティビティを定義していません。",
+	"section.count": "合計: {{count}}",
+	"section.loading": "読み込み中…",
+	"section.error": "データを読み込めませんでした。",
+	"section.empty": "項目はありません。"
+}

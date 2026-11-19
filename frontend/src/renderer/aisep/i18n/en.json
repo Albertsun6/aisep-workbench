@@ -1,0 +1,14 @@
+{
+	"nav.title": "AISEP",
+	"page.title": "AISEP workbench",
+	"page.fixtureNotice": "Placeholder data from local fixtures (provisional interface). Not connected to the model server yet.",
+	"page.notFound": "This AISEP page does not exist.",
+	"section.architecture.title": "Architecture overview",
+	"section.gates.title": "Pending approval gates",
+	"section.aiActivity.title": "AI in progress",
+	"section.aiActivity.unsourced": "No data source yet: the metamodel draft does not define AI activity.",
+	"section.count": "Total: {{count}}",
+	"section.loading": "Loading…",
+	"section.error": "Could not load data.",
+	"section.empty": "Nothing here."
+}

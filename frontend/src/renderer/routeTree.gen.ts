@@ -20,6 +20,7 @@ import { Route as ShellArtifactsRouteImport } from './routes/_shell.artifacts'
 import { Route as ShellSessionsIndexRouteImport } from './routes/_shell.sessions.index'
 import { Route as ShellSessionsSessionIdRouteImport } from './routes/_shell.sessions.$sessionId'
 import { Route as ShellProjectsProjectIdRouteImport } from './routes/_shell.projects.$projectId'
+import { Route as ShellAisepSplatRouteImport } from './routes/_shell.aisep.$'
 import { Route as ShellProjectsProjectIdSettingsRouteImport } from './routes/_shell.projects.$projectId_.settings'
 import { Route as ShellProjectsProjectIdSessionsSessionIdRouteImport } from './routes/_shell.projects.$projectId_.sessions.$sessionId'
 import { Route as ShellHostHostIdSessionSessionIdRouteImport } from './routes/_shell.host.$hostId.session.$sessionId'
@@ -80,6 +81,11 @@ const ShellProjectsProjectIdRoute = ShellProjectsProjectIdRouteImport.update({
   path: '/projects/$projectId',
   getParentRoute: () => ShellRoute,
 } as any)
+const ShellAisepSplatRoute = ShellAisepSplatRouteImport.update({
+  id: '/aisep/$',
+  path: '/aisep/$',
+  getParentRoute: () => ShellRoute,
+} as any)
 const ShellProjectsProjectIdSettingsRoute =
   ShellProjectsProjectIdSettingsRouteImport.update({
     id: '/projects/$projectId_/settings',
@@ -119,6 +125,7 @@ export interface FileRoutesByFullPath {
   '/sessions': typeof ShellSessionsRouteWithChildren
   '/settings': typeof ShellSettingsRoute
   '/usage': typeof ShellUsageRoute
+  '/aisep/$': typeof ShellAisepSplatRoute
   '/projects/$projectId': typeof ShellProjectsProjectIdRoute
   '/sessions/$sessionId': typeof ShellSessionsSessionIdRoute
   '/sessions/': typeof ShellSessionsIndexRoute
@@ -135,6 +142,7 @@ export interface FileRoutesByTo {
   '/settings': typeof ShellSettingsRoute
   '/usage': typeof ShellUsageRoute
   '/': typeof ShellIndexRoute
+  '/aisep/$': typeof ShellAisepSplatRoute
   '/projects/$projectId': typeof ShellProjectsProjectIdRoute
   '/sessions/$sessionId': typeof ShellSessionsSessionIdRoute
   '/sessions': typeof ShellSessionsIndexRoute
@@ -154,6 +162,7 @@ export interface FileRoutesById {
   '/_shell/settings': typeof ShellSettingsRoute
   '/_shell/usage': typeof ShellUsageRoute
   '/_shell/': typeof ShellIndexRoute
+  '/_shell/aisep/$': typeof ShellAisepSplatRoute
   '/_shell/projects/$projectId': typeof ShellProjectsProjectIdRoute
   '/_shell/sessions/$sessionId': typeof ShellSessionsSessionIdRoute
   '/_shell/sessions/': typeof ShellSessionsIndexRoute
@@ -173,6 +182,7 @@ export interface FileRouteTypes {
     | '/sessions'
     | '/settings'
     | '/usage'
+    | '/aisep/$'
     | '/projects/$projectId'
     | '/sessions/$sessionId'
     | '/sessions/'
@@ -189,6 +199,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/usage'
     | '/'
+    | '/aisep/$'
     | '/projects/$projectId'
     | '/sessions/$sessionId'
     | '/sessions'
@@ -207,6 +218,7 @@ export interface FileRouteTypes {
     | '/_shell/settings'
     | '/_shell/usage'
     | '/_shell/'
+    | '/_shell/aisep/$'
     | '/_shell/projects/$projectId'
     | '/_shell/sessions/$sessionId'
     | '/_shell/sessions/'
@@ -300,6 +312,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ShellProjectsProjectIdRouteImport
       parentRoute: typeof ShellRoute
     }
+    '/_shell/aisep/$': {
+      id: '/_shell/aisep/$'
+      path: '/aisep/$'
+      fullPath: '/aisep/$'
+      preLoaderRoute: typeof ShellAisepSplatRouteImport
+      parentRoute: typeof ShellRoute
+    }
     '/_shell/projects/$projectId_/settings': {
       id: '/_shell/projects/$projectId_/settings'
       path: '/projects/$projectId/settings'
@@ -360,6 +379,7 @@ interface ShellRouteChildren {
   ShellSettingsRoute: typeof ShellSettingsRoute
   ShellUsageRoute: typeof ShellUsageRoute
   ShellIndexRoute: typeof ShellIndexRoute
+  ShellAisepSplatRoute: typeof ShellAisepSplatRoute
   ShellProjectsProjectIdRoute: typeof ShellProjectsProjectIdRoute
   ShellProjectsProjectIdSettingsRoute: typeof ShellProjectsProjectIdSettingsRoute
   ShellHostHostIdProjectProjectIdRoute: typeof ShellHostHostIdProjectProjectIdRoute
@@ -376,6 +396,7 @@ const ShellRouteChildren: ShellRouteChildren = {
   ShellSettingsRoute: ShellSettingsRoute,
   ShellUsageRoute: ShellUsageRoute,
   ShellIndexRoute: ShellIndexRoute,
+  ShellAisepSplatRoute: ShellAisepSplatRoute,
   ShellProjectsProjectIdRoute: ShellProjectsProjectIdRoute,
   ShellProjectsProjectIdSettingsRoute: ShellProjectsProjectIdSettingsRoute,
   ShellHostHostIdProjectProjectIdRoute: ShellHostHostIdProjectProjectIdRoute,

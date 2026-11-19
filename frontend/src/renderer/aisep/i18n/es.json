@@ -1,0 +1,14 @@
+{
+	"nav.title": "AISEP",
+	"page.title": "Banco de trabajo AISEP",
+	"page.fixtureNotice": "Datos provisionales de fixtures locales (interfaz provisional). Aún no está conectado al servidor de modelos.",
+	"page.notFound": "Esta página de AISEP no existe.",
+	"section.architecture.title": "Panorama de la arquitectura",
+	"section.gates.title": "Puertas pendientes de aprobación",
+	"section.aiActivity.title": "IA en curso",
+	"section.aiActivity.unsourced": "Sin fuente de datos: el borrador del metamodelo no define la actividad de IA.",
+	"section.count": "Total: {{count}}",
+	"section.loading": "Cargando…",
+	"section.error": "No se pudieron cargar los datos.",
+	"section.empty": "No hay nada aquí."
+}
