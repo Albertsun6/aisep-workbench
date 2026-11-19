@@ -26,6 +26,7 @@ AISEP 代码全部在 `frontend/src/renderer/aisep/`（上游没有这个目录�
 | `frontend/src/renderer/routes/_shell.aisep.$.tsx` | AISEP 新增的路由壳（3 行），上游没有同名文件 |
 | `frontend/src/renderer/routeTree.gen.ts` | 生成文件，多出 aisep 路由的几行 |
 | 上游 `APP_LOCALES`（`frontend/src/shared/ui-locale.ts`） | AISEP 不改它，但 `aisep/i18n/index.ts` 按它做类型约束：上游加语言时 typecheck 会报 `Property '<locale>' is missing`，补一个 `aisep/i18n/<locale>.json` 即可 |
+| AO 会话接口（`GET /api/v1/sessions`，类型取自 `frontend/src/api/schema.ts` 的 `ControllersSessionView`） | AISEP 不改它，只读。工作台"AI 进行中"区域（ADR-013）经 `aisep/data/ao-sessions.ts` 读取，AISEP 产品代码里只有这个文件引用 AO API 客户端和生成类型；它的测试 `aisep/data/ao-sessions.test.ts` 也引用生成类型（用来造会话样例），上游改字段时两者一起改。用到的字段：`id`、`status`、`isTerminated`、`kanbanColumn`（只看是否为 `archive`）、`harness`、`branch`、`terminalTitle`、`displayName`、`issueId`。`status` 的 15 个取值：`working`、`pr_open`、`draft`、`ci_failed`、`review_pending`、`changes_requested`、`commented`、`approved`、`mergeable`、`merged`、`needs_input`、`exited`、`idle`、`terminated`、`no_signal`。`STATUS_BUCKETS` 按这个联合类型写成 `Record`：上游增删取值时 typecheck 报错，补上分组即可。另引用 `lib/api-client`（`apiClient`、`hasTrustedApiBaseUrl`）和 `lib/agent-options`（`agentLabel`） |
 
 上游 i18n 语言文件（`frontend/src/renderer/i18n/*.json`）**AISEP 不改**：AISEP 文案在独立命名空间 `aisep` 里。
 
@@ -42,6 +43,7 @@ AISEP 代码全部在 `frontend/src/renderer/aisep/`（上游没有这个目录�
 5. 验证（在 `frontend/` 下）：
    - `npm run typecheck`
    - `npx vitest run --config vite.renderer.config.ts src/renderer/aisep src/renderer/components/Sidebar.test.tsx src/renderer/i18n src/renderer/router.test.tsx`
+   - 核对 AO 会话接口：`git diff <旧 tag> <新 tag> -- frontend/src/api/schema.ts`，看 `ControllersSessionView` 里上表列出的字段和 `status` 取值有没有改名、删除或改语义；`status` 有新增时 typecheck 已经报错，按上游 `attentionZone`（`packages/product-ui/src/session-presentation.ts`）和后端 `DeriveStatus` 的含义补进 `STATUS_BUCKETS`；`kanbanColumn` 的 `archive` 是否仍只表示已终止的会话（后端 `DeriveKanbanPresentation`）
    - 启动隔离开发实例，点侧栏 AISEP 看页面，改一处 `aisep/i18n/en.json` 看热重载：
      `env -u AO_PORT AO_PORT=3500 AO_DEV_ELECTRON_DIR=<dir>/electron AO_RUN_FILE=<dir>/running.json AO_DATA_DIR=<dir>/data npm run dev`（`<dir>` 用一个新目录，绝不用 `~/.ao`）
 6. stable 版本验证通过后合回 `aisep-main`，更新“当前锁定版本”，在“同步记录”追加一行；nightly 只演练，不合回。
