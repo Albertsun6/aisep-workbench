@@ -77,5 +77,12 @@
 	"gate.gates.GateRequirements": "需求",
 	"gate.gates.GateArchitecture": "架构",
 	"gate.gates.GateDesign": "设计",
-	"gate.gates.GateMerge": "合并"
+	"gate.gates.GateMerge": "合并",
+	"state.Proposed": "待批准",
+	"state.Approved": "已批准",
+	"state.Rejected": "已驳回",
+	"state.Superseded": "已取代",
+	"state.none": "无批准状态",
+	"section.gates.approvedOnBranch": "已在 {{branch}} 批准、待合并",
+	"section.aiActivity.gateNeedsServer": "关口页需要连接模型服务（VITE_AISEP_MCP_URL）。"
 }

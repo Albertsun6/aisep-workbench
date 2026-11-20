@@ -67,6 +67,13 @@ describe("changedElementsView (§5.8 error table)", () => {
 		expect(changedElementsView(undefined, new AisepToolError(code, code, false)).kind).toBe(kind);
 	});
 
+	it("shows the error, not the last count, when a later refetch fails otherwise", () => {
+		const last = { result: diffWtDirty as DiffResult, viaRef: false };
+		expect(changedElementsView(last, toolError(refNotFound as Envelope)).kind).toBe("branchNotInRepo");
+		expect(changedElementsView(last, new Error("socket hang up")).kind).toBe("unavailable");
+		expect(changedElementsView(last, null)).toMatchObject({ kind: "count", count: 2 });
+	});
+
 	it("keeps the last count when a refetch fails (WORKTREE_CHANGED)", () => {
 		const view = changedElementsView({ result: diffWtDirty as DiffResult, viaRef: false }, new AisepToolError("WORKTREE_CHANGED", "", true));
 		expect(view).toMatchObject({ kind: "count", count: 2, dirty: true });

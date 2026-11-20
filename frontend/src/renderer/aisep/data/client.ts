@@ -250,11 +250,12 @@ export interface ModelElement {
  * on arch:approvalState: the server derives no state for some element types (Stakeholder), and they still belong here.
  */
 export const ELEMENTS_QUERY = `PREFIX aisep: <https://aisep.example/ont/aisep#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
 SELECT ?element ?type ?inModel ?prefLabel ?approvalState WHERE {
   ?element arch:inModel ?inModel ; a ?type ; skos:prefLabel ?prefLabel .
   FILTER(lang(?prefLabel) = "zh")
-  FILTER NOT EXISTS { ?element a aisep:ApprovalRecord }
-  FILTER NOT EXISTS { ?element a aisep:AgentActivity }
+  FILTER NOT EXISTS { ?element a/rdfs:subClassOf* aisep:ApprovalRecord }
+  FILTER NOT EXISTS { ?element a/rdfs:subClassOf* aisep:AgentActivity }
   OPTIONAL { ?element arch:approvalState ?approvalState }
 }`;
 
@@ -263,13 +264,25 @@ SELECT ?element ?type ?inModel ?prefLabel ?approvalState WHERE {
  * as Proposed), still without the governance kinds.
  */
 export const PENDING_QUERY = `PREFIX aisep: <https://aisep.example/ont/aisep#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
 SELECT ?element ?type ?inModel ?prefLabel ?approvalState WHERE {
   ?element arch:inModel ?inModel ; a ?type ; skos:prefLabel ?prefLabel ; arch:approvalState ?approvalState .
   FILTER(?approvalState = arch:Proposed)
   FILTER(lang(?prefLabel) = "zh")
-  FILTER NOT EXISTS { ?element a aisep:ApprovalRecord }
-  FILTER NOT EXISTS { ?element a aisep:AgentActivity }
+  FILTER NOT EXISTS { ?element a/rdfs:subClassOf* aisep:ApprovalRecord }
+  FILTER NOT EXISTS { ?element a/rdfs:subClassOf* aisep:AgentActivity }
 }`;
+
+/**
+ * "已在分支批准、待合并" (§2 row 3, Q2=A): run on a session branch (ref = branch), the elements whose state DERIVED
+ * there is Approved. The state comes from the approval records in that branch's content (P4), so a later Rejected on
+ * the branch wins over an earlier Approved.
+ */
+export const APPROVED_QUERY = `SELECT ?element WHERE { ?element arch:approvalState arch:Approved . }`;
+
+export function iriColumn(result: QueryResult, variable: string): Iri[] {
+	return asSelect(result).rows.flatMap((row) => (row[variable] ? [row[variable].value] : []));
+}
 
 /** The workbench only sends SELECT. */
 export function asSelect(result: QueryResult): SelectResult {

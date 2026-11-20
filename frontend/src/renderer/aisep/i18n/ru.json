@@ -77,5 +77,12 @@
 	"gate.gates.GateRequirements": "Требования",
 	"gate.gates.GateArchitecture": "Архитектура",
 	"gate.gates.GateDesign": "Проектирование",
-	"gate.gates.GateMerge": "Слияние"
+	"gate.gates.GateMerge": "Слияние",
+	"state.Proposed": "Предложено",
+	"state.Approved": "Утверждено",
+	"state.Rejected": "Отклонено",
+	"state.Superseded": "Заменено",
+	"state.none": "Нет статуса утверждения",
+	"section.gates.approvedOnBranch": "Утверждено в {{branch}}, ещё не слито",
+	"section.aiActivity.gateNeedsServer": "Странице шлюза нужен сервер моделей (VITE_AISEP_MCP_URL)."
 }

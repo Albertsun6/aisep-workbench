@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQueries, useQuery } from "@tanstack/react-query";
 import { useId, useState } from "react";
 import { Workflow } from "@/components/app-icons";
 import { Badge } from "@/components/ui/badge";
@@ -7,7 +7,17 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { PageTopbar, PageTopbarTitle } from "../components/PageTopbar";
 import { aoSessionSource, type AgentSessionBucket, type AgentSessionRow, type AgentSessionSource } from "./data/ao-sessions";
 import { branchChanges, changedElementsView } from "./data/changed-elements";
-import { ELEMENTS_QUERY, PENDING_QUERY, elementsFromRows, type AisepModelClient, type Iri, type ModelElement } from "./data/client";
+import {
+	APPROVED_QUERY,
+	ELEMENTS_QUERY,
+	PENDING_QUERY,
+	elementsFromRows,
+	iriColumn,
+	type AisepModelClient,
+	type ApprovalState,
+	type Iri,
+	type ModelElement,
+} from "./data/client";
 import { FixtureClient, fixtureClient } from "./data/fixture-client";
 import { McpModelClient, shouldRetryAisep } from "./data/mcp-client";
 import { useAisepT, type AisepMessageKey } from "./i18n";
@@ -52,6 +62,24 @@ export function AisepWorkbenchPage({
 		queryFn: async ({ signal }) => elementsFromRows(await client.query(PENDING_QUERY, {}, { signal })),
 		retry: shouldRetryAisep,
 	});
+	// §2 row 3 (Q2=A): approvals are committed on the session branch, so main still derives Proposed until the merge;
+	// each session branch is asked which elements its own records approve, so nobody approves them twice.
+	const agentSessions = useAgentSessions(sessions);
+	const branches = [...new Set(agentSessions.data?.flatMap((row) => row.branch ?? []) ?? [])].sort();
+	const approvedOnBranch = useQueries({
+		queries: branches.map((branch) => ({
+			queryKey: ["aisep", "approved-on-branch", branch],
+			queryFn: async ({ signal }: { signal: AbortSignal }) =>
+				iriColumn(await client.query(APPROVED_QUERY, { ref: branch }, { signal }), "element"),
+			refetchInterval: CHANGED_ELEMENTS_REFRESH_MS,
+			retry: shouldRetryAisep,
+		})),
+	});
+	const approvedBranches = new Map<Iri, string[]>();
+	approvedOnBranch.forEach((result, index) => {
+		// A branch the model repo does not have (REF_NOT_FOUND) simply marks nothing.
+		for (const iri of result.data ?? []) approvedBranches.set(iri, [...(approvedBranches.get(iri) ?? []), branches[index]]);
+	});
 
 	return (
 		<div className="flex min-h-0 flex-1 flex-col bg-background">
@@ -72,6 +100,7 @@ export function AisepWorkbenchPage({
 						items={elements.data?.elements}
 						truncated={elements.data?.truncated}
 						highlight={violationFocus}
+						meta={(item) => t(STATE_TEXT[item.approvalState ?? "none"])}
 						isLoading={elements.isLoading}
 						isError={elements.isError}
 						adornment={
@@ -103,10 +132,14 @@ export function AisepWorkbenchPage({
 						titleKey="section.gates.title"
 						items={pending.data?.elements}
 						truncated={pending.data?.truncated}
+						meta={(item) => {
+							const onBranches = approvedBranches.get(item.iri);
+							return onBranches ? t("section.gates.approvedOnBranch", { branch: onBranches.join(", ") }) : null;
+						}}
 						isLoading={pending.isLoading}
 						isError={pending.isError}
 					/>
-					<AiActivitySection source={sessions} client={client} />
+					<AiActivitySection source={sessions} client={client} gateLinks={!(client instanceof FixtureClient)} />
 				</div>
 			</div>
 		</div>
@@ -142,6 +175,7 @@ function ElementSection({
 	items,
 	truncated,
 	highlight,
+	meta,
 	isLoading,
 	isError,
 	adornment,
@@ -151,6 +185,8 @@ function ElementSection({
 	items: ModelElement[] | undefined;
 	truncated?: boolean;
 	highlight?: ReadonlySet<Iri>;
+	/** Shown after the name, e.g. the derived approval state. */
+	meta?: (item: ModelElement) => React.ReactNode;
 	isLoading: boolean;
 	isError: boolean;
 	adornment?: React.ReactNode;
@@ -181,6 +217,7 @@ function ElementSection({
 									title={item.iri}
 								>
 									{item.prefLabel}
+									{meta?.(item) ? <span className="ml-2 font-normal text-muted-foreground">{meta(item)}</span> : null}
 								</li>
 							);
 						})}
@@ -210,13 +247,27 @@ function orderAgentSessions(rows: readonly AgentSessionRow[]): AgentSessionRow[]
 	return [...rows].sort((a, b) => BUCKET_ORDER[a.bucket] - BUCKET_ORDER[b.bucket]);
 }
 
-function AiActivitySection({ source, client }: { source: AgentSessionSource; client: AisepModelClient }) {
-	const t = useAisepT();
-	const sessions = useQuery({
+/** One cache entry for the orchestrator sessions, shared by the AI activity area and the pending-gate marks. */
+function useAgentSessions(source: AgentSessionSource) {
+	return useQuery({
 		queryKey: ["aisep", "agent-sessions"],
 		queryFn: async () => orderAgentSessions(await source.list()),
 		refetchInterval: AGENT_SESSIONS_REFRESH_MS,
 	});
+}
+
+function AiActivitySection({
+	source,
+	client,
+	gateLinks,
+}: {
+	source: AgentSessionSource;
+	client: AisepModelClient;
+	/** False with the offline fixtures: a gate page needs the model server. */
+	gateLinks: boolean;
+}) {
+	const t = useAisepT();
+	const sessions = useAgentSessions(source);
 	return (
 		<Section titleKey="section.aiActivity.title">
 			{sessions.isLoading ? (
@@ -243,7 +294,9 @@ function AiActivitySection({ source, client }: { source: AgentSessionSource; cli
 								</TableCell>
 								<TableCell title={row.rawStatus}>{t(BUCKET_LABEL[row.bucket])}</TableCell>
 								<TableCell className="font-mono">
-									{row.branch ? (
+									{row.branch && !gateLinks ? (
+										<span title={t("section.aiActivity.gateNeedsServer")}>{row.branch}</span>
+									) : row.branch ? (
 										<a
 											href={gateHref(row.branch)}
 											title={t("section.aiActivity.openGate", { branch: row.branch })}
@@ -272,6 +325,14 @@ function AiActivitySection({ source, client }: { source: AgentSessionSource; cli
 		</Section>
 	);
 }
+
+const STATE_TEXT: Record<ApprovalState | "none", AisepMessageKey> = {
+	Proposed: "state.Proposed",
+	Approved: "state.Approved",
+	Rejected: "state.Rejected",
+	Superseded: "state.Superseded",
+	none: "state.none",
+};
 
 /** Worktree edits do not move the branch head, so there is no other invalidation signal (§8 step 4). */
 export const CHANGED_ELEMENTS_REFRESH_MS = 15_000;

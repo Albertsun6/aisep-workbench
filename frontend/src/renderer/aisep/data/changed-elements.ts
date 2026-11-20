@@ -31,8 +31,10 @@ export type ChangedElementsView =
 
 /** §5.8 error table, worktree-mode column; anything unknown is "unavailable". */
 export function changedElementsView(data: BranchChanges | undefined, error: unknown): ChangedElementsView {
-	// TanStack keeps the last data on a failed refetch (WORKTREE_CHANGED: "保留上次的数字").
-	if (data) {
+	// TanStack keeps the last data on a failed refetch. Only WORKTREE_CHANGED keeps showing it ("保留上次的数字");
+	// any other error (the branch was deleted, the merge base became ambiguous …) replaces the stale number.
+	const keepLast = error == null || (error instanceof AisepToolError && error.code === "WORKTREE_CHANGED");
+	if (data && keepLast) {
 		const { result, viaRef } = data;
 		if (!result.baseHasModels && !result.headHasModels) return { kind: "noModels" };
 		return {

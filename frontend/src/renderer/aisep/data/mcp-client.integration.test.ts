@@ -59,6 +59,16 @@ describe.skipIf(!AISEP_ROOT)("McpModelClient against a real AISEP MCP Server (HT
 		for (const e of elements) expect(e.inModel).toBe(M);
 	});
 
+	it("keeps elements the server derives no approval state for (aisep#29: Stakeholders), with no state", async (ctx) => {
+		const result = await client.query(ELEMENTS_QUERY);
+		const architect = elementsFromRows(result).elements.find((e) => e.iri === `${M}chiefArchitect`);
+		if (architect?.approvalState !== undefined) ctx.skip(); // this server still derives a state for Stakeholders
+		record("elements-query-no-state.json", result, base);
+		// With approvalState required in ELEMENTS_QUERY, the Stakeholder would vanish here.
+		expect(architect).toMatchObject({ prefLabel: "首席架构师" });
+		expect(architect?.approvalState).toBeUndefined();
+	});
+
 	it("lists only Proposed elements as pending, never the approval record or an Approved element", async () => {
 		const result = await client.query(PENDING_QUERY);
 		record("pending-query.json", result, base);

@@ -1,0 +1,33 @@
+{
+	"source": {
+		"repo": "/fixture/repo",
+		"ref": "feat/activity",
+		"commit": "c0d22f7d5c2860e9c4626b267f6c938f3448d22e"
+	},
+	"kind": "select",
+	"variables": [
+		"element"
+	],
+	"rows": [
+		{
+			"element": {
+				"type": "iri",
+				"value": "https://aisep.example/model/procurement/quoteApproval"
+			}
+		},
+		{
+			"element": {
+				"type": "iri",
+				"value": "https://aisep.example/model/procurement/quotationLine"
+			}
+		},
+		{
+			"element": {
+				"type": "iri",
+				"value": "https://aisep.example/model/procurement/quotation"
+			}
+		}
+	],
+	"truncated": false,
+	"findings": []
+}

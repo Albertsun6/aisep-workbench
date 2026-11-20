@@ -77,5 +77,12 @@
 	"gate.gates.GateRequirements": "요구사항",
 	"gate.gates.GateArchitecture": "아키텍처",
 	"gate.gates.GateDesign": "설계",
-	"gate.gates.GateMerge": "병합"
+	"gate.gates.GateMerge": "병합",
+	"state.Proposed": "제안됨",
+	"state.Approved": "승인됨",
+	"state.Rejected": "반려됨",
+	"state.Superseded": "대체됨",
+	"state.none": "승인 상태 없음",
+	"section.gates.approvedOnBranch": "{{branch}}에서 승인됨, 아직 병합 전",
+	"section.aiActivity.gateNeedsServer": "게이트 페이지에는 모델 서버(VITE_AISEP_MCP_URL)가 필요합니다."
 }

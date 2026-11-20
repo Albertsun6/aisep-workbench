@@ -123,7 +123,7 @@ describe("McpModelClient timeouts, cancellation and malformed results", () => {
 			init?.signal?.addEventListener("abort", () => reject(new DOMException("aborted", "AbortError")));
 		});
 
-	it("gives up after timeoutMs with a retryable McpProtocolError (status 0, timedOut)", async () => {
+	it("gives up after timeoutMs with a McpProtocolError (status 0, timedOut) that is not retried", async () => {
 		vi.useFakeTimers();
 		const pending = new McpModelClient(URL, hanging).gate({}, { timeoutMs: 1_000 }).catch((e: unknown) => e);
 		await vi.advanceTimersByTimeAsync(999);
@@ -135,7 +135,7 @@ describe("McpModelClient timeouts, cancellation and malformed results", () => {
 		const error = await pending;
 		expect(error).toBeInstanceOf(McpProtocolError);
 		expect(error).toMatchObject({ status: 0, timedOut: true });
-		expect(shouldRetryAisep(0, error)).toBe(true);
+		expect(shouldRetryAisep(0, error)).toBe(false);
 	});
 
 	it("passes the caller's cancellation through as an AbortError, not a protocol error", async () => {
@@ -191,8 +191,9 @@ describe("shouldRetryAisep (§7.1 retryable)", () => {
 		expect(shouldRetryAisep(0, tool("INVALID_ARGUMENT", false))).toBe(false);
 	});
 
-	it("retries no-response and 5xx protocol errors, never 4xx or JSON-RPC refusals", () => {
+	it("retries no-response and 5xx protocol errors, never a timeout, a 4xx or a JSON-RPC refusal", () => {
 		expect(shouldRetryAisep(0, new McpProtocolError("x", 0))).toBe(true);
+		expect(shouldRetryAisep(0, new McpProtocolError("x", 0, undefined, true))).toBe(false);
 		expect(shouldRetryAisep(0, new McpProtocolError("x", 502))).toBe(true);
 		expect(shouldRetryAisep(0, new McpProtocolError("x", 403))).toBe(false);
 		expect(shouldRetryAisep(0, new McpProtocolError("x", 200, -32602))).toBe(false);

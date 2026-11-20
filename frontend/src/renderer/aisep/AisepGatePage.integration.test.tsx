@@ -8,10 +8,12 @@ import userEvent from "@testing-library/user-event";
 import { existsSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { APPROVERS_QUERY, AisepGatePage } from "./AisepGatePage";
+import { APPROVERS_QUERY, AisepGatePage, NOT_APPROVABLE_QUERY } from "./AisepGatePage";
 import {
+	APPROVED_QUERY,
 	AisepToolError,
 	ELEMENTS_QUERY,
+	iriColumn,
 	PENDING_QUERY,
 	asSelect,
 	elementsFromRows,
@@ -56,7 +58,9 @@ describe.skipIf(!AISEP_ROOT)("AisepGatePage against a real AISEP MCP Server", ()
 		const wt = join(base, "wt-approve");
 		git(repo, "worktree", "add", "-q", "-b", BRANCH, wt);
 		appendModel(wt, "am4.ttl", businessObject("quotationLine", "报价行"));
-		commitAll(wt, "add quotationLine");
+		// A new Stakeholder is an "element" to the diff but can never be approved (R4-5): it must not be prefilled.
+		appendModel(wt, "governance.ttl", `\n:reviewer a arch:Stakeholder ;\n    arch:inModel <${M}> ;\n    skos:prefLabel "评审人"@zh .\n`);
+		commitAll(wt, "add quotationLine and a reviewer");
 		head = git(repo, "rev-parse", BRANCH);
 		server = await startServer(repo, "workbench", base);
 		live = new McpModelClient(server.url, nodeFetch);
@@ -75,6 +79,7 @@ describe.skipIf(!AISEP_ROOT)("AisepGatePage against a real AISEP MCP Server", ()
 			query: async (...args: Parameters<AisepModelClient["query"]>) => {
 				const result = await live.query(...args);
 				if (args[0] === APPROVERS_QUERY) record("gate-approvers.json", result, base);
+				if (args[0] === NOT_APPROVABLE_QUERY) record("gate-not-approvable.json", result, base);
 				return result;
 			},
 			recordApproval: async (...args: Parameters<AisepModelClient["recordApproval"]>) => {
@@ -108,6 +113,7 @@ describe.skipIf(!AISEP_ROOT)("AisepGatePage against a real AISEP MCP Server", ()
 		expect(within(row).getAllByRole("cell").map((c) => c.textContent)).toEqual([
 			en["gate.change.added"], en["gate.kind.element"], "报价行", "",
 		]);
+		expect(within(changes).getByText("评审人")).toBeInTheDocument();
 		expect(screen.getByText(new RegExp(`${head.slice(0, 7)}`))).toBeInTheDocument();
 		const check = screen.getByRole("region", { name: en["gate.check.title"] });
 		// A gate on a commit snapshot (§3.3) is the slow call: give it room on a loaded machine.
@@ -128,7 +134,9 @@ describe.skipIf(!AISEP_ROOT)("AisepGatePage against a real AISEP MCP Server", ()
 
 		expect(approvals).toEqual([
 			expect.objectContaining({
-				model: "procurement", gate: "GateArchitecture", decision: "Approved", approvedBy: `${M}chiefArchitect`,
+				// The first approver the server lists; both Stakeholders on the branch may approve.
+				model: "procurement", gate: "GateArchitecture", decision: "Approved",
+				approvedBy: expect.stringMatching(new RegExp(`^${M}(chiefArchitect|reviewer)$`)),
 				approves: [`${M}quotationLine`], branch: BRANCH, headCommit: head,
 			}),
 		]);
@@ -175,7 +183,8 @@ SELECT ?r WHERE { ?r a aisep:ApprovalRecord ; aisep:approves <${M}quotationLine>
 		const result = await live.recordApproval(
 			{
 				model: "procurement", gate: "GateArchitecture", decision: "Approved", approvedBy: `${M}chiefArchitect`,
-				approves: [`${M}quotationLine`], branch, headCommit: git(repo, "rev-parse", branch),
+				// quotation is Proposed on main: approving it here is what the pending gates mark as "approved on the branch".
+				approves: [`${M}quotationLine`, `${M}quotation`], branch, headCommit: git(repo, "rev-parse", branch),
 				activity: { agent: `${M}chiefArchitect`, sessionRef: "ao-session-1", startedAt: "2026-11-20T00:00:00Z" },
 			},
 			{ timeoutMs: 500_000 },
@@ -190,5 +199,13 @@ SELECT ?r WHERE { ?r a aisep:ApprovalRecord ; aisep:approves <${M}quotationLine>
 		// The approved element itself is still listed, now Approved on this branch.
 		const { elements } = elementsFromRows(await live.query(ELEMENTS_QUERY, { ref: branch }));
 		expect(elements.find((e) => e.iri === `${M}quotationLine`)?.approvalState).toBe("Approved");
+
+		// §2 row 3: the branch reports what its records approve; main still has quotation pending.
+		const approvedHere = await live.query(APPROVED_QUERY, { ref: branch });
+		record("approved-on-branch.json", approvedHere, base);
+		expect(iriColumn(approvedHere, "element")).toEqual(expect.arrayContaining([`${M}quotation`, `${M}quotationLine`]));
+		const pendingOnMain = elementsFromRows(await live.query(PENDING_QUERY)).elements.map((e) => e.iri);
+		expect(pendingOnMain).toContain(`${M}quotation`);
+		expect(iriColumn(await live.query(APPROVED_QUERY), "element")).not.toContain(`${M}quotation`);
 	}, 520_000);
 });

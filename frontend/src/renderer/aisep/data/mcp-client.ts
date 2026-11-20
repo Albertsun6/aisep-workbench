@@ -130,13 +130,18 @@ export async function callMcpTool(
 
 /**
  * TanStack Query `retry` for AISEP calls: a tool error is retried only when the server says it is retryable (§7.1:
- * LOCKED, CONFLICT, WORKTREE_CHANGED, QUERY_TIMEOUT …); a protocol error only when no response came back or the
- * server failed (5xx); a 4xx or JSON-RPC refusal, and anything thrown while reading the result, never.
+ * LOCKED, CONFLICT, WORKTREE_CHANGED, QUERY_TIMEOUT …); a protocol error only when no response came back (but not
+ * after a client timeout) or the server failed (5xx); a 4xx or JSON-RPC refusal, and anything thrown while reading
+ * the result, never.
  */
 export function shouldRetryAisep(failureCount: number, error: unknown): boolean {
 	if (failureCount >= 3) return false;
 	if (error instanceof AisepToolError) return error.retryable;
-	if (error instanceof McpProtocolError) return error.rpcCode === undefined && (error.status === 0 || error.status >= 500);
+	// A timeout is not retried: the call already waited its whole budget (minutes for a gate), and retrying would
+	// multiply that wait before the user sees an error.
+	if (error instanceof McpProtocolError) {
+		return !error.timedOut && error.rpcCode === undefined && (error.status === 0 || error.status >= 500);
+	}
 	return false;
 }
 

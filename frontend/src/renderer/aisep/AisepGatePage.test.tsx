@@ -5,9 +5,10 @@ import { act, cleanup, render, screen, waitFor, within } from "@testing-library/
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { appI18n } from "../i18n";
-import { APPROVERS_QUERY, AisepGatePage, approvalCandidates } from "./AisepGatePage";
+import { APPROVERS_QUERY, AisepGatePage, NOT_APPROVABLE_QUERY, approvalCandidates } from "./AisepGatePage";
 import {
 	AisepToolError,
+	iriColumn,
 	type AisepModelClient,
 	type ApprovalInput,
 	type ApprovalResult,
@@ -22,6 +23,7 @@ import gateApprovers from "./data/fixtures/gate-approvers.json";
 import gateCheck from "./data/fixtures/gate-check.json";
 import gateDiff from "./data/fixtures/gate-diff.json";
 import gateFail from "./data/fixtures/gate-fail.json";
+import gateNotApprovable from "./data/fixtures/gate-not-approvable.json";
 import { aisepCatalogs } from "./i18n";
 
 const en = aisepCatalogs.en;
@@ -35,7 +37,12 @@ function gateClient(overrides: Partial<AisepModelClient> = {}) {
 	const client = Object.assign(Object.create(fixtureClient) as AisepModelClient, {
 		diff: async (input: unknown) => (calls.diff.push(input), diff),
 		gate: async (target: unknown) => (calls.gate.push(target), gateCheck as GateResult),
-		query: async (sparql: string, target: unknown) => (calls.query.push([sparql, target]), gateApprovers as QueryResult),
+		query: async (sparql: string, target: unknown) => {
+			calls.query.push([sparql, target]);
+			if (sparql === APPROVERS_QUERY) return gateApprovers as QueryResult;
+			if (sparql === NOT_APPROVABLE_QUERY) return gateNotApprovable as QueryResult;
+			throw new Error(`unexpected query ${sparql}`);
+		},
 		recordApproval: async (input: ApprovalInput) => (calls.approve.push(input), gateApproval as ApprovalResult),
 		...overrides,
 	});
@@ -70,7 +77,10 @@ describe("AisepGatePage", () => {
 		expect(await within(check).findByText(en["gate.check.pass"])).toBeInTheDocument();
 		expect(calls.diff).toEqual([{ head: BRANCH, detail: "items" }]);
 		expect(calls.gate).toEqual([{ ref: head }]);
-		expect(calls.query).toEqual([[APPROVERS_QUERY, { ref: head }]]);
+		expect(calls.query).toEqual(
+			expect.arrayContaining([[APPROVERS_QUERY, { ref: head }], [NOT_APPROVABLE_QUERY, { ref: head }]]),
+		);
+		expect(calls.query).toHaveLength(2);
 	});
 
 	it("approves exactly the commit that was shown, with the prefilled elements and the first approver", async () => {
@@ -85,12 +95,37 @@ describe("AisepGatePage", () => {
 		);
 		expect(calls.approve).toEqual([
 			{
-				model: "procurement", gate: "GateArchitecture", decision: "Approved", approvedBy: `${M}chiefArchitect`,
+				model: "procurement", gate: "GateArchitecture", decision: "Approved", approvedBy: (gateApprovers as QueryResult & { kind: "select" }).rows[0].approver.value,
 				approves: [`${M}quotationLine`], branch: BRANCH, headCommit: head, expectedBaseCommit: diff.base.commit,
 			},
 		]);
 		// One decision per page visit: the buttons stay off after it is recorded.
 		expect(approve).toBeDisabled();
+	});
+
+	it("does not prefill a Stakeholder the branch added: it can never be approved (R4-5)", async () => {
+		renderGate(gateClient().client);
+		const changes = await screen.findByRole("region", { name: en["gate.diff.title"] });
+		expect(within(changes).getByText("评审人")).toBeInTheDocument();
+		const approval = screen.getByRole("region", { name: en["gate.approval.title"] });
+		expect(await within(approval).findByRole("checkbox", { name: "报价行" })).toBeInTheDocument();
+		expect(within(approval).queryByRole("checkbox", { name: "评审人" })).toBeNull();
+		expect(within(approval).getAllByRole("checkbox")).toHaveLength(1);
+	});
+
+	it("diffs the branch again on every visit (§2: once per page entry, never cached across visits)", async () => {
+		const { client, calls } = gateClient();
+		const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+		const page = (
+			<QueryClientProvider client={queryClient}>
+				<AisepGatePage branch={BRANCH} client={client} />
+			</QueryClientProvider>
+		);
+		const first = render(page);
+		await screen.findByRole("region", { name: en["gate.diff.title"] });
+		first.unmount();
+		render(page);
+		await waitFor(() => expect(calls.diff).toHaveLength(2));
 	});
 
 	it("cannot approve once every element is unchecked", async () => {
@@ -146,7 +181,10 @@ describe("approvalCandidates", () => {
 			{ ...(diff.items ?? [])[0], iri: `${M}rel`, kind: "relationship" as const },
 			{ ...(diff.items ?? [])[0], iri: "https://aisep.example/model/sales/x", files: { base: [], head: ["models/sales/am4.ttl"] } },
 		];
-		const byModel = approvalCandidates({ ...diff, items });
+		const notApprovable = new Set(iriColumn(gateNotApprovable as QueryResult, "element"));
+		expect(notApprovable.has(`${M}reviewer`)).toBe(true);
+		expect([...approvalCandidates({ ...diff, items }).get("procurement") ?? []].map((i) => i.iri)).toContain(`${M}reviewer`);
+		const byModel = approvalCandidates({ ...diff, items }, notApprovable);
 		expect([...byModel.keys()]).toEqual(["procurement", "sales"]);
 		expect(byModel.get("procurement")?.map((i) => i.iri)).toEqual([`${M}quotationLine`]);
 	});

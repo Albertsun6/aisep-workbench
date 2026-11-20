@@ -1,8 +1,8 @@
 {
 	"source": {
 		"repo": "/fixture/repo",
-		"ref": "3effc2c2766ac285f3acf40565d36be247fedef7",
-		"commit": "3effc2c2766ac285f3acf40565d36be247fedef7"
+		"ref": "52b598fce4ee65c5c4fbac4d22f9c03fe0d24fd6",
+		"commit": "52b598fce4ee65c5c4fbac4d22f9c03fe0d24fd6"
 	},
 	"kind": "select",
 	"variables": [
@@ -10,6 +10,17 @@
 		"prefLabel"
 	],
 	"rows": [
+		{
+			"approver": {
+				"type": "iri",
+				"value": "https://aisep.example/model/procurement/reviewer"
+			},
+			"prefLabel": {
+				"type": "literal",
+				"value": "评审人",
+				"lang": "zh"
+			}
+		},
 		{
 			"approver": {
 				"type": "iri",

@@ -1,12 +1,12 @@
 {
 	"approval": {
-		"iri": "https://aisep.example/model/procurement/approval-20261120162007-architecture-3effc2c",
-		"file": "models/procurement/governance/approval-20261120162007-architecture-3effc2c.ttl"
+		"iri": "https://aisep.example/model/procurement/approval-20261120184035-architecture-52b598f",
+		"file": "models/procurement/governance/approval-20261120184035-architecture-52b598f.ttl"
 	},
 	"activity": null,
-	"evidence": "3effc2c2766ac285f3acf40565d36be247fedef7",
-	"baseCommit": "8cee8db88e19de9cfca3c8f348b3d68707522e5b",
-	"commit": "49f9724e433cd72b8007bb11a743e365f337edf6",
+	"evidence": "52b598fce4ee65c5c4fbac4d22f9c03fe0d24fd6",
+	"baseCommit": "10314a373a7cb99dbfaf5ecf67a3f70476d1c612",
+	"commit": "923eeaed172db3a097ce122d5c01e0aa0b35a435",
 	"branch": "feat/approve",
 	"duplicate": false,
 	"gate": {
@@ -14,7 +14,7 @@
 		"summary": {
 			"violations": 0,
 			"warnings": 1,
-			"infos": 1,
+			"infos": 2,
 			"violationsByLayer": {
 				"L0": 0,
 				"build": 0,

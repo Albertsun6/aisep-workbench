@@ -12,6 +12,7 @@ import { modelClient } from "./AisepWorkbenchPage";
 import {
 	AisepToolError,
 	asSelect,
+	iriColumn,
 	type AisepModelClient,
 	type ApprovalInput,
 	type Change,
@@ -27,10 +28,23 @@ import { useAisepT, type AisepMessageKey } from "./i18n";
 
 /** §5.9 approvedBy: an existing arch:Stakeholder that is not an aisep:AIAgent (AI cannot approve). */
 export const APPROVERS_QUERY = `PREFIX aisep: <https://aisep.example/ont/aisep#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
 SELECT ?approver ?prefLabel WHERE {
-  ?approver a arch:Stakeholder ; skos:prefLabel ?prefLabel .
-  FILTER NOT EXISTS { ?approver a aisep:AIAgent }
+  ?approver a/rdfs:subClassOf* arch:Stakeholder ; skos:prefLabel ?prefLabel .
+  FILTER NOT EXISTS { ?approver a/rdfs:subClassOf* aisep:AIAgent }
   FILTER(lang(?prefLabel) = "zh")
+}`;
+
+/**
+ * §5.9 approves (R4-5): elements, models or ADRs, but never an approval record, an AI activity or a Stakeholder (nor
+ * their subclasses). The diff's kind already drops relationships, views and governance records; this catches the
+ * Stakeholders, which the diff counts as elements.
+ */
+export const NOT_APPROVABLE_QUERY = `PREFIX aisep: <https://aisep.example/ont/aisep#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+SELECT DISTINCT ?element WHERE {
+  VALUES ?excluded { arch:Stakeholder aisep:ApprovalRecord aisep:AgentActivity arch:QualifiedRelationship }
+  ?element arch:inModel ?model ; a/rdfs:subClassOf* ?excluded .
 }`;
 
 export interface Approver {
@@ -57,10 +71,10 @@ function modelSlug(file: string | undefined): string | undefined {
 }
 
 /** §5.9 approves: prefilled with the diff's added and modified elements, grouped by the model whose files hold them. */
-export function approvalCandidates(diff: DiffResult): Map<string, DiffItem[]> {
+export function approvalCandidates(diff: DiffResult, notApprovable: ReadonlySet<Iri> = new Set()): Map<string, DiffItem[]> {
 	const byModel = new Map<string, DiffItem[]>();
 	for (const item of diff.items ?? []) {
-		if (item.kind !== "element" || item.change === "removed") continue;
+		if (item.kind !== "element" || item.change === "removed" || notApprovable.has(item.iri)) continue;
 		const slug = modelSlug(item.files.head[0]);
 		if (!slug) continue;
 		byModel.set(slug, [...(byModel.get(slug) ?? []), item]);
@@ -119,8 +133,11 @@ export function AisepGatePage({ branch, client = modelClient }: { branch: string
 		queryKey: ["aisep", "gate", "diff", branch],
 		queryFn: ({ signal }) => client.diff({ head: branch, detail: "items" }, { signal }),
 		retry: shouldRetryAisep,
-		staleTime: Number.POSITIVE_INFINITY,
+		// §2 "进入页面一次": every visit diffs the branch head again; nothing refetches while the page is open, so the
+		// commit on screen stays the one being approved.
+		refetchOnMount: "always",
 		refetchOnWindowFocus: false,
+		refetchOnReconnect: false,
 	});
 	const head = diff.data?.head.kind === "ref" ? diff.data.head.commit : undefined;
 
@@ -274,7 +291,14 @@ function ApprovalSection({
 }) {
 	const t = useAisepT();
 	const queryClient = useQueryClient();
-	const candidates = approvalCandidates(diff);
+	const notApprovable = useQuery({
+		queryKey: ["aisep", "gate", "not-approvable", commit],
+		queryFn: async ({ signal }) => new Set(iriColumn(await client.query(NOT_APPROVABLE_QUERY, { ref: commit }, { signal }), "element")),
+		retry: shouldRetryAisep,
+		staleTime: Number.POSITIVE_INFINITY,
+		refetchOnWindowFocus: false,
+	});
+	const candidates = approvalCandidates(diff, notApprovable.data);
 	const models = [...candidates.keys()];
 	const gateCheck = useGateCheck(client, commit);
 	const approvers = useQuery({
@@ -284,7 +308,8 @@ function ApprovalSection({
 		staleTime: Number.POSITIVE_INFINITY,
 		refetchOnWindowFocus: false,
 	});
-	const [model, setModel] = useState(models[0]);
+	const [chosenModel, setModel] = useState<string>();
+	const model = chosenModel !== undefined && models.includes(chosenModel) ? chosenModel : models[0];
 	const [gate, setGate] = useState<GateId>("GateArchitecture");
 	const [approver, setApprover] = useState<Iri | undefined>();
 	const [unchecked, setUnchecked] = useState<ReadonlySet<Iri>>(new Set());
@@ -300,10 +325,22 @@ function ApprovalSection({
 				approvalInput(branch, diff, { model: model as string, gate, decision, approvedBy: approver as Iri, approves }),
 				{ timeoutMs: GATE_TIMEOUT_MS },
 			),
-		// Main-branch rows stay Proposed until merge (§2); only the branch's own reads change.
-		onSuccess: () => queryClient.invalidateQueries({ queryKey: ["aisep", "diff"] }),
+		// Main-branch rows stay Proposed until merge (§2); only the branch's own reads change: its changed-elements
+		// count and its "approved on the branch, not merged" marks in the pending gates.
+		onSuccess: () =>
+			Promise.all([
+				queryClient.invalidateQueries({ queryKey: ["aisep", "diff"] }),
+				queryClient.invalidateQueries({ queryKey: ["aisep", "approved-on-branch", branch] }),
+			]),
 	});
 
+	if (notApprovable.isLoading) {
+		return (
+			<GateSection titleKey="gate.approval.title">
+				<p role="status" className="text-xs text-muted-foreground">{t("section.loading")}</p>
+			</GateSection>
+		);
+	}
 	if (models.length === 0) {
 		return (
 			<GateSection titleKey="gate.approval.title">

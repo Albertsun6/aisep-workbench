@@ -5,13 +5,24 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { appI18n } from "../i18n";
 import { AGENT_SESSIONS_REFRESH_MS, AisepWorkbenchPage, CHANGED_ELEMENTS_REFRESH_MS, defaultModelClient, gateHref } from "./AisepWorkbenchPage";
 import type { AgentSessionRow, AgentSessionSource } from "./data/ao-sessions";
-import { AisepToolError, type AisepModelClient, type DiffInput, type DiffResult, type FindingsResult, type QueryResult } from "./data/client";
+import {
+	APPROVED_QUERY,
+	AisepToolError,
+	ELEMENTS_QUERY,
+	type AisepModelClient,
+	type DiffInput,
+	type DiffResult,
+	type FindingsResult,
+	type QueryResult,
+} from "./data/client";
 import { fixtureClient } from "./data/fixture-client";
 import diffNoModels from "./data/fixtures/diff-no-models.json";
 import diffRefFallback from "./data/fixtures/diff-ref-fallback.json";
 import diffWtClean from "./data/fixtures/diff-wt-clean.json";
 import diffWtDirty from "./data/fixtures/diff-wt-dirty.json";
 import diffWtIncomplete from "./data/fixtures/diff-wt-incomplete.json";
+import approvedOnBranch from "./data/fixtures/approved-on-branch.json";
+import elementsQueryNoState from "./data/fixtures/elements-query-no-state.json";
 import elementsQuery from "./data/fixtures/elements-query.json";
 import refNotFound from "./data/fixtures/error-ref-not-found.json";
 import worktreeNotFound from "./data/fixtures/error-worktree-not-found.json";
@@ -234,6 +245,18 @@ function diffingClient(overrides: Partial<AisepModelClient> = {}): { client: Ais
 	return { client, calls };
 }
 
+/** The same answers, but not a FixtureClient: the page treats it as a connected model server. */
+function liveLike(client: AisepModelClient): AisepModelClient {
+	return {
+		query: (...a) => client.query(...a),
+		gate: (...a) => client.gate(...a),
+		findings: (...a) => client.findings(...a),
+		impact: (...a) => client.impact(...a),
+		diff: (...a) => client.diff(...a),
+		recordApproval: (...a) => client.recordApproval(...a),
+	};
+}
+
 const branchRow = (branch: string): AgentSessionRow => ({
 	sessionRef: branch, agent: "Codex", task: `task ${branch}`, branch, bucket: "inProgress", rawStatus: "working",
 });
@@ -298,10 +321,74 @@ describe("AisepWorkbenchPage changed-elements column (§8 step 4)", () => {
 		}
 	});
 
-	it("links each branch to its gate page", async () => {
-		renderPage(diffingClient().client, fakeSessions([branchRow("feat/edit")]));
+	it("links each branch to its gate page when a model server is connected", async () => {
+		renderPage(liveLike(diffingClient().client), fakeSessions([branchRow("feat/edit")]));
 		expect(await screen.findByRole("link", { name: "feat/edit" })).toHaveAttribute("href", "#/aisep/gate/feat/edit");
 		expect(gateHref("feat/a b")).toBe("#/aisep/gate/feat/a%20b");
+	});
+});
+
+describe("AisepWorkbenchPage with the offline fixtures", () => {
+	it("does not link branches to a gate page that could only fail, and says why", async () => {
+		renderPage(fixtureClient, fakeSessions([branchRow("feat/edit")]));
+		const branch = await screen.findByText("feat/edit");
+		expect(screen.queryByRole("link", { name: "feat/edit" })).toBeNull();
+		expect(branch).toHaveAttribute("title", aisepCatalogs.en["section.aiActivity.gateNeedsServer"]);
+	});
+});
+
+describe("AisepWorkbenchPage approval states (§2, T31)", () => {
+	const en = aisepCatalogs.en;
+	const M = "https://aisep.example/model/procurement/";
+	const item = (local: string) =>
+		within(screen.getByRole("region", { name: en["section.architecture.title"] })).findByTitle(`${M}${local}`);
+
+	it("shows each element's derived approval state", async () => {
+		renderPage();
+		expect(await item("quoteApproval")).toHaveTextContent(`报价审批${en["state.Approved"]}`);
+		expect(await item("quotation")).toHaveTextContent(`报价单${en["state.Proposed"]}`);
+	});
+
+	it("keeps an element the server derives no state for, and says it has none instead of calling it Proposed", async () => {
+		renderPage(diffingClient({
+			query: (sparql) => Promise.resolve((sparql === ELEMENTS_QUERY ? elementsQueryNoState : fixtureClient.query(sparql)) as QueryResult),
+		}).client);
+		const architect = await item("chiefArchitect");
+		expect(architect).toHaveTextContent("首席架构师");
+		expect(architect).toHaveTextContent(en["state.none"]);
+		expect(architect).not.toHaveTextContent(en["state.Proposed"]);
+	});
+
+	it("ELEMENTS_QUERY never requires approvalState (only inside OPTIONAL)", () => {
+		const required = ELEMENTS_QUERY.replace(/OPTIONAL\s*\{[^}]*\}/g, "");
+		expect(ELEMENTS_QUERY).toMatch(/OPTIONAL\s*\{[^}]*arch:approvalState/);
+		expect(required).not.toMatch(/approvalState\s+\?approvalState/);
+	});
+
+	it("marks a pending element already approved on a session branch, and asks that branch, not main", async () => {
+		const calls: [string, unknown][] = [];
+		const { client } = diffingClient({
+			query: (sparql, target) => {
+				calls.push([sparql, target]);
+				if (sparql === APPROVED_QUERY) {
+					return target?.ref === "feat/activity"
+						? Promise.resolve(approvedOnBranch as QueryResult)
+						: Promise.reject(toolError(refNotFound as Envelope));
+				}
+				return fixtureClient.query(sparql);
+			},
+		});
+		renderPage(client, fakeSessions([branchRow("feat/activity"), branchRow("feat/elsewhere")]));
+		const gates = screen.getByRole("region", { name: en["section.gates.title"] });
+		const quotation = await within(gates).findByTitle(`${M}quotation`);
+		await vi.waitFor(() =>
+			expect(quotation).toHaveTextContent(en["section.gates.approvedOnBranch"].replace("{{branch}}", "feat/activity")),
+		);
+		const supplier = within(gates).getByTitle(`${M}supplier`);
+		expect(supplier.textContent).toBe("供应商");
+		expect(calls.filter(([q]) => q === APPROVED_QUERY).map(([, t]) => t)).toEqual(
+			expect.arrayContaining([{ ref: "feat/activity" }, { ref: "feat/elsewhere" }]),
+		);
 	});
 });
 

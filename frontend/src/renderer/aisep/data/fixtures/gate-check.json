@@ -3,7 +3,7 @@
 	"summary": {
 		"violations": 0,
 		"warnings": 1,
-		"infos": 1,
+		"infos": 2,
 		"violationsByLayer": {
 			"L0": 0,
 			"build": 0,
@@ -12,7 +12,7 @@
 			"L3": 0,
 			"L4": 0
 		},
-		"seconds": 61.99
+		"seconds": 28.23
 	},
 	"findings": [
 		{
@@ -30,11 +30,19 @@
 			"focus": "https://aisep.example/model/procurement/quotationLine",
 			"file": "models/procurement/am4.ttl",
 			"message": "procurement:quotationLine (报价行, am4:BusinessObject): isolated element — no relationship or link to another model member"
+		},
+		{
+			"severity": "Info",
+			"layer": "L4",
+			"rule": null,
+			"focus": "https://aisep.example/model/procurement/reviewer",
+			"file": "models/procurement/governance.ttl",
+			"message": "procurement:reviewer (评审人, arch:Stakeholder): isolated element — no relationship or link to another model member"
 		}
 	],
 	"source": {
 		"repo": "/fixture/repo",
-		"ref": "3effc2c2766ac285f3acf40565d36be247fedef7",
-		"commit": "3effc2c2766ac285f3acf40565d36be247fedef7"
+		"ref": "52b598fce4ee65c5c4fbac4d22f9c03fe0d24fd6",
+		"commit": "52b598fce4ee65c5c4fbac4d22f9c03fe0d24fd6"
 	}
 }
