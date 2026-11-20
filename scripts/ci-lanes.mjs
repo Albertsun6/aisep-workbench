@@ -21,12 +21,14 @@ export const FRONTEND_WORKFLOW_LANES = ['frontend', 'docs', 'boundary', 'cloud',
 const EVERY_LANE = /^(\.github\/(workflows|actions)\/|scripts\/ci-lanes\.mjs$)/;
 const ALL_VITEST = /^(frontend\/(package(-lock)?\.json|vite[^/]*\.ts|vitest[^/]*\.ts|tsconfig[^/]*\.json|src\/renderer\/test\/|scripts\/)|packages\/(product-ui|shared)\/)/;
 const FILE_LIMIT = 3000;
+// AISEP: aisep-main is this mirror's trunk (UPSTREAM.md), so PRs into it get lanes like PRs into main.
+const TRUNKS = new Set(['main', 'aisep-main']);
 
 export function pickLanes({ event, draft = false, base = 'main', fork = false, labels = [], files = [] }) {
-  if (event === 'pull_request' && !draft && base !== 'main' && fork) {
+  if (event === 'pull_request' && !draft && !TRUNKS.has(base) && fork) {
     throw new Error(`This fork PR targets ${base}. CI cannot re-run it when it moves to main, so ci-ok stays red: target main and push again.`);
   }
-  if (event === 'pull_request' && (draft || base !== 'main')) {
+  if (event === 'pull_request' && (draft || !TRUNKS.has(base))) {
     return { lanes: [], full: false, macos: false, vitest: '' };
   }
   const full = event !== 'pull_request' || labels.includes('ci:full');
