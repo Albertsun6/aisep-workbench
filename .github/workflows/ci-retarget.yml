@@ -10,7 +10,8 @@ permissions:
 
 jobs:
   rerun:
-    if: github.event.changes.base && github.base_ref == 'main' && !github.event.pull_request.head.repo.fork
+    # AISEP: aisep-main is this mirror's trunk (UPSTREAM.md); keep in sync with TRUNKS in scripts/ci-lanes.mjs.
+    if: github.event.changes.base && (github.base_ref == 'main' || github.base_ref == 'aisep-main') && !github.event.pull_request.head.repo.fork
     runs-on: ubuntu-latest
     timeout-minutes: 90
     steps:
