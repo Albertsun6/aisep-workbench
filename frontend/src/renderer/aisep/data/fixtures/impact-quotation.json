@@ -1,38 +1,371 @@
 {
-	"_source": "spec §9 depends mode on the am4 part of the procurement model; the spec reports 5 elements for this case",
-	"focus": "https://aisep.example/model/procurement/quotation",
+	"focus": {
+		"iri": "https://aisep.example/model/procurement/quotation",
+		"label": "报价单",
+		"types": [
+			"https://meta.linked.archi/archimate4/onto#BusinessObject"
+		]
+	},
 	"mode": "depends",
 	"depth": 3,
+	"invalidModel": null,
 	"items": [
 		{
-			"iri": "https://aisep.example/model/procurement/quoteApproval",
+			"iri": "https://aisep.example/model/procurement/quotationAggregate",
+			"label": "报价单聚合",
+			"types": [
+				"https://aisep.example/ont/ddd#Aggregate"
+			],
 			"depth": 1,
-			"via": "https://meta.linked.archi/archimate4/onto#Access",
-			"dependency": "Backward"
+			"related": false,
+			"path": [
+				{
+					"from": "https://aisep.example/model/procurement/quotation",
+					"relationship": "https://aisep.example/model/procurement/rel-quotationAggregate-realizes-quotation",
+					"via": "https://meta.linked.archi/archimate4/onto#Realization",
+					"direction": "backward",
+					"to": "https://aisep.example/model/procurement/quotationAggregate"
+				}
+			]
+		},
+		{
+			"iri": "https://aisep.example/model/procurement/quoteApproval",
+			"label": "报价审批",
+			"types": [
+				"https://meta.linked.archi/archimate4/onto#Process"
+			],
+			"depth": 1,
+			"related": false,
+			"path": [
+				{
+					"from": "https://aisep.example/model/procurement/quotation",
+					"relationship": "https://aisep.example/model/procurement/rel-quoteApproval-accesses-quotation",
+					"via": "https://meta.linked.archi/archimate4/onto#Access",
+					"direction": "backward",
+					"to": "https://aisep.example/model/procurement/quoteApproval"
+				}
+			]
 		},
 		{
 			"iri": "https://aisep.example/model/procurement/submitQuotation",
+			"label": "提交报价单",
+			"types": [
+				"https://meta.linked.archi/archimate4/onto#Process"
+			],
 			"depth": 1,
-			"via": "https://meta.linked.archi/archimate4/onto#Access",
-			"dependency": "Backward"
+			"related": false,
+			"path": [
+				{
+					"from": "https://aisep.example/model/procurement/quotation",
+					"relationship": "https://aisep.example/model/procurement/rel-submitQuotation-accesses-quotation",
+					"via": "https://meta.linked.archi/archimate4/onto#Access",
+					"direction": "backward",
+					"to": "https://aisep.example/model/procurement/submitQuotation"
+				}
+			]
 		},
 		{
-			"iri": "https://aisep.example/model/procurement/supplier",
+			"iri": "https://aisep.example/model/procurement/QuotationEntity",
+			"label": "报价单实体类",
+			"types": [
+				"https://meta.linked.archi/uml/onto#Class"
+			],
 			"depth": 2,
-			"via": "https://meta.linked.archi/archimate4/onto#Assignment",
-			"dependency": "Both"
+			"related": false,
+			"path": [
+				{
+					"from": "https://aisep.example/model/procurement/quotation",
+					"relationship": "https://aisep.example/model/procurement/rel-quotationAggregate-realizes-quotation",
+					"via": "https://meta.linked.archi/archimate4/onto#Realization",
+					"direction": "backward",
+					"to": "https://aisep.example/model/procurement/quotationAggregate"
+				},
+				{
+					"from": "https://aisep.example/model/procurement/quotationAggregate",
+					"relationship": "https://aisep.example/model/procurement/rel-QuotationEntity-refines-quotationAggregate",
+					"via": "https://meta.linked.archi/core#Refines",
+					"direction": "backward",
+					"to": "https://aisep.example/model/procurement/QuotationEntity"
+				}
+			]
+		},
+		{
+			"iri": "https://aisep.example/model/procurement/bpmnQuoteApproval",
+			"label": "报价审批流程",
+			"types": [
+				"https://meta.linked.archi/bpmn/onto#Process"
+			],
+			"depth": 2,
+			"related": false,
+			"path": [
+				{
+					"from": "https://aisep.example/model/procurement/quotation",
+					"relationship": "https://aisep.example/model/procurement/rel-quoteApproval-accesses-quotation",
+					"via": "https://meta.linked.archi/archimate4/onto#Access",
+					"direction": "backward",
+					"to": "https://aisep.example/model/procurement/quoteApproval"
+				},
+				{
+					"from": "https://aisep.example/model/procurement/quoteApproval",
+					"relationship": "https://aisep.example/model/procurement/rel-bpmnQuoteApproval-refines-quoteApproval",
+					"via": "https://meta.linked.archi/core#Refines",
+					"direction": "backward",
+					"to": "https://aisep.example/model/procurement/bpmnQuoteApproval"
+				}
+			]
 		},
 		{
 			"iri": "https://aisep.example/model/procurement/procurementManager",
+			"label": "采购经理",
+			"types": [
+				"https://meta.linked.archi/archimate4/onto#Role"
+			],
 			"depth": 2,
-			"via": "https://meta.linked.archi/archimate4/onto#Assignment",
-			"dependency": "Both"
+			"related": false,
+			"path": [
+				{
+					"from": "https://aisep.example/model/procurement/quotation",
+					"relationship": "https://aisep.example/model/procurement/rel-quoteApproval-accesses-quotation",
+					"via": "https://meta.linked.archi/archimate4/onto#Access",
+					"direction": "backward",
+					"to": "https://aisep.example/model/procurement/quoteApproval"
+				},
+				{
+					"from": "https://aisep.example/model/procurement/quoteApproval",
+					"relationship": "https://aisep.example/model/procurement/rel-procurementManager-assigned-quoteApproval",
+					"via": "https://meta.linked.archi/archimate4/onto#Assignment",
+					"direction": "backward",
+					"to": "https://aisep.example/model/procurement/procurementManager"
+				}
+			]
+		},
+		{
+			"iri": "https://aisep.example/model/procurement/procurementSubdomain",
+			"label": "采购",
+			"types": [
+				"https://aisep.example/ont/ddd#Subdomain"
+			],
+			"depth": 2,
+			"related": false,
+			"path": [
+				{
+					"from": "https://aisep.example/model/procurement/quotation",
+					"relationship": "https://aisep.example/model/procurement/rel-quoteApproval-accesses-quotation",
+					"via": "https://meta.linked.archi/archimate4/onto#Access",
+					"direction": "backward",
+					"to": "https://aisep.example/model/procurement/quoteApproval"
+				},
+				{
+					"from": "https://aisep.example/model/procurement/quoteApproval",
+					"relationship": "https://aisep.example/model/procurement/rel-quoteApproval-realizes-procurementSubdomain",
+					"via": "https://meta.linked.archi/archimate4/onto#Realization",
+					"direction": "forward",
+					"to": "https://aisep.example/model/procurement/procurementSubdomain"
+				}
+			]
+		},
+		{
+			"iri": "https://aisep.example/model/procurement/quotationBC",
+			"label": "报价上下文",
+			"types": [
+				"https://aisep.example/ont/ddd#BoundedContext"
+			],
+			"depth": 2,
+			"related": false,
+			"path": [
+				{
+					"from": "https://aisep.example/model/procurement/quotation",
+					"relationship": "https://aisep.example/model/procurement/rel-quotationAggregate-realizes-quotation",
+					"via": "https://meta.linked.archi/archimate4/onto#Realization",
+					"direction": "backward",
+					"to": "https://aisep.example/model/procurement/quotationAggregate"
+				},
+				{
+					"from": "https://aisep.example/model/procurement/quotationAggregate",
+					"relationship": "https://aisep.example/model/procurement/rel-quotationBC-owns-quotationAggregate",
+					"via": "https://aisep.example/ont/ddd#Ownership",
+					"direction": "backward",
+					"to": "https://aisep.example/model/procurement/quotationBC"
+				}
+			]
+		},
+		{
+			"iri": "https://aisep.example/model/procurement/quotationRoot",
+			"label": "报价单实体",
+			"types": [
+				"https://aisep.example/ont/ddd#Entity"
+			],
+			"depth": 2,
+			"related": false,
+			"path": [
+				{
+					"from": "https://aisep.example/model/procurement/quotation",
+					"relationship": "https://aisep.example/model/procurement/rel-quotationAggregate-realizes-quotation",
+					"via": "https://meta.linked.archi/archimate4/onto#Realization",
+					"direction": "backward",
+					"to": "https://aisep.example/model/procurement/quotationAggregate"
+				},
+				{
+					"from": "https://aisep.example/model/procurement/quotationAggregate",
+					"relationship": "https://aisep.example/model/procurement/rel-quotationAggregate-root-quotationRoot",
+					"via": "https://aisep.example/ont/ddd#RootContainment",
+					"direction": "forward",
+					"to": "https://aisep.example/model/procurement/quotationRoot"
+				}
+			]
 		},
 		{
 			"iri": "https://aisep.example/model/procurement/reqTwoLevelApproval",
+			"label": "单笔超过10万需二级审批",
+			"types": [
+				"https://meta.linked.archi/archimate4/onto#Requirement"
+			],
 			"depth": 2,
-			"via": "https://meta.linked.archi/archimate4/onto#Realization",
-			"dependency": "Both"
+			"related": false,
+			"path": [
+				{
+					"from": "https://aisep.example/model/procurement/quotation",
+					"relationship": "https://aisep.example/model/procurement/rel-quoteApproval-accesses-quotation",
+					"via": "https://meta.linked.archi/archimate4/onto#Access",
+					"direction": "backward",
+					"to": "https://aisep.example/model/procurement/quoteApproval"
+				},
+				{
+					"from": "https://aisep.example/model/procurement/quoteApproval",
+					"relationship": "https://aisep.example/model/procurement/rel-quoteApproval-realizes-reqTwoLevelApproval",
+					"via": "https://meta.linked.archi/archimate4/onto#Realization",
+					"direction": "forward",
+					"to": "https://aisep.example/model/procurement/reqTwoLevelApproval"
+				}
+			]
+		},
+		{
+			"iri": "https://aisep.example/model/procurement/supplier",
+			"label": "供应商",
+			"types": [
+				"https://meta.linked.archi/archimate4/onto#Role"
+			],
+			"depth": 2,
+			"related": false,
+			"path": [
+				{
+					"from": "https://aisep.example/model/procurement/quotation",
+					"relationship": "https://aisep.example/model/procurement/rel-quoteApproval-accesses-quotation",
+					"via": "https://meta.linked.archi/archimate4/onto#Access",
+					"direction": "backward",
+					"to": "https://aisep.example/model/procurement/quoteApproval"
+				},
+				{
+					"from": "https://aisep.example/model/procurement/quoteApproval",
+					"relationship": "https://aisep.example/model/procurement/rel-supplier-assigned-quoteApproval",
+					"via": "https://meta.linked.archi/archimate4/onto#Assignment",
+					"direction": "backward",
+					"to": "https://aisep.example/model/procurement/supplier"
+				}
+			]
+		},
+		{
+			"iri": "https://aisep.example/model/procurement/procurementSystem",
+			"label": "采购系统",
+			"types": [
+				"https://meta.linked.archi/archimate4/onto#ApplicationComponent"
+			],
+			"depth": 3,
+			"related": false,
+			"path": [
+				{
+					"from": "https://aisep.example/model/procurement/quotation",
+					"relationship": "https://aisep.example/model/procurement/rel-quotationAggregate-realizes-quotation",
+					"via": "https://meta.linked.archi/archimate4/onto#Realization",
+					"direction": "backward",
+					"to": "https://aisep.example/model/procurement/quotationAggregate"
+				},
+				{
+					"from": "https://aisep.example/model/procurement/quotationAggregate",
+					"relationship": "https://aisep.example/model/procurement/rel-quotationBC-owns-quotationAggregate",
+					"via": "https://aisep.example/ont/ddd#Ownership",
+					"direction": "backward",
+					"to": "https://aisep.example/model/procurement/quotationBC"
+				},
+				{
+					"from": "https://aisep.example/model/procurement/quotationBC",
+					"relationship": "https://aisep.example/model/procurement/rel-procurementSystem-composedOf-quotationBC",
+					"via": "https://meta.linked.archi/archimate4/onto#Composition",
+					"direction": "backward",
+					"to": "https://aisep.example/model/procurement/procurementSystem"
+				}
+			]
+		},
+		{
+			"iri": "https://aisep.example/model/procurement/quotationCode",
+			"label": "报价上下文代码",
+			"types": [
+				"https://aisep.example/ont/aisep#CodeLocation"
+			],
+			"depth": 3,
+			"related": false,
+			"path": [
+				{
+					"from": "https://aisep.example/model/procurement/quotation",
+					"relationship": "https://aisep.example/model/procurement/rel-quotationAggregate-realizes-quotation",
+					"via": "https://meta.linked.archi/archimate4/onto#Realization",
+					"direction": "backward",
+					"to": "https://aisep.example/model/procurement/quotationAggregate"
+				},
+				{
+					"from": "https://aisep.example/model/procurement/quotationAggregate",
+					"relationship": "https://aisep.example/model/procurement/rel-quotationBC-owns-quotationAggregate",
+					"via": "https://aisep.example/ont/ddd#Ownership",
+					"direction": "backward",
+					"to": "https://aisep.example/model/procurement/quotationBC"
+				},
+				{
+					"from": "https://aisep.example/model/procurement/quotationBC",
+					"relationship": "https://aisep.example/model/procurement/rel-quotationCode-implements-quotationBC",
+					"via": "https://aisep.example/ont/aisep#Implementation",
+					"direction": "backward",
+					"to": "https://aisep.example/model/procurement/quotationCode"
+				}
+			]
+		},
+		{
+			"iri": "https://aisep.example/model/procurement/quotationPackage",
+			"label": "报价服务发布包",
+			"types": [
+				"https://aisep.example/ont/aisep#Deployable"
+			],
+			"depth": 3,
+			"related": false,
+			"path": [
+				{
+					"from": "https://aisep.example/model/procurement/quotation",
+					"relationship": "https://aisep.example/model/procurement/rel-quotationAggregate-realizes-quotation",
+					"via": "https://meta.linked.archi/archimate4/onto#Realization",
+					"direction": "backward",
+					"to": "https://aisep.example/model/procurement/quotationAggregate"
+				},
+				{
+					"from": "https://aisep.example/model/procurement/quotationAggregate",
+					"relationship": "https://aisep.example/model/procurement/rel-quotationBC-owns-quotationAggregate",
+					"via": "https://aisep.example/ont/ddd#Ownership",
+					"direction": "backward",
+					"to": "https://aisep.example/model/procurement/quotationBC"
+				},
+				{
+					"from": "https://aisep.example/model/procurement/quotationBC",
+					"relationship": "https://aisep.example/model/procurement/rel-quotationPackage-realizes-quotationBC",
+					"via": "https://meta.linked.archi/archimate4/onto#Realization",
+					"direction": "backward",
+					"to": "https://aisep.example/model/procurement/quotationPackage"
+				}
+			]
 		}
-	]
+	],
+	"truncated": false,
+	"findings": [],
+	"source": {
+		"repo": "/fixture/repo",
+		"ref": null,
+		"commit": null
+	}
 }

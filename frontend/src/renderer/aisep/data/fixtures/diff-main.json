@@ -1,0 +1,56 @@
+{
+	"base": {
+		"ref": null,
+		"commit": "39fd95611a0c658a7d5409d38c48d095a3ca9ef7",
+		"viaMergeBase": true,
+		"mainRef": "refs/heads/main"
+	},
+	"head": {
+		"kind": "ref",
+		"ref": "main",
+		"commit": "39fd95611a0c658a7d5409d38c48d095a3ca9ef7"
+	},
+	"incomplete": false,
+	"failedFiles": [],
+	"indeterminate": [],
+	"counts": {
+		"element": {
+			"added": 0,
+			"modified": 0,
+			"removed": 0
+		},
+		"relationship": {
+			"added": 0,
+			"modified": 0,
+			"removed": 0
+		},
+		"view": {
+			"added": 0,
+			"modified": 0,
+			"removed": 0
+		},
+		"governance": {
+			"added": 0,
+			"modified": 0,
+			"removed": 0
+		},
+		"schema": {
+			"added": 0,
+			"modified": 0,
+			"removed": 0
+		},
+		"other": {
+			"added": 0,
+			"modified": 0,
+			"removed": 0
+		}
+	},
+	"changedElementCount": 0,
+	"touchedElementCount": 0,
+	"items": [],
+	"touchedElements": [],
+	"moves": [],
+	"truncated": false,
+	"baseHasModels": true,
+	"headHasModels": true
+}

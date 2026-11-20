@@ -5,12 +5,20 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { PageTopbar, PageTopbarTitle } from "../components/PageTopbar";
 import { aoSessionSource, type AgentSessionBucket, type AgentSessionRow, type AgentSessionSource } from "./data/ao-sessions";
 import { ELEMENTS_QUERY, elementsFromRows, type AisepModelClient, type ModelElement } from "./data/client";
-import { fixtureClient } from "./data/fixture-client";
+import { FixtureClient, fixtureClient } from "./data/fixture-client";
+import { McpModelClient } from "./data/mcp-client";
 import { useAisepT, type AisepMessageKey } from "./i18n";
+
+/** §8 step 3: the AISEP MCP Server when its URL is configured (e.g. http://127.0.0.1:8765/mcp), else offline fixtures. */
+export function defaultModelClient(url: string | undefined = import.meta.env.VITE_AISEP_MCP_URL): AisepModelClient {
+	return url ? new McpModelClient(url) : fixtureClient;
+}
+
+const modelClient = defaultModelClient();
 
 /** Placeholder workbench: three regions; "AI 进行中" reads live orchestrator sessions (ADR-013). */
 export function AisepWorkbenchPage({
-	client = fixtureClient,
+	client = modelClient,
 	sessions = aoSessionSource,
 }: {
 	client?: AisepModelClient;
@@ -34,7 +42,9 @@ export function AisepWorkbenchPage({
 			/>
 			<div className="min-h-0 flex-1 overflow-y-auto">
 				<div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-6 pt-3 pb-6">
-					<p className="text-xs text-muted-foreground">{t("page.fixtureNotice")}</p>
+					{client instanceof FixtureClient ? (
+						<p className="text-xs text-muted-foreground">{t("page.fixtureNotice")}</p>
+					) : null}
 					<ElementSection
 						titleKey="section.architecture.title"
 						items={elements.data}
