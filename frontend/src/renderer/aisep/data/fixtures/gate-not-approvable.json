@@ -1,8 +1,8 @@
 {
 	"source": {
 		"repo": "/fixture/repo",
-		"ref": "52b598fce4ee65c5c4fbac4d22f9c03fe0d24fd6",
-		"commit": "52b598fce4ee65c5c4fbac4d22f9c03fe0d24fd6"
+		"ref": "3434e312016687d16fc79f5fc3a9904ca5fb9296",
+		"commit": "3434e312016687d16fc79f5fc3a9904ca5fb9296"
 	},
 	"kind": "select",
 	"variables": [

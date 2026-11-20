@@ -1,6 +1,6 @@
 // End to end against a REAL AISEP MCP Server (§8 step 5): the gate page on a temp repo's branch, approve in the UI,
-// then find the approval record on the branch with model_query. Needs AISEP_ROOT (see data/live-server.ts); the
-// approval part also needs a server with governance_record_approval (aisep slice S5) and is skipped without one.
+// then find the approval record on the branch with model_query. Needs AISEP_ROOT (see data/live-server.ts) at an
+// aisep with governance_record_approval (slice S5, aisep#24, on main since bbc287a); without it the approval cases fail.
 // AISEP_RECORD_FIXTURES=1 records the page's answers into data/fixtures/gate-*.json for AisepGatePage.test.tsx.
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
@@ -33,7 +33,7 @@ import {
 	startServer,
 	type LiveServer,
 } from "./data/live-server";
-import { callMcpTool, McpModelClient, McpProtocolError } from "./data/mcp-client";
+import { McpModelClient } from "./data/mcp-client";
 import { aisepCatalogs } from "./i18n";
 
 const en = aisepCatalogs.en;
@@ -120,10 +120,7 @@ describe.skipIf(!AISEP_ROOT)("AisepGatePage against a real AISEP MCP Server", ()
 		expect(await within(check).findByText(en["gate.check.pass"], {}, { timeout: 400_000 })).toBeInTheDocument();
 	}, 420_000);
 
-	it("records an approval from the page, and the record is then found on the branch", async (ctx) => {
-		const probe = await callMcpTool(server.url, "governance_record_approval", {}).catch((e: unknown) => e);
-		if (probe instanceof McpProtocolError && probe.rpcCode === -32602) ctx.skip(); // server without slice S5
-
+	it("records an approval from the page, and the record is then found on the branch", async () => {
 		renderGate();
 		const approve = await screen.findByRole("button", { name: en["gate.approval.approve"] }, { timeout: 60_000 });
 		await waitFor(() => expect(approve).toBeEnabled(), { timeout: 30_000 });
@@ -171,10 +168,7 @@ SELECT ?r WHERE { ?r a aisep:ApprovalRecord ; aisep:approves <${M}quotationLine>
 		expect(code).toBe("STALE_HEAD");
 	}, 520_000);
 
-	it("T31: an approval that records an AI activity adds it to neither the element list nor the pending gates", async (ctx) => {
-		const probe = await callMcpTool(server.url, "governance_record_approval", {}).catch((e: unknown) => e);
-		if (probe instanceof McpProtocolError && probe.rpcCode === -32602) ctx.skip(); // server without slice S5
-
+	it("T31: an approval that records an AI activity adds it to neither the element list nor the pending gates", async () => {
 		const branch = "feat/activity";
 		const wt = join(base, "wt-activity");
 		git(repo, "worktree", "add", "-q", "-b", branch, wt);

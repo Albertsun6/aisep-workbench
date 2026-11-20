@@ -3,14 +3,14 @@
 	"message": "分支在 headCommit 之后有非批准提交，请刷新差异后再批",
 	"retryable": false,
 	"details": {
-		"tip": "155993b112272ae6c4f57b365486df9047397c9e",
-		"offendingCommit": "155993b112272ae6c4f57b365486df9047397c9e",
+		"tip": "411909c18a3d0f2153accd2b2e9c55a9dc0c8918",
+		"offendingCommit": "411909c18a3d0f2153accd2b2e9c55a9dc0c8918",
 		"reason": "not-approval-commit",
 		"problems": [
 			{
 				"reason": "not-approval-commit",
-				"message": "155993b 不是批准提交：(b) M 100644 models/procurement/am4.ttl：须是新增的 100644 文件 models/<slug>/governance/<名>.ttl",
-				"offendingCommit": "155993b112272ae6c4f57b365486df9047397c9e"
+				"message": "411909c 不是批准提交：(b) M 100644 models/procurement/am4.ttl：须是新增的 100644 文件 models/<slug>/governance/<名>.ttl",
+				"offendingCommit": "411909c18a3d0f2153accd2b2e9c55a9dc0c8918"
 			}
 		]
 	}

@@ -2,7 +2,7 @@
 	"source": {
 		"repo": "/fixture/repo",
 		"ref": "feat/activity",
-		"commit": "c0d22f7d5c2860e9c4626b267f6c938f3448d22e"
+		"commit": "7abe3ab83d1cc0923ccc0b05d5e89d0337a9ae20"
 	},
 	"kind": "select",
 	"variables": [
