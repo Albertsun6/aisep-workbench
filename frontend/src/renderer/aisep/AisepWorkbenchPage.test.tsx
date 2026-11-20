@@ -2,10 +2,11 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, cleanup, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { appI18n } from "../i18n";
-import { AGENT_SESSIONS_REFRESH_MS, AisepWorkbenchPage } from "./AisepWorkbenchPage";
+import { AGENT_SESSIONS_REFRESH_MS, AisepWorkbenchPage, defaultModelClient } from "./AisepWorkbenchPage";
 import type { AgentSessionRow, AgentSessionSource } from "./data/ao-sessions";
 import type { AisepModelClient } from "./data/client";
 import { fixtureClient } from "./data/fixture-client";
+import { McpModelClient } from "./data/mcp-client";
 import { aisepCatalogs } from "./i18n";
 
 const fakeSessions = (rows: AgentSessionRow[]): AgentSessionSource => ({ list: () => Promise.resolve(rows) });
@@ -39,13 +40,15 @@ describe("AisepWorkbenchPage", () => {
 		expect(screen.getByRole("heading", { level: 1, name: en["page.title"] })).toBeInTheDocument();
 
 		const architecture = screen.getByRole("region", { name: en["section.architecture.title"] });
-		expect(await within(architecture).findByText("Total: 8")).toBeInTheDocument();
-		expect(within(architecture).getAllByRole("listitem")).toHaveLength(8);
+		expect(await within(architecture).findByText("Total: 26")).toBeInTheDocument();
+		expect(within(architecture).getAllByRole("listitem")).toHaveLength(26);
 
 		const gates = screen.getByRole("region", { name: en["section.gates.title"] });
-		expect(within(gates).getByText("Total: 2")).toBeInTheDocument();
-		expect(within(gates).getByText("报价审批")).toBeInTheDocument();
+		expect(within(gates).getByText("Total: 25")).toBeInTheDocument();
 		expect(within(gates).getByText("单笔超过10万需二级审批")).toBeInTheDocument();
+		// Approved, so not pending; the approval record itself has no approvalState and is not an element row at all.
+		expect(within(gates).queryByText("报价审批")).toBeNull();
+		expect(within(architecture).getByText("报价审批")).toBeInTheDocument();
 
 		const ai = screen.getByRole("region", { name: en["section.aiActivity.title"] });
 		expect(await within(ai).findByText(en["section.aiActivity.empty"])).toBeInTheDocument();
@@ -62,7 +65,23 @@ describe("AisepWorkbenchPage", () => {
 		renderPage();
 		await act(() => appI18n.changeLanguage("zh-CN"));
 		expect(screen.getByRole("heading", { level: 1, name: "AISEP 工作台" })).toBeInTheDocument();
-		expect(await screen.findByText("共 8 项")).toBeInTheDocument();
+		expect(await screen.findByText("共 26 项")).toBeInTheDocument();
+	});
+
+	it("uses the MCP server when its URL is configured, else the offline fixtures", () => {
+		const client = defaultModelClient("http://127.0.0.1:8765/mcp");
+		expect(client).toBeInstanceOf(McpModelClient);
+		expect((client as McpModelClient).endpoint).toBe("http://127.0.0.1:8765/mcp");
+		expect(defaultModelClient(undefined)).toBe(fixtureClient);
+		expect(defaultModelClient("")).toBe(fixtureClient);
+	});
+
+	it("shows the placeholder-data notice only for the fixture client", async () => {
+		const live = new McpModelClient("http://127.0.0.1:1/mcp", () => Promise.resolve(new Response(JSON.stringify({ jsonrpc: "2.0", id: 1, result: { structuredContent: { kind: "select", variables: [], rows: [], truncated: false } } }))));
+		renderPage(live);
+		const architecture = screen.getByRole("region", { name: aisepCatalogs.en["section.architecture.title"] });
+		expect(await within(architecture).findByText(aisepCatalogs.en["section.empty"])).toBeInTheDocument();
+		expect(screen.queryByText(aisepCatalogs.en["page.fixtureNotice"])).toBeNull();
 	});
 
 	it("shows an error state when the client fails", async () => {

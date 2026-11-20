@@ -1,0 +1,33 @@
+{
+	"partial": true,
+	"summary": {
+		"violations": 0,
+		"warnings": 0,
+		"infos": 0,
+		"violationsByLayer": {
+			"L0": 0,
+			"build": 0,
+			"L1": 0,
+			"L2": 0,
+			"L3": 0,
+			"L4": 0
+		},
+		"seconds": 0.08
+	},
+	"findings": [],
+	"source": {
+		"repo": "/fixture/repo",
+		"ref": null,
+		"commit": null
+	},
+	"openViolations": {
+		"count": 0,
+		"byLayer": {
+			"L0": 0,
+			"build": 0,
+			"L1": 0,
+			"L2": 0
+		},
+		"items": []
+	}
+}
