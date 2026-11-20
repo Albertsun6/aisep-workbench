@@ -84,5 +84,7 @@
 	"state.Superseded": "Ersetzt",
 	"state.none": "Kein Freigabestatus",
 	"section.gates.approvedOnBranch": "Auf {{branch}} freigegeben, noch nicht gemergt",
-	"section.aiActivity.gateNeedsServer": "Die Gate-Seite braucht den Modellserver (VITE_AISEP_MCP_URL)."
+	"section.aiActivity.gateNeedsServer": "Die Gate-Seite braucht den Modellserver (VITE_AISEP_MCP_URL).",
+	"section.gates.branchMarksUnknown": "Freigaben auf {{branches}} konnten nicht gelesen werden: Dort bereits freigegebene Elemente sind womöglich nicht markiert.",
+	"gate.approval.notApprovableFailed": "Es ließ sich nicht prüfen, welche Elemente freigegeben werden können, daher wird nichts vorausgefüllt: {{message}}"
 }

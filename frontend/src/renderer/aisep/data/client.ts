@@ -280,8 +280,17 @@ SELECT ?element ?type ?inModel ?prefLabel ?approvalState WHERE {
  */
 export const APPROVED_QUERY = `SELECT ?element WHERE { ?element arch:approvalState arch:Approved . }`;
 
+/**
+ * One IRI column of a SELECT whose answer must be complete (a set the caller acts on: approved elements, elements that
+ * cannot be approved). A result the server cut off at its row limit (§5.6) throws instead of passing a partial set off
+ * as the whole one.
+ */
 export function iriColumn(result: QueryResult, variable: string): Iri[] {
-	return asSelect(result).rows.flatMap((row) => (row[variable] ? [row[variable].value] : []));
+	const select = asSelect(result);
+	if (select.truncated) {
+		throw new AisepToolError("RESULT_TRUNCATED", `the server truncated the result at ${select.rows.length} rows`, false);
+	}
+	return select.rows.flatMap((row) => (row[variable] ? [row[variable].value] : []));
 }
 
 /** The workbench only sends SELECT. */

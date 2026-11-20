@@ -8,6 +8,7 @@ import { PageTopbar, PageTopbarTitle } from "../components/PageTopbar";
 import { aoSessionSource, type AgentSessionBucket, type AgentSessionRow, type AgentSessionSource } from "./data/ao-sessions";
 import { branchChanges, changedElementsView } from "./data/changed-elements";
 import {
+	AisepToolError,
 	APPROVED_QUERY,
 	ELEMENTS_QUERY,
 	PENDING_QUERY,
@@ -76,8 +77,14 @@ export function AisepWorkbenchPage({
 		})),
 	});
 	const approvedBranches = new Map<Iri, string[]>();
+	const unknownBranches: string[] = [];
 	approvedOnBranch.forEach((result, index) => {
-		// A branch the model repo does not have (REF_NOT_FOUND) simply marks nothing.
+		// A branch the model repo does not have (REF_NOT_FOUND) has no approvals to mark. Any other failure (server
+		// down, a truncated answer …) means we do not know, and must say so rather than show "not approved".
+		if (result.isError && !(result.error instanceof AisepToolError && result.error.code === "REF_NOT_FOUND")) {
+			unknownBranches.push(branches[index]);
+			return;
+		}
 		for (const iri of result.data ?? []) approvedBranches.set(iri, [...(approvedBranches.get(iri) ?? []), branches[index]]);
 	});
 
@@ -138,7 +145,13 @@ export function AisepWorkbenchPage({
 						}}
 						isLoading={pending.isLoading}
 						isError={pending.isError}
-					/>
+					>
+						{unknownBranches.length ? (
+							<p role="alert" className="text-caption text-warning">
+								{t("section.gates.branchMarksUnknown", { branches: unknownBranches.join(", ") })}
+							</p>
+						) : null}
+					</ElementSection>
 					<AiActivitySection source={sessions} client={client} gateLinks={!(client instanceof FixtureClient)} />
 				</div>
 			</div>

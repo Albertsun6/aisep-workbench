@@ -128,6 +128,25 @@ describe("AisepGatePage", () => {
 		await waitFor(() => expect(calls.diff).toHaveLength(2));
 	});
 
+	it.each([
+		["fails", () => Promise.reject(new Error("socket hang up"))],
+		["is truncated", () => Promise.resolve({ ...(gateNotApprovable as QueryResult), truncated: true } as QueryResult)],
+	])("prefills nothing when the not-approvable query %s (a Stakeholder would slip in)", async (_, answer) => {
+		const { client } = gateClient({
+			query: async (sparql: string) => {
+				if (sparql === NOT_APPROVABLE_QUERY) return answer();
+				return gateApprovers as QueryResult;
+			},
+		});
+		renderGate(client);
+		const approval = await screen.findByRole("region", { name: en["gate.approval.title"] });
+		expect(await within(approval).findByRole("alert")).toHaveTextContent(
+			en["gate.approval.notApprovableFailed"].split("{{message}}")[0],
+		);
+		expect(within(approval).queryByRole("checkbox")).toBeNull();
+		expect(within(approval).queryByRole("button", { name: en["gate.approval.approve"] })).toBeNull();
+	});
+
 	it("cannot approve once every element is unchecked", async () => {
 		renderGate(gateClient().client);
 		const approve = await screen.findByRole("button", { name: en["gate.approval.approve"] });
@@ -183,7 +202,7 @@ describe("approvalCandidates", () => {
 		];
 		const notApprovable = new Set(iriColumn(gateNotApprovable as QueryResult, "element"));
 		expect(notApprovable.has(`${M}reviewer`)).toBe(true);
-		expect([...approvalCandidates({ ...diff, items }).get("procurement") ?? []].map((i) => i.iri)).toContain(`${M}reviewer`);
+		expect([...approvalCandidates({ ...diff, items }, new Set()).get("procurement") ?? []].map((i) => i.iri)).toContain(`${M}reviewer`);
 		const byModel = approvalCandidates({ ...diff, items }, notApprovable);
 		expect([...byModel.keys()]).toEqual(["procurement", "sales"]);
 		expect(byModel.get("procurement")?.map((i) => i.iri)).toEqual([`${M}quotationLine`]);

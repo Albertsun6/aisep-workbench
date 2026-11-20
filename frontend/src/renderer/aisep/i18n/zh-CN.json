@@ -84,5 +84,7 @@
 	"state.Superseded": "已取代",
 	"state.none": "无批准状态",
 	"section.gates.approvedOnBranch": "已在 {{branch}} 批准、待合并",
-	"section.aiActivity.gateNeedsServer": "关口页需要连接模型服务（VITE_AISEP_MCP_URL）。"
+	"section.aiActivity.gateNeedsServer": "关口页需要连接模型服务（VITE_AISEP_MCP_URL）。",
+	"section.gates.branchMarksUnknown": "读取不到 {{branches}} 上的批准记录：在这些分支上已批准的元素可能没有标出。",
+	"gate.approval.notApprovableFailed": "无法确认哪些元素可以批准，因此不预填：{{message}}"
 }

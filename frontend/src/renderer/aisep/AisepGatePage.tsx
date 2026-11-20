@@ -71,7 +71,7 @@ function modelSlug(file: string | undefined): string | undefined {
 }
 
 /** §5.9 approves: prefilled with the diff's added and modified elements, grouped by the model whose files hold them. */
-export function approvalCandidates(diff: DiffResult, notApprovable: ReadonlySet<Iri> = new Set()): Map<string, DiffItem[]> {
+export function approvalCandidates(diff: DiffResult, notApprovable: ReadonlySet<Iri>): Map<string, DiffItem[]> {
 	const byModel = new Map<string, DiffItem[]>();
 	for (const item of diff.items ?? []) {
 		if (item.kind !== "element" || item.change === "removed" || notApprovable.has(item.iri)) continue;
@@ -298,7 +298,8 @@ function ApprovalSection({
 		staleTime: Number.POSITIVE_INFINITY,
 		refetchOnWindowFocus: false,
 	});
-	const candidates = approvalCandidates(diff, notApprovable.data);
+	// Without the exclusion set there is no safe prefill (a Stakeholder would slip in): the form waits for it.
+	const candidates = approvalCandidates(diff, notApprovable.data ?? new Set());
 	const models = [...candidates.keys()];
 	const gateCheck = useGateCheck(client, commit);
 	const approvers = useQuery({
@@ -334,6 +335,15 @@ function ApprovalSection({
 			]),
 	});
 
+	if (notApprovable.isError) {
+		return (
+			<GateSection titleKey="gate.approval.title">
+				<p role="alert" className="text-xs text-destructive">
+					{t("gate.approval.notApprovableFailed", { message: errorMessage(notApprovable.error) })}
+				</p>
+			</GateSection>
+		);
+	}
 	if (notApprovable.isLoading) {
 		return (
 			<GateSection titleKey="gate.approval.title">
