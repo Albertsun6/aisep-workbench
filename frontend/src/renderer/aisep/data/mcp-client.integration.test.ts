@@ -62,8 +62,7 @@ describe.skipIf(!AISEP_ROOT)("McpModelClient against a real AISEP MCP Server (HT
 	it("keeps elements the server derives no approval state for (aisep#29: Stakeholders), with no state", async (ctx) => {
 		const result = await client.query(ELEMENTS_QUERY);
 		const architect = elementsFromRows(result).elements.find((e) => e.iri === `${M}chiefArchitect`);
-		if (architect?.approvalState !== undefined) ctx.skip(); // this server still derives a state for Stakeholders
-		record("elements-query-no-state.json", result, base);
+		if (architect?.approvalState !== undefined) ctx.skip(); // a server before aisep#29 still derives one
 		// With approvalState required in ELEMENTS_QUERY, the Stakeholder would vanish here.
 		expect(architect).toMatchObject({ prefLabel: "首席架构师" });
 		expect(architect?.approvalState).toBeUndefined();

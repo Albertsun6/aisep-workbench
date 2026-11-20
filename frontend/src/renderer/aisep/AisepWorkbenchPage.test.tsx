@@ -22,7 +22,6 @@ import diffWtClean from "./data/fixtures/diff-wt-clean.json";
 import diffWtDirty from "./data/fixtures/diff-wt-dirty.json";
 import diffWtIncomplete from "./data/fixtures/diff-wt-incomplete.json";
 import approvedOnBranch from "./data/fixtures/approved-on-branch.json";
-import elementsQueryNoState from "./data/fixtures/elements-query-no-state.json";
 import elementsQuery from "./data/fixtures/elements-query.json";
 import refNotFound from "./data/fixtures/error-ref-not-found.json";
 import worktreeNotFound from "./data/fixtures/error-worktree-not-found.json";
@@ -65,7 +64,9 @@ describe("AisepWorkbenchPage", () => {
 		expect(within(architecture).getAllByRole("listitem")).toHaveLength(26);
 
 		const gates = screen.getByRole("region", { name: en["section.gates.title"] });
-		expect(within(gates).getByText("Total: 25")).toBeInTheDocument();
+		// 26 elements, minus 报价审批 (Approved) and 首席架构师 (a Stakeholder: no state since aisep#29).
+		expect(await within(gates).findByText("Total: 24")).toBeInTheDocument();
+		expect(within(gates).queryByTitle("https://aisep.example/model/procurement/chiefArchitect")).toBeNull();
 		expect(within(gates).getByText("单笔超过10万需二级审批")).toBeInTheDocument();
 		// Approved, so not pending; the approval record itself has no approvalState and is not an element row at all.
 		expect(within(gates).queryByText("报价审批")).toBeNull();
@@ -350,9 +351,8 @@ describe("AisepWorkbenchPage approval states (§2, T31)", () => {
 	});
 
 	it("keeps an element the server derives no state for, and says it has none instead of calling it Proposed", async () => {
-		renderPage(diffingClient({
-			query: (sparql) => Promise.resolve((sparql === ELEMENTS_QUERY ? elementsQueryNoState : fixtureClient.query(sparql)) as QueryResult),
-		}).client);
+		// Recorded after aisep#29: the server derives no state for Stakeholders.
+		renderPage();
 		const architect = await item("chiefArchitect");
 		expect(architect).toHaveTextContent("首席架构师");
 		expect(architect).toHaveTextContent(en["state.none"]);

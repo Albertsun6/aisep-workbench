@@ -108,29 +108,6 @@
 		{
 			"element": {
 				"type": "iri",
-				"value": "https://aisep.example/model/procurement/chiefArchitect"
-			},
-			"type": {
-				"type": "iri",
-				"value": "https://meta.linked.archi/core#Stakeholder"
-			},
-			"inModel": {
-				"type": "iri",
-				"value": "https://aisep.example/model/procurement/"
-			},
-			"prefLabel": {
-				"type": "literal",
-				"value": "首席架构师",
-				"lang": "zh"
-			},
-			"approvalState": {
-				"type": "iri",
-				"value": "https://meta.linked.archi/core#Proposed"
-			}
-		},
-		{
-			"element": {
-				"type": "iri",
 				"value": "https://aisep.example/model/procurement/quotationRoot"
 			},
 			"type": {
