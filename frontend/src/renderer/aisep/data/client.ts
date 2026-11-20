@@ -280,6 +280,9 @@ SELECT ?element ?type ?inModel ?prefLabel ?approvalState WHERE {
  */
 export const APPROVED_QUERY = `SELECT ?element WHERE { ?element arch:approvalState arch:Approved . }`;
 
+/** model_query's largest `limit` (§5.6); its default is only 1000 rows. */
+export const QUERY_LIMIT_MAX = 10_000;
+
 /**
  * One IRI column of a SELECT whose answer must be complete (a set the caller acts on: approved elements, elements that
  * cannot be approved). A result the server cut off at its row limit (§5.6) throws instead of passing a partial set off

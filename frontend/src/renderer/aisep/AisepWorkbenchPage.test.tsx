@@ -387,7 +387,8 @@ describe("AisepWorkbenchPage approval states (§2, T31)", () => {
 		const supplier = within(gates).getByTitle(`${M}supplier`);
 		expect(supplier.textContent).toBe("供应商");
 		expect(calls.filter(([q]) => q === APPROVED_QUERY).map(([, t]) => t)).toEqual(
-			expect.arrayContaining([{ ref: "feat/activity" }, { ref: "feat/elsewhere" }]),
+			// limit: the server's default page is only 1000 rows (§5.6).
+			expect.arrayContaining([{ ref: "feat/activity", limit: 10_000 }, { ref: "feat/elsewhere", limit: 10_000 }]),
 		);
 		// A branch the model repo does not have is not an unknown: it simply has no approvals.
 		expect(within(gates).queryByRole("alert")).toBeNull();

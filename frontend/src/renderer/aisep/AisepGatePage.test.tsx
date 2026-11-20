@@ -78,7 +78,7 @@ describe("AisepGatePage", () => {
 		expect(calls.diff).toEqual([{ head: BRANCH, detail: "items" }]);
 		expect(calls.gate).toEqual([{ ref: head }]);
 		expect(calls.query).toEqual(
-			expect.arrayContaining([[APPROVERS_QUERY, { ref: head }], [NOT_APPROVABLE_QUERY, { ref: head }]]),
+			expect.arrayContaining([[APPROVERS_QUERY, { ref: head }], [NOT_APPROVABLE_QUERY, { ref: head, limit: 10_000 }]]),
 		);
 		expect(calls.query).toHaveLength(2);
 	});

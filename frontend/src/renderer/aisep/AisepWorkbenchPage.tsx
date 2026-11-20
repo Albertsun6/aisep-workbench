@@ -12,6 +12,7 @@ import {
 	APPROVED_QUERY,
 	ELEMENTS_QUERY,
 	PENDING_QUERY,
+	QUERY_LIMIT_MAX,
 	elementsFromRows,
 	iriColumn,
 	type AisepModelClient,
@@ -71,7 +72,7 @@ export function AisepWorkbenchPage({
 		queries: branches.map((branch) => ({
 			queryKey: ["aisep", "approved-on-branch", branch],
 			queryFn: async ({ signal }: { signal: AbortSignal }) =>
-				iriColumn(await client.query(APPROVED_QUERY, { ref: branch }, { signal }), "element"),
+				iriColumn(await client.query(APPROVED_QUERY, { ref: branch, limit: QUERY_LIMIT_MAX }, { signal }), "element"),
 			refetchInterval: CHANGED_ELEMENTS_REFRESH_MS,
 			retry: shouldRetryAisep,
 		})),

@@ -11,6 +11,7 @@ import { PageTopbar, PageTopbarTitle } from "../components/PageTopbar";
 import { modelClient } from "./AisepWorkbenchPage";
 import {
 	AisepToolError,
+	QUERY_LIMIT_MAX,
 	asSelect,
 	iriColumn,
 	type AisepModelClient,
@@ -293,7 +294,9 @@ function ApprovalSection({
 	const queryClient = useQueryClient();
 	const notApprovable = useQuery({
 		queryKey: ["aisep", "gate", "not-approvable", commit],
-		queryFn: async ({ signal }) => new Set(iriColumn(await client.query(NOT_APPROVABLE_QUERY, { ref: commit }, { signal }), "element")),
+		// The set only grows (every approval record and AI activity is in it): ask for the largest page (§5.6).
+		queryFn: async ({ signal }) =>
+			new Set(iriColumn(await client.query(NOT_APPROVABLE_QUERY, { ref: commit, limit: QUERY_LIMIT_MAX }, { signal }), "element")),
 		retry: shouldRetryAisep,
 		staleTime: Number.POSITIVE_INFINITY,
 		refetchOnWindowFocus: false,
