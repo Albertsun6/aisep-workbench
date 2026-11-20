@@ -1,7 +1,7 @@
 // McpModelClient with a fake fetch fed real server responses (aisep §8 step 2). The live-server run is
 // mcp-client.integration.test.ts.
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { AisepToolError, elementsFromRows, type QueryResult } from "./client";
+import { AisepToolError, elementsFromRows, iriColumn, type QueryResult } from "./client";
 import elementsQuery from "./fixtures/elements-query.json";
 import gateFixture from "./fixtures/gate.json";
 import { MCP_PROTOCOL_VERSION, McpModelClient, McpProtocolError, shouldRetryAisep } from "./mcp-client";
@@ -201,6 +201,19 @@ describe("shouldRetryAisep (§7.1 retryable)", () => {
 
 	it("never retries other errors (e.g. a result that does not parse)", () => {
 		expect(shouldRetryAisep(0, new Error("unknown approvalState"))).toBe(false);
+	});
+});
+
+describe("iriColumn", () => {
+	const iri = (value: string) => ({ x: { type: "iri" as const, value } });
+	it("returns the column, and refuses a truncated answer instead of passing a partial set off as complete", () => {
+		const rows = [iri("https://a.example/1"), iri("https://a.example/2")];
+		expect(iriColumn({ kind: "select", variables: ["x"], rows, truncated: false }, "x")).toEqual([
+			"https://a.example/1", "https://a.example/2",
+		]);
+		expect(() => iriColumn({ kind: "select", variables: ["x"], rows, truncated: true }, "x")).toThrow(
+			expect.objectContaining({ code: "RESULT_TRUNCATED" }),
+		);
 	});
 });
 

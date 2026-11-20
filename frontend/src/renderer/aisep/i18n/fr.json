@@ -84,5 +84,7 @@
 	"state.Superseded": "Remplacé",
 	"state.none": "Aucun état d’approbation",
 	"section.gates.approvedOnBranch": "Approuvé sur {{branch}}, pas encore fusionné",
-	"section.aiActivity.gateNeedsServer": "La page de porte nécessite le serveur de modèles (VITE_AISEP_MCP_URL)."
+	"section.aiActivity.gateNeedsServer": "La page de porte nécessite le serveur de modèles (VITE_AISEP_MCP_URL).",
+	"section.gates.branchMarksUnknown": "Impossible de lire les approbations sur {{branches}} : les éléments déjà approuvés là-bas peuvent ne pas être signalés.",
+	"gate.approval.notApprovableFailed": "Impossible de vérifier quels éléments peuvent être approuvés, donc rien n’est prérempli : {{message}}"
 }

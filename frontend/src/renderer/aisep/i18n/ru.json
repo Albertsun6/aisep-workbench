@@ -84,5 +84,7 @@
 	"state.Superseded": "Заменено",
 	"state.none": "Нет статуса утверждения",
 	"section.gates.approvedOnBranch": "Утверждено в {{branch}}, ещё не слито",
-	"section.aiActivity.gateNeedsServer": "Странице шлюза нужен сервер моделей (VITE_AISEP_MCP_URL)."
+	"section.aiActivity.gateNeedsServer": "Странице шлюза нужен сервер моделей (VITE_AISEP_MCP_URL).",
+	"section.gates.branchMarksUnknown": "Не удалось прочитать утверждения в {{branches}}: уже утверждённые там элементы могут быть не отмечены.",
+	"gate.approval.notApprovableFailed": "Не удалось проверить, какие элементы можно утвердить, поэтому ничего не заполнено: {{message}}"
 }

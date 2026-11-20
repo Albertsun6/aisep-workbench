@@ -387,8 +387,26 @@ describe("AisepWorkbenchPage approval states (§2, T31)", () => {
 		const supplier = within(gates).getByTitle(`${M}supplier`);
 		expect(supplier.textContent).toBe("供应商");
 		expect(calls.filter(([q]) => q === APPROVED_QUERY).map(([, t]) => t)).toEqual(
-			expect.arrayContaining([{ ref: "feat/activity" }, { ref: "feat/elsewhere" }]),
+			// limit: the server's default page is only 1000 rows (§5.6).
+			expect.arrayContaining([{ ref: "feat/activity", limit: 10_000 }, { ref: "feat/elsewhere", limit: 10_000 }]),
 		);
+		// A branch the model repo does not have is not an unknown: it simply has no approvals.
+		expect(within(gates).queryByRole("alert")).toBeNull();
+	});
+
+	it.each([
+		["the server fails", () => Promise.reject(new Error("socket hang up"))],
+		["the answer is truncated", () => Promise.resolve({ ...(approvedOnBranch as QueryResult), truncated: true } as QueryResult)],
+	])("says the marks of a branch are unknown when %s, instead of showing it as not approved", async (_, answer) => {
+		const { client } = diffingClient({
+			query: (sparql) => (sparql === APPROVED_QUERY ? answer() : fixtureClient.query(sparql)),
+		});
+		renderPage(client, fakeSessions([branchRow("feat/activity")]));
+		const gates = screen.getByRole("region", { name: en["section.gates.title"] });
+		expect(await within(gates).findByRole("alert")).toHaveTextContent(
+			en["section.gates.branchMarksUnknown"].replace("{{branches}}", "feat/activity"),
+		);
+		expect(within(gates).getByTitle(`${M}quotation`).textContent).toBe("报价单");
 	});
 });
 

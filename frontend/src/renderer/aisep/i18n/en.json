@@ -84,5 +84,7 @@
 	"state.Superseded": "Superseded",
 	"state.none": "No approval state",
 	"section.gates.approvedOnBranch": "Approved on {{branch}}, not merged yet",
-	"section.aiActivity.gateNeedsServer": "The gate page needs the model server (VITE_AISEP_MCP_URL)."
+	"section.aiActivity.gateNeedsServer": "The gate page needs the model server (VITE_AISEP_MCP_URL).",
+	"section.gates.branchMarksUnknown": "Could not read the approvals on {{branches}}: elements already approved there may not be marked.",
+	"gate.approval.notApprovableFailed": "Could not check which elements can be approved, so nothing is prefilled: {{message}}"
 }
