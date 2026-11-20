@@ -1,0 +1,408 @@
+// Gate page (aisep docs/mcp-interface.md §8 step 5, §2 "关口页"): the branch's committed model changes against the
+// main branch, the gate check on that same commit, and the one write the workbench does: record an approval.
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useId, useState } from "react";
+import { Workflow } from "@/components/app-icons";
+import { Button, buttonVariants } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { PageTopbar, PageTopbarTitle } from "../components/PageTopbar";
+import { modelClient } from "./AisepWorkbenchPage";
+import {
+	AisepToolError,
+	asSelect,
+	type AisepModelClient,
+	type ApprovalInput,
+	type Change,
+	type DiffItem,
+	type DiffKind,
+	type DiffResult,
+	type GateId,
+	type Iri,
+	type QueryResult,
+} from "./data/client";
+import { shouldRetryAisep } from "./data/mcp-client";
+import { useAisepT, type AisepMessageKey } from "./i18n";
+
+/** §5.9 approvedBy: an existing arch:Stakeholder that is not an aisep:AIAgent (AI cannot approve). */
+export const APPROVERS_QUERY = `PREFIX aisep: <https://aisep.example/ont/aisep#>
+SELECT ?approver ?prefLabel WHERE {
+  ?approver a arch:Stakeholder ; skos:prefLabel ?prefLabel .
+  FILTER NOT EXISTS { ?approver a aisep:AIAgent }
+  FILTER(lang(?prefLabel) = "zh")
+}`;
+
+export interface Approver {
+	iri: Iri;
+	prefLabel: string;
+}
+
+export function approversFromRows(result: QueryResult): Approver[] {
+	return asSelect(result).rows.map((row) => ({ iri: row.approver.value, prefLabel: row.prefLabel.value }));
+}
+
+/**
+ * model_gate on a commit snapshot (§3.3) and record_approval (which runs the full gate again, §5.9 step 3) are the
+ * slow calls: seconds on an idle machine, minutes on a loaded one. The default MCP timeout would cut them off.
+ */
+export const GATE_TIMEOUT_MS = 600_000;
+
+/** A branch head is never on main, so GateRelease (mainline commits only, §5.9 step 1) is not offered here. */
+export const BRANCH_GATES = ["GateRequirements", "GateArchitecture", "GateDesign", "GateMerge"] as const satisfies readonly GateId[];
+
+/** "models/<slug>/…" -> slug. */
+function modelSlug(file: string | undefined): string | undefined {
+	return file?.match(/^models\/([^/]+)\//)?.[1];
+}
+
+/** §5.9 approves: prefilled with the diff's added and modified elements, grouped by the model whose files hold them. */
+export function approvalCandidates(diff: DiffResult): Map<string, DiffItem[]> {
+	const byModel = new Map<string, DiffItem[]>();
+	for (const item of diff.items ?? []) {
+		if (item.kind !== "element" || item.change === "removed") continue;
+		const slug = modelSlug(item.files.head[0]);
+		if (!slug) continue;
+		byModel.set(slug, [...(byModel.get(slug) ?? []), item]);
+	}
+	return byModel;
+}
+
+/** The approval for exactly the commit the user saw (headCommit) and the base it was compared with. */
+export function approvalInput(
+	branch: string,
+	diff: DiffResult,
+	choice: { model: string; gate: GateId; decision: "Approved" | "Rejected"; approvedBy: Iri; approves: Iri[] },
+): ApprovalInput {
+	if (diff.head.kind !== "ref") throw new Error("a gate approves a commit, never a worktree (§5.8)");
+	return { ...choice, branch, headCommit: diff.head.commit, expectedBaseCommit: diff.base.commit };
+}
+
+const CHANGE_TEXT: Record<Change, AisepMessageKey> = {
+	added: "gate.change.added",
+	modified: "gate.change.modified",
+	removed: "gate.change.removed",
+};
+const CHANGE_CLASS: Record<Change, string> = {
+	added: "text-success",
+	modified: "text-warning",
+	removed: "text-destructive",
+};
+const KIND_TEXT: Record<DiffKind, AisepMessageKey> = {
+	element: "gate.kind.element",
+	relationship: "gate.kind.relationship",
+	view: "gate.kind.view",
+	governance: "gate.kind.governance",
+	schema: "gate.kind.schema",
+	other: "gate.kind.other",
+};
+const GATE_TEXT: Record<(typeof BRANCH_GATES)[number], AisepMessageKey> = {
+	GateRequirements: "gate.gates.GateRequirements",
+	GateArchitecture: "gate.gates.GateArchitecture",
+	GateDesign: "gate.gates.GateDesign",
+	GateMerge: "gate.gates.GateMerge",
+};
+
+function localName(iri: Iri): string {
+	return iri.slice(Math.max(iri.lastIndexOf("/"), iri.lastIndexOf("#")) + 1);
+}
+
+function errorMessage(error: unknown): string {
+	if (error instanceof AisepToolError) return error.hint ? `${error.message}（${error.hint}）` : error.message;
+	return error instanceof Error ? error.message : String(error);
+}
+
+export function AisepGatePage({ branch, client = modelClient }: { branch: string; client?: AisepModelClient }) {
+	const t = useAisepT();
+	// Entered once (§2): resolving the branch here pins head.commit; gate and approval use that commit, not the branch.
+	const diff = useQuery({
+		queryKey: ["aisep", "gate", "diff", branch],
+		queryFn: ({ signal }) => client.diff({ head: branch, detail: "items" }, { signal }),
+		retry: shouldRetryAisep,
+		staleTime: Number.POSITIVE_INFINITY,
+		refetchOnWindowFocus: false,
+	});
+	const head = diff.data?.head.kind === "ref" ? diff.data.head.commit : undefined;
+
+	return (
+		<div className="flex min-h-0 flex-1 flex-col bg-background">
+			<PageTopbar
+				lead={
+					<PageTopbarTitle as="h1" icon={<Workflow className="size-icon-md" aria-hidden="true" />}>
+						{t("gate.title", { branch })}
+					</PageTopbarTitle>
+				}
+			/>
+			<div className="min-h-0 flex-1 overflow-y-auto">
+				<div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-6 pt-3 pb-6">
+					<a href="#/aisep" className={`${buttonVariants({ variant: "link" })} self-start text-xs`}>
+						{t("gate.back")}
+					</a>
+					{diff.isLoading ? (
+						<p role="status" className="text-xs text-muted-foreground">{t("section.loading")}</p>
+					) : diff.isError ? (
+						<p role="alert" className="text-xs text-destructive">{t("gate.error", { message: errorMessage(diff.error) })}</p>
+					) : diff.data && head ? (
+						<>
+							<p className="font-mono text-caption text-muted-foreground">
+								{t("gate.commits", { head: head.slice(0, 7), base: diff.data.base.commit.slice(0, 7) })}
+							</p>
+							<DiffSection diff={diff.data} />
+							<CheckSection client={client} commit={head} />
+							<ApprovalSection client={client} branch={branch} diff={diff.data} commit={head} />
+						</>
+					) : null}
+				</div>
+			</div>
+		</div>
+	);
+}
+
+function GateSection({ titleKey, children }: { titleKey: AisepMessageKey; children: React.ReactNode }) {
+	const t = useAisepT();
+	const headingId = useId();
+	return (
+		<section aria-labelledby={headingId} className="flex flex-col gap-2">
+			<h2 id={headingId} className="text-control font-medium text-foreground">
+				{t(titleKey)}
+			</h2>
+			{children}
+		</section>
+	);
+}
+
+function DiffSection({ diff }: { diff: DiffResult }) {
+	const t = useAisepT();
+	const items = diff.items ?? [];
+	return (
+		<GateSection titleKey="gate.diff.title">
+			{diff.truncated ? <p role="note" className="text-caption text-warning">{t("section.truncated", { count: items.length })}</p> : null}
+			{items.length === 0 ? (
+				<p className="text-xs text-muted-foreground">{t("gate.diff.empty")}</p>
+			) : (
+				<Table className="text-xs">
+					<TableHeader>
+						<TableRow>
+							<TableHead>{t("gate.diff.column.change")}</TableHead>
+							<TableHead>{t("gate.diff.column.kind")}</TableHead>
+							<TableHead>{t("gate.diff.column.name")}</TableHead>
+							<TableHead>{t("gate.diff.column.endpoints")}</TableHead>
+						</TableRow>
+					</TableHeader>
+					<TableBody>
+						{items.map((item) => (
+							<TableRow key={item.iri}>
+								<TableCell className={CHANGE_CLASS[item.change]}>{t(CHANGE_TEXT[item.change])}</TableCell>
+								<TableCell>{t(KIND_TEXT[item.kind])}</TableCell>
+								<TableCell title={item.iri}>{item.label ?? localName(item.iri)}</TableCell>
+								<TableCell>
+									{item.source && item.target
+										? `${item.source.label ?? localName(item.source.iri)} → ${item.target.label ?? localName(item.target.iri)}`
+										: ""}
+								</TableCell>
+							</TableRow>
+						))}
+					</TableBody>
+				</Table>
+			)}
+		</GateSection>
+	);
+}
+
+function CheckSection({ client, commit }: { client: AisepModelClient; commit: string }) {
+	const t = useAisepT();
+	const gate = useGateCheck(client, commit);
+	return (
+		<GateSection titleKey="gate.check.title">
+			{gate.isLoading ? (
+				<p role="status" className="text-xs text-muted-foreground">{t("section.loading")}</p>
+			) : gate.isError ? (
+				<p role="alert" className="text-xs text-destructive">{t("gate.error", { message: errorMessage(gate.error) })}</p>
+			) : gate.data ? (
+				<>
+					<p className="text-xs">
+						<span className={gate.data.result === "PASS" ? "font-medium text-success" : "font-medium text-destructive"}>
+							{t(gate.data.result === "PASS" ? "gate.check.pass" : "gate.check.fail")}
+						</span>{" "}
+						<span className="tabular-nums text-muted-foreground">
+							{t("gate.check.summary", {
+								violations: gate.data.summary.violations,
+								warnings: gate.data.summary.warnings,
+								infos: gate.data.summary.infos,
+							})}
+						</span>
+					</p>
+					{gate.data.findings.length ? (
+						<ul className="flex flex-col gap-1 text-xs">
+							{gate.data.findings.map((finding, index) => (
+								<li
+									key={`${finding.focus}-${index}`}
+									className={finding.severity === "Violation" ? "break-words text-destructive" : "break-words text-muted-foreground"}
+								>
+									[{finding.severity}] {finding.layer} {finding.message}
+								</li>
+							))}
+						</ul>
+					) : null}
+				</>
+			) : null}
+		</GateSection>
+	);
+}
+
+/** model_gate on the pinned commit (§2: `ref = head.commit`). */
+function useGateCheck(client: AisepModelClient, commit: string) {
+	return useQuery({
+		queryKey: ["aisep", "gate", "check", commit],
+		queryFn: ({ signal }) => client.gate({ ref: commit }, { signal, timeoutMs: GATE_TIMEOUT_MS }),
+		retry: shouldRetryAisep,
+		staleTime: Number.POSITIVE_INFINITY,
+		refetchOnWindowFocus: false,
+	});
+}
+
+function ApprovalSection({
+	client,
+	branch,
+	diff,
+	commit,
+}: {
+	client: AisepModelClient;
+	branch: string;
+	diff: DiffResult;
+	commit: string;
+}) {
+	const t = useAisepT();
+	const queryClient = useQueryClient();
+	const candidates = approvalCandidates(diff);
+	const models = [...candidates.keys()];
+	const gateCheck = useGateCheck(client, commit);
+	const approvers = useQuery({
+		queryKey: ["aisep", "gate", "approvers", commit],
+		queryFn: async ({ signal }) => approversFromRows(await client.query(APPROVERS_QUERY, { ref: commit }, { signal })),
+		retry: shouldRetryAisep,
+		staleTime: Number.POSITIVE_INFINITY,
+		refetchOnWindowFocus: false,
+	});
+	const [model, setModel] = useState(models[0]);
+	const [gate, setGate] = useState<GateId>("GateArchitecture");
+	const [approver, setApprover] = useState<Iri | undefined>();
+	const [unchecked, setUnchecked] = useState<ReadonlySet<Iri>>(new Set());
+	useEffect(() => {
+		if (approver === undefined && approvers.data?.length) setApprover(approvers.data[0].iri);
+	}, [approver, approvers.data]);
+
+	const items = model ? (candidates.get(model) ?? []) : [];
+	const approves = items.map((item) => item.iri).filter((iri) => !unchecked.has(iri));
+	const record = useMutation({
+		mutationFn: (decision: "Approved" | "Rejected") =>
+			client.recordApproval(
+				approvalInput(branch, diff, { model: model as string, gate, decision, approvedBy: approver as Iri, approves }),
+				{ timeoutMs: GATE_TIMEOUT_MS },
+			),
+		// Main-branch rows stay Proposed until merge (§2); only the branch's own reads change.
+		onSuccess: () => queryClient.invalidateQueries({ queryKey: ["aisep", "diff"] }),
+	});
+
+	if (models.length === 0) {
+		return (
+			<GateSection titleKey="gate.approval.title">
+				<p className="text-xs text-muted-foreground">{t("gate.approval.none")}</p>
+			</GateSection>
+		);
+	}
+	const gateFailed = gateCheck.data?.result === "FAIL";
+	const ready = approves.length > 0 && approver !== undefined && !record.isPending && !record.isSuccess;
+	return (
+		<GateSection titleKey="gate.approval.title">
+			<div className="flex flex-wrap items-end gap-3 text-xs">
+				{models.length > 1 ? (
+					<LabeledSelect label={t("gate.approval.model")} value={model} onValueChange={setModel}
+						options={models.map((slug) => ({ value: slug, label: slug }))} />
+				) : null}
+				<LabeledSelect label={t("gate.approval.gate")} value={gate} onValueChange={(value) => setGate(value as GateId)}
+					options={BRANCH_GATES.map((id) => ({ value: id, label: t(GATE_TEXT[id]) }))} />
+				{approvers.data?.length ? (
+					<LabeledSelect label={t("gate.approval.approver")} value={approver} onValueChange={setApprover}
+						options={approvers.data.map((a) => ({ value: a.iri, label: a.prefLabel }))} />
+				) : approvers.isSuccess ? (
+					<p className="text-destructive">{t("gate.approval.noApprovers")}</p>
+				) : null}
+			</div>
+			<fieldset className="flex flex-col gap-1 text-xs">
+				<legend className="mb-1 text-muted-foreground">{t("gate.approval.approves")}</legend>
+				{items.map((item) => (
+					<label key={item.iri} className="flex items-center gap-2" title={item.iri}>
+						<Checkbox
+							checked={!unchecked.has(item.iri)}
+							onCheckedChange={(checked) =>
+								setUnchecked((prev) => {
+									const next = new Set(prev);
+									if (checked === true) next.delete(item.iri);
+									else next.add(item.iri);
+									return next;
+								})
+							}
+						/>
+						{item.label ?? localName(item.iri)}
+					</label>
+				))}
+			</fieldset>
+			{gateFailed ? <p className="text-xs text-destructive">{t("gate.approval.gateFailed")}</p> : null}
+			<div className="flex gap-2">
+				<Button variant="accent" size="sm" disabled={!ready || gateFailed || !gateCheck.isSuccess}
+					onClick={() => record.mutate("Approved")}>
+					{t("gate.approval.approve")}
+				</Button>
+				<Button variant="secondary" size="sm" disabled={!ready} onClick={() => record.mutate("Rejected")}>
+					{t("gate.approval.reject")}
+				</Button>
+			</div>
+			{record.isSuccess ? (
+				<p role="status" className="text-xs text-success">
+					{t(record.data.duplicate ? "gate.approval.duplicate" : "gate.approval.recorded", {
+						record: localName(record.data.approval.iri),
+						commit: record.data.commit.slice(0, 7),
+					})}
+				</p>
+			) : record.isError ? (
+				<p role="alert" className="text-xs text-destructive">
+					{record.error instanceof AisepToolError && record.error.code === "STALE_HEAD"
+						? t("gate.approval.staleHead")
+						: t("gate.approval.failed", { message: errorMessage(record.error) })}
+				</p>
+			) : null}
+		</GateSection>
+	);
+}
+
+function LabeledSelect({
+	label,
+	value,
+	onValueChange,
+	options,
+}: {
+	label: string;
+	value: string | undefined;
+	onValueChange: (value: string) => void;
+	options: { value: string; label: string }[];
+}) {
+	const id = useId();
+	return (
+		<div className="flex flex-col gap-1">
+			<span id={id} className="text-muted-foreground">{label}</span>
+			<Select value={value} onValueChange={onValueChange}>
+				<SelectTrigger size="sm" aria-labelledby={id} className="min-w-40">
+					<SelectValue />
+				</SelectTrigger>
+				<SelectContent>
+					{options.map((option) => (
+						<SelectItem key={option.value} value={option.value}>
+							{option.label}
+						</SelectItem>
+					))}
+				</SelectContent>
+			</Select>
+		</div>
+	);
+}

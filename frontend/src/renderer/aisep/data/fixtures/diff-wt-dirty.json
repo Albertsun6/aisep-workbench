@@ -1,0 +1,53 @@
+{
+	"base": {
+		"ref": null,
+		"commit": "e09b49e9280425a521552f7eda9455b5e7130a15",
+		"viaMergeBase": true,
+		"mainRef": "refs/heads/main"
+	},
+	"head": {
+		"kind": "worktree",
+		"branch": "feat/edit",
+		"headCommit": "289a2ec3dd1af66c9b66f1dc743e04e99cf29ca2",
+		"dirty": true
+	},
+	"incomplete": false,
+	"failedFiles": [],
+	"indeterminate": [],
+	"counts": {
+		"element": {
+			"added": 2,
+			"modified": 0,
+			"removed": 0
+		},
+		"relationship": {
+			"added": 0,
+			"modified": 0,
+			"removed": 0
+		},
+		"view": {
+			"added": 0,
+			"modified": 0,
+			"removed": 0
+		},
+		"governance": {
+			"added": 0,
+			"modified": 0,
+			"removed": 0
+		},
+		"schema": {
+			"added": 0,
+			"modified": 0,
+			"removed": 0
+		},
+		"other": {
+			"added": 0,
+			"modified": 0,
+			"removed": 0
+		}
+	},
+	"changedElementCount": 2,
+	"touchedElementCount": 2,
+	"baseHasModels": true,
+	"headHasModels": true
+}

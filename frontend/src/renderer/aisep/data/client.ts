@@ -120,7 +120,8 @@ export interface DiffItem {
 	triples?: { added: [string, Term][]; removed: [string, Term][] };
 }
 export interface DiffResult {
-	base: { ref: string | null; commit: Sha; viaMergeBase: boolean; mainRef?: string };
+	/** S7 sends mainRef: null when base was given explicitly. */
+	base: { ref: string | null; commit: Sha; viaMergeBase: boolean; mainRef?: string | null };
 	head:
 		| { kind: "ref"; ref: string | null; commit: Sha }
 		| { kind: "worktree"; branch: string; headCommit: Sha; dirty: boolean };
@@ -138,7 +139,8 @@ export interface DiffResult {
 	items?: DiffItem[];
 	touchedElements?: Iri[];
 	moves?: { iri: Iri; files: { base: string[]; head: string[] } }[];
-	truncated: boolean;
+	/** §5.8 lists it always; S7 sends it only with detail = items | triples. */
+	truncated?: boolean;
 }
 export interface DiffInput {
 	repo?: string;
@@ -175,7 +177,8 @@ export interface ApprovalInput {
 }
 export interface ApprovalResult {
 	approval: { iri: Iri; file: string };
-	activity?: { iri: Iri; reused: boolean };
+	/** S5 (aisep#24) sends null when no activity was given. */
+	activity?: { iri: Iri; reused: boolean } | null;
 	evidence: string;
 	baseCommit?: Sha;
 	commit: Sha;
@@ -186,14 +189,27 @@ export interface ApprovalResult {
 	findings: Finding[];
 }
 
-/** The six workbench tools. The four model-writing tools are not part of the workbench (phase one). */
+/** Client-side, never sent to the server: a caller signal (TanStack Query passes one per query) and a timeout. */
+export interface CallOptions {
+	signal?: AbortSignal;
+	timeoutMs?: number;
+}
+
+/**
+ * The six workbench tools. The four model-writing tools are not part of the workbench (phase one).
+ * The trailing CallOptions is a workbench addition to the §8 sketch: cancellation and a timeout per call.
+ */
 export interface AisepModelClient {
-	query(sparql: string, target?: Target & { limit?: number }): Promise<QueryResult>;
-	gate(target?: Target & { model?: string }): Promise<GateResult>;
-	findings(target?: Target & { model?: string }): Promise<FindingsResult>;
-	impact(focus: Iri, options?: Target & { mode?: ImpactMode; depth?: number; allowInvalid?: boolean }): Promise<ImpactResult>;
-	diff(input: DiffInput): Promise<DiffResult>;
-	recordApproval(input: ApprovalInput): Promise<ApprovalResult>;
+	query(sparql: string, target?: Target & { limit?: number }, options?: CallOptions): Promise<QueryResult>;
+	gate(target?: Target & { model?: string }, options?: CallOptions): Promise<GateResult>;
+	findings(target?: Target & { model?: string }, options?: CallOptions): Promise<FindingsResult>;
+	impact(
+		focus: Iri,
+		options?: Target & { mode?: ImpactMode; depth?: number; allowInvalid?: boolean },
+		callOptions?: CallOptions,
+	): Promise<ImpactResult>;
+	diff(input: DiffInput, options?: CallOptions): Promise<DiffResult>;
+	recordApproval(input: ApprovalInput, options?: CallOptions): Promise<ApprovalResult>;
 }
 
 /** A tool result with isError: true; code is one of §7.2 (or a client-side code such as UNEXPECTED_RESULT_KIND). */
@@ -218,22 +234,41 @@ export const APPROVAL_STATE_IRI: Record<string, ApprovalState> = {
 	"https://aisep.example/ont/aisep#Superseded": "Superseded",
 };
 
-/** An element with its derived (§6.6) approval state. */
+/** An element with its derived (§6.6) approval state, when the server derives one for its type. */
 export interface ModelElement {
 	iri: Iri;
 	type: Iri;
 	inModel: Iri;
 	prefLabel: string;
-	approvalState: ApprovalState;
+	/** undefined: the server derives no state for this element (e.g. arch:Stakeholder). Never read as Proposed. */
+	approvalState?: ApprovalState;
 }
 
 /**
- * Only subjects that HAVE arch:approvalState (§8): approval records and AI activities are arch:Elements with an
- * inModel and a zh label but no approvalState, and must not show up as Proposed.
+ * "架构全景": every model member with a zh label except the governance kinds of §5.8 step 9 (approval records and AI
+ * activities are arch:Elements with an inModel and a zh label, but they are records, not architecture). Not filtered
+ * on arch:approvalState: the server derives no state for some element types (Stakeholder), and they still belong here.
  */
-export const ELEMENTS_QUERY = `SELECT ?element ?type ?inModel ?prefLabel ?approvalState WHERE {
-  ?element arch:inModel ?inModel ; a ?type ; skos:prefLabel ?prefLabel ; arch:approvalState ?approvalState .
+export const ELEMENTS_QUERY = `PREFIX aisep: <https://aisep.example/ont/aisep#>
+SELECT ?element ?type ?inModel ?prefLabel ?approvalState WHERE {
+  ?element arch:inModel ?inModel ; a ?type ; skos:prefLabel ?prefLabel .
   FILTER(lang(?prefLabel) = "zh")
+  FILTER NOT EXISTS { ?element a aisep:ApprovalRecord }
+  FILTER NOT EXISTS { ?element a aisep:AgentActivity }
+  OPTIONAL { ?element arch:approvalState ?approvalState }
+}`;
+
+/**
+ * "待批准关口": only subjects whose DERIVED state is Proposed (P4: a state the server did not derive is never shown
+ * as Proposed), still without the governance kinds.
+ */
+export const PENDING_QUERY = `PREFIX aisep: <https://aisep.example/ont/aisep#>
+SELECT ?element ?type ?inModel ?prefLabel ?approvalState WHERE {
+  ?element arch:inModel ?inModel ; a ?type ; skos:prefLabel ?prefLabel ; arch:approvalState ?approvalState .
+  FILTER(?approvalState = arch:Proposed)
+  FILTER(lang(?prefLabel) = "zh")
+  FILTER NOT EXISTS { ?element a aisep:ApprovalRecord }
+  FILTER NOT EXISTS { ?element a aisep:AgentActivity }
 }`;
 
 /** The workbench only sends SELECT. */
@@ -244,11 +279,13 @@ export function asSelect(result: QueryResult): SelectResult {
 	return result;
 }
 
-export function elementsFromRows(result: QueryResult): ModelElement[] {
-	return asSelect(result).rows.map((row) => {
+/** truncated: the server stopped at its row limit (§5.6), so `elements` is not the whole model. */
+export function elementsFromRows(result: QueryResult): { elements: ModelElement[]; truncated: boolean } {
+	const select = asSelect(result);
+	const elements = select.rows.map((row) => {
 		const stateIri = row.approvalState?.value;
 		const approvalState = stateIri === undefined ? undefined : APPROVAL_STATE_IRI[stateIri];
-		if (!approvalState) throw new Error(`unknown or missing approvalState for ${row.element?.value}: ${stateIri}`);
+		if (stateIri !== undefined && !approvalState) throw new Error(`unknown approvalState for ${row.element?.value}: ${stateIri}`);
 		return {
 			iri: row.element.value,
 			type: row.type.value,
@@ -257,4 +294,5 @@ export function elementsFromRows(result: QueryResult): ModelElement[] {
 			approvalState,
 		};
 	});
+	return { elements, truncated: select.truncated };
 }

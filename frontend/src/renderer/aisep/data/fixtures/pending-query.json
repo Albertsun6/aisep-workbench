@@ -1,0 +1,594 @@
+{
+	"source": {
+		"repo": "/fixture/repo",
+		"ref": null,
+		"commit": null
+	},
+	"kind": "select",
+	"variables": [
+		"element",
+		"type",
+		"inModel",
+		"prefLabel",
+		"approvalState"
+	],
+	"rows": [
+		{
+			"element": {
+				"type": "iri",
+				"value": "https://aisep.example/model/procurement/trSecondLevelApprovalRun1"
+			},
+			"type": {
+				"type": "iri",
+				"value": "https://aisep.example/ont/aisep#TestResult"
+			},
+			"inModel": {
+				"type": "iri",
+				"value": "https://aisep.example/model/procurement/"
+			},
+			"prefLabel": {
+				"type": "literal",
+				"value": "超10万报价二级审批测试 第1次运行",
+				"lang": "zh"
+			},
+			"approvalState": {
+				"type": "iri",
+				"value": "https://meta.linked.archi/core#Proposed"
+			}
+		},
+		{
+			"element": {
+				"type": "iri",
+				"value": "https://aisep.example/model/procurement/tcSecondLevelApproval"
+			},
+			"type": {
+				"type": "iri",
+				"value": "https://aisep.example/ont/aisep#TestCase"
+			},
+			"inModel": {
+				"type": "iri",
+				"value": "https://aisep.example/model/procurement/"
+			},
+			"prefLabel": {
+				"type": "literal",
+				"value": "超10万报价二级审批测试",
+				"lang": "zh"
+			},
+			"approvalState": {
+				"type": "iri",
+				"value": "https://meta.linked.archi/core#Proposed"
+			}
+		},
+		{
+			"element": {
+				"type": "iri",
+				"value": "https://aisep.example/model/procurement/acOver100kSecondLevel"
+			},
+			"type": {
+				"type": "iri",
+				"value": "https://aisep.example/ont/aisep#AcceptanceCriterion"
+			},
+			"inModel": {
+				"type": "iri",
+				"value": "https://aisep.example/model/procurement/"
+			},
+			"prefLabel": {
+				"type": "literal",
+				"value": "金额 100001 元的报价单须经二级审批才能通过",
+				"lang": "zh"
+			},
+			"approvalState": {
+				"type": "iri",
+				"value": "https://meta.linked.archi/core#Proposed"
+			}
+		},
+		{
+			"element": {
+				"type": "iri",
+				"value": "https://aisep.example/model/procurement/QuotationEntity"
+			},
+			"type": {
+				"type": "iri",
+				"value": "https://meta.linked.archi/uml/onto#Class"
+			},
+			"inModel": {
+				"type": "iri",
+				"value": "https://aisep.example/model/procurement/"
+			},
+			"prefLabel": {
+				"type": "literal",
+				"value": "报价单实体类",
+				"lang": "zh"
+			},
+			"approvalState": {
+				"type": "iri",
+				"value": "https://meta.linked.archi/core#Proposed"
+			}
+		},
+		{
+			"element": {
+				"type": "iri",
+				"value": "https://aisep.example/model/procurement/chiefArchitect"
+			},
+			"type": {
+				"type": "iri",
+				"value": "https://meta.linked.archi/core#Stakeholder"
+			},
+			"inModel": {
+				"type": "iri",
+				"value": "https://aisep.example/model/procurement/"
+			},
+			"prefLabel": {
+				"type": "literal",
+				"value": "首席架构师",
+				"lang": "zh"
+			},
+			"approvalState": {
+				"type": "iri",
+				"value": "https://meta.linked.archi/core#Proposed"
+			}
+		},
+		{
+			"element": {
+				"type": "iri",
+				"value": "https://aisep.example/model/procurement/quotationRoot"
+			},
+			"type": {
+				"type": "iri",
+				"value": "https://aisep.example/ont/ddd#Entity"
+			},
+			"inModel": {
+				"type": "iri",
+				"value": "https://aisep.example/model/procurement/"
+			},
+			"prefLabel": {
+				"type": "literal",
+				"value": "报价单实体",
+				"lang": "zh"
+			},
+			"approvalState": {
+				"type": "iri",
+				"value": "https://meta.linked.archi/core#Proposed"
+			}
+		},
+		{
+			"element": {
+				"type": "iri",
+				"value": "https://aisep.example/model/procurement/quotationAggregate"
+			},
+			"type": {
+				"type": "iri",
+				"value": "https://aisep.example/ont/ddd#Aggregate"
+			},
+			"inModel": {
+				"type": "iri",
+				"value": "https://aisep.example/model/procurement/"
+			},
+			"prefLabel": {
+				"type": "literal",
+				"value": "报价单聚合",
+				"lang": "zh"
+			},
+			"approvalState": {
+				"type": "iri",
+				"value": "https://meta.linked.archi/core#Proposed"
+			}
+		},
+		{
+			"element": {
+				"type": "iri",
+				"value": "https://aisep.example/model/procurement/quotationBC"
+			},
+			"type": {
+				"type": "iri",
+				"value": "https://aisep.example/ont/ddd#BoundedContext"
+			},
+			"inModel": {
+				"type": "iri",
+				"value": "https://aisep.example/model/procurement/"
+			},
+			"prefLabel": {
+				"type": "literal",
+				"value": "报价上下文",
+				"lang": "zh"
+			},
+			"approvalState": {
+				"type": "iri",
+				"value": "https://meta.linked.archi/core#Proposed"
+			}
+		},
+		{
+			"element": {
+				"type": "iri",
+				"value": "https://aisep.example/model/procurement/procurementSubdomain"
+			},
+			"type": {
+				"type": "iri",
+				"value": "https://aisep.example/ont/ddd#Subdomain"
+			},
+			"inModel": {
+				"type": "iri",
+				"value": "https://aisep.example/model/procurement/"
+			},
+			"prefLabel": {
+				"type": "literal",
+				"value": "采购",
+				"lang": "zh"
+			},
+			"approvalState": {
+				"type": "iri",
+				"value": "https://meta.linked.archi/core#Proposed"
+			}
+		},
+		{
+			"element": {
+				"type": "iri",
+				"value": "https://aisep.example/model/procurement/quotationPackage"
+			},
+			"type": {
+				"type": "iri",
+				"value": "https://aisep.example/ont/aisep#Deployable"
+			},
+			"inModel": {
+				"type": "iri",
+				"value": "https://aisep.example/model/procurement/"
+			},
+			"prefLabel": {
+				"type": "literal",
+				"value": "报价服务发布包",
+				"lang": "zh"
+			},
+			"approvalState": {
+				"type": "iri",
+				"value": "https://meta.linked.archi/core#Proposed"
+			}
+		},
+		{
+			"element": {
+				"type": "iri",
+				"value": "https://aisep.example/model/procurement/quotationCode"
+			},
+			"type": {
+				"type": "iri",
+				"value": "https://aisep.example/ont/aisep#CodeLocation"
+			},
+			"inModel": {
+				"type": "iri",
+				"value": "https://aisep.example/model/procurement/"
+			},
+			"prefLabel": {
+				"type": "literal",
+				"value": "报价上下文代码",
+				"lang": "zh"
+			},
+			"approvalState": {
+				"type": "iri",
+				"value": "https://meta.linked.archi/core#Proposed"
+			}
+		},
+		{
+			"element": {
+				"type": "iri",
+				"value": "https://aisep.example/model/procurement/bpmnEnd"
+			},
+			"type": {
+				"type": "iri",
+				"value": "https://meta.linked.archi/bpmn/onto#EndEvent"
+			},
+			"inModel": {
+				"type": "iri",
+				"value": "https://aisep.example/model/procurement/"
+			},
+			"prefLabel": {
+				"type": "literal",
+				"value": "审批完成",
+				"lang": "zh"
+			},
+			"approvalState": {
+				"type": "iri",
+				"value": "https://meta.linked.archi/core#Proposed"
+			}
+		},
+		{
+			"element": {
+				"type": "iri",
+				"value": "https://aisep.example/model/procurement/bpmnSecondLevel"
+			},
+			"type": {
+				"type": "iri",
+				"value": "https://meta.linked.archi/bpmn/onto#UserTask"
+			},
+			"inModel": {
+				"type": "iri",
+				"value": "https://aisep.example/model/procurement/"
+			},
+			"prefLabel": {
+				"type": "literal",
+				"value": "二级审批",
+				"lang": "zh"
+			},
+			"approvalState": {
+				"type": "iri",
+				"value": "https://meta.linked.archi/core#Proposed"
+			}
+		},
+		{
+			"element": {
+				"type": "iri",
+				"value": "https://aisep.example/model/procurement/bpmnFirstLevel"
+			},
+			"type": {
+				"type": "iri",
+				"value": "https://meta.linked.archi/bpmn/onto#UserTask"
+			},
+			"inModel": {
+				"type": "iri",
+				"value": "https://aisep.example/model/procurement/"
+			},
+			"prefLabel": {
+				"type": "literal",
+				"value": "一级审批",
+				"lang": "zh"
+			},
+			"approvalState": {
+				"type": "iri",
+				"value": "https://meta.linked.archi/core#Proposed"
+			}
+		},
+		{
+			"element": {
+				"type": "iri",
+				"value": "https://aisep.example/model/procurement/bpmnAmountGateway"
+			},
+			"type": {
+				"type": "iri",
+				"value": "https://meta.linked.archi/bpmn/onto#ExclusiveGateway"
+			},
+			"inModel": {
+				"type": "iri",
+				"value": "https://aisep.example/model/procurement/"
+			},
+			"prefLabel": {
+				"type": "literal",
+				"value": "金额超过10万?",
+				"lang": "zh"
+			},
+			"approvalState": {
+				"type": "iri",
+				"value": "https://meta.linked.archi/core#Proposed"
+			}
+		},
+		{
+			"element": {
+				"type": "iri",
+				"value": "https://aisep.example/model/procurement/bpmnReview"
+			},
+			"type": {
+				"type": "iri",
+				"value": "https://meta.linked.archi/bpmn/onto#UserTask"
+			},
+			"inModel": {
+				"type": "iri",
+				"value": "https://aisep.example/model/procurement/"
+			},
+			"prefLabel": {
+				"type": "literal",
+				"value": "审核报价单",
+				"lang": "zh"
+			},
+			"approvalState": {
+				"type": "iri",
+				"value": "https://meta.linked.archi/core#Proposed"
+			}
+		},
+		{
+			"element": {
+				"type": "iri",
+				"value": "https://aisep.example/model/procurement/bpmnStart"
+			},
+			"type": {
+				"type": "iri",
+				"value": "https://meta.linked.archi/bpmn/onto#StartEvent"
+			},
+			"inModel": {
+				"type": "iri",
+				"value": "https://aisep.example/model/procurement/"
+			},
+			"prefLabel": {
+				"type": "literal",
+				"value": "收到报价单",
+				"lang": "zh"
+			},
+			"approvalState": {
+				"type": "iri",
+				"value": "https://meta.linked.archi/core#Proposed"
+			}
+		},
+		{
+			"element": {
+				"type": "iri",
+				"value": "https://aisep.example/model/procurement/bpmnQuoteApproval"
+			},
+			"type": {
+				"type": "iri",
+				"value": "https://meta.linked.archi/bpmn/onto#Process"
+			},
+			"inModel": {
+				"type": "iri",
+				"value": "https://aisep.example/model/procurement/"
+			},
+			"prefLabel": {
+				"type": "literal",
+				"value": "报价审批流程",
+				"lang": "zh"
+			},
+			"approvalState": {
+				"type": "iri",
+				"value": "https://meta.linked.archi/core#Proposed"
+			}
+		},
+		{
+			"element": {
+				"type": "iri",
+				"value": "https://aisep.example/model/procurement/reqTwoLevelApproval"
+			},
+			"type": {
+				"type": "iri",
+				"value": "https://meta.linked.archi/archimate4/onto#Requirement"
+			},
+			"inModel": {
+				"type": "iri",
+				"value": "https://aisep.example/model/procurement/"
+			},
+			"prefLabel": {
+				"type": "literal",
+				"value": "单笔超过10万需二级审批",
+				"lang": "zh"
+			},
+			"approvalState": {
+				"type": "iri",
+				"value": "https://meta.linked.archi/core#Proposed"
+			}
+		},
+		{
+			"element": {
+				"type": "iri",
+				"value": "https://aisep.example/model/procurement/quoteManagementService"
+			},
+			"type": {
+				"type": "iri",
+				"value": "https://meta.linked.archi/archimate4/onto#Service"
+			},
+			"inModel": {
+				"type": "iri",
+				"value": "https://aisep.example/model/procurement/"
+			},
+			"prefLabel": {
+				"type": "literal",
+				"value": "报价管理",
+				"lang": "zh"
+			},
+			"approvalState": {
+				"type": "iri",
+				"value": "https://meta.linked.archi/core#Proposed"
+			}
+		},
+		{
+			"element": {
+				"type": "iri",
+				"value": "https://aisep.example/model/procurement/procurementSystem"
+			},
+			"type": {
+				"type": "iri",
+				"value": "https://meta.linked.archi/archimate4/onto#ApplicationComponent"
+			},
+			"inModel": {
+				"type": "iri",
+				"value": "https://aisep.example/model/procurement/"
+			},
+			"prefLabel": {
+				"type": "literal",
+				"value": "采购系统",
+				"lang": "zh"
+			},
+			"approvalState": {
+				"type": "iri",
+				"value": "https://meta.linked.archi/core#Proposed"
+			}
+		},
+		{
+			"element": {
+				"type": "iri",
+				"value": "https://aisep.example/model/procurement/submitQuotation"
+			},
+			"type": {
+				"type": "iri",
+				"value": "https://meta.linked.archi/archimate4/onto#Process"
+			},
+			"inModel": {
+				"type": "iri",
+				"value": "https://aisep.example/model/procurement/"
+			},
+			"prefLabel": {
+				"type": "literal",
+				"value": "提交报价单",
+				"lang": "zh"
+			},
+			"approvalState": {
+				"type": "iri",
+				"value": "https://meta.linked.archi/core#Proposed"
+			}
+		},
+		{
+			"element": {
+				"type": "iri",
+				"value": "https://aisep.example/model/procurement/quotation"
+			},
+			"type": {
+				"type": "iri",
+				"value": "https://meta.linked.archi/archimate4/onto#BusinessObject"
+			},
+			"inModel": {
+				"type": "iri",
+				"value": "https://aisep.example/model/procurement/"
+			},
+			"prefLabel": {
+				"type": "literal",
+				"value": "报价单",
+				"lang": "zh"
+			},
+			"approvalState": {
+				"type": "iri",
+				"value": "https://meta.linked.archi/core#Proposed"
+			}
+		},
+		{
+			"element": {
+				"type": "iri",
+				"value": "https://aisep.example/model/procurement/procurementManager"
+			},
+			"type": {
+				"type": "iri",
+				"value": "https://meta.linked.archi/archimate4/onto#Role"
+			},
+			"inModel": {
+				"type": "iri",
+				"value": "https://aisep.example/model/procurement/"
+			},
+			"prefLabel": {
+				"type": "literal",
+				"value": "采购经理",
+				"lang": "zh"
+			},
+			"approvalState": {
+				"type": "iri",
+				"value": "https://meta.linked.archi/core#Proposed"
+			}
+		},
+		{
+			"element": {
+				"type": "iri",
+				"value": "https://aisep.example/model/procurement/supplier"
+			},
+			"type": {
+				"type": "iri",
+				"value": "https://meta.linked.archi/archimate4/onto#Role"
+			},
+			"inModel": {
+				"type": "iri",
+				"value": "https://aisep.example/model/procurement/"
+			},
+			"prefLabel": {
+				"type": "literal",
+				"value": "供应商",
+				"lang": "zh"
+			},
+			"approvalState": {
+				"type": "iri",
+				"value": "https://meta.linked.archi/core#Proposed"
+			}
+		}
+	],
+	"truncated": false,
+	"findings": []
+}

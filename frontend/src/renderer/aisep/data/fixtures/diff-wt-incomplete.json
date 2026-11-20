@@ -1,0 +1,63 @@
+{
+	"base": {
+		"ref": null,
+		"commit": "e09b49e9280425a521552f7eda9455b5e7130a15",
+		"viaMergeBase": true,
+		"mainRef": "refs/heads/main"
+	},
+	"head": {
+		"kind": "worktree",
+		"branch": "feat/broken",
+		"headCommit": "e09b49e9280425a521552f7eda9455b5e7130a15",
+		"dirty": true
+	},
+	"incomplete": true,
+	"failedFiles": [
+		{
+			"file": "models/procurement/code.ttl",
+			"error": "Parser error at line 29 between columns 9 and 11: Unexpected end of file (line 29)"
+		}
+	],
+	"indeterminate": [
+		"https://aisep.example/model/procurement/quotationCode",
+		"https://aisep.example/model/procurement/quotationPackage",
+		"https://aisep.example/model/procurement/rel-quotationCode-implements-quotationBC",
+		"https://aisep.example/model/procurement/rel-quotationPackage-realizes-quotationBC"
+	],
+	"counts": {
+		"element": {
+			"added": 0,
+			"modified": 0,
+			"removed": 0
+		},
+		"relationship": {
+			"added": 0,
+			"modified": 0,
+			"removed": 0
+		},
+		"view": {
+			"added": 0,
+			"modified": 0,
+			"removed": 0
+		},
+		"governance": {
+			"added": 0,
+			"modified": 0,
+			"removed": 0
+		},
+		"schema": {
+			"added": 0,
+			"modified": 0,
+			"removed": 0
+		},
+		"other": {
+			"added": 0,
+			"modified": 0,
+			"removed": 0
+		}
+	},
+	"changedElementCount": 0,
+	"touchedElementCount": 0,
+	"baseHasModels": true,
+	"headHasModels": true
+}

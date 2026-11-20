@@ -1,0 +1,74 @@
+{
+	"base": {
+		"ref": null,
+		"commit": "8cee8db88e19de9cfca3c8f348b3d68707522e5b",
+		"viaMergeBase": true,
+		"mainRef": "refs/heads/main"
+	},
+	"head": {
+		"kind": "ref",
+		"ref": "feat/approve",
+		"commit": "3effc2c2766ac285f3acf40565d36be247fedef7"
+	},
+	"incomplete": false,
+	"failedFiles": [],
+	"indeterminate": [],
+	"counts": {
+		"element": {
+			"added": 1,
+			"modified": 0,
+			"removed": 0
+		},
+		"relationship": {
+			"added": 0,
+			"modified": 0,
+			"removed": 0
+		},
+		"view": {
+			"added": 0,
+			"modified": 0,
+			"removed": 0
+		},
+		"governance": {
+			"added": 0,
+			"modified": 0,
+			"removed": 0
+		},
+		"schema": {
+			"added": 0,
+			"modified": 0,
+			"removed": 0
+		},
+		"other": {
+			"added": 0,
+			"modified": 0,
+			"removed": 0
+		}
+	},
+	"changedElementCount": 1,
+	"touchedElementCount": 1,
+	"items": [
+		{
+			"iri": "https://aisep.example/model/procurement/quotationLine",
+			"kind": "element",
+			"change": "added",
+			"types": [
+				"https://meta.linked.archi/archimate4/onto#BusinessObject"
+			],
+			"label": "报价行",
+			"files": {
+				"base": [],
+				"head": [
+					"models/procurement/am4.ttl"
+				]
+			}
+		}
+	],
+	"touchedElements": [
+		"https://aisep.example/model/procurement/quotationLine"
+	],
+	"moves": [],
+	"truncated": false,
+	"baseHasModels": true,
+	"headHasModels": true
+}

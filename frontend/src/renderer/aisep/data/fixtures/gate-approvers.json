@@ -1,0 +1,27 @@
+{
+	"source": {
+		"repo": "/fixture/repo",
+		"ref": "3effc2c2766ac285f3acf40565d36be247fedef7",
+		"commit": "3effc2c2766ac285f3acf40565d36be247fedef7"
+	},
+	"kind": "select",
+	"variables": [
+		"approver",
+		"prefLabel"
+	],
+	"rows": [
+		{
+			"approver": {
+				"type": "iri",
+				"value": "https://aisep.example/model/procurement/chiefArchitect"
+			},
+			"prefLabel": {
+				"type": "literal",
+				"value": "首席架构师",
+				"lang": "zh"
+			}
+		}
+	],
+	"truncated": false,
+	"findings": []
+}
