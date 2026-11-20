@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { AisepToolError, ELEMENTS_QUERY, elementsFromRows } from "./client";
+import { AisepToolError, ELEMENTS_QUERY, PENDING_QUERY, elementsFromRows } from "./client";
 import { fixtureClient } from "./fixture-client";
 
 const MODEL = "https://aisep.example/model/procurement/";
@@ -7,15 +7,24 @@ const APPROVAL_STATES = ["Proposed", "Approved", "Rejected", "Superseded"];
 
 describe("FixtureClient (recorded from the real server)", () => {
 	it("returns the procurement elements with §3 IRIs and derived approval states, without the approval record", async () => {
-		const elements = elementsFromRows(await fixtureClient.query(ELEMENTS_QUERY));
+		const { elements } = elementsFromRows(await fixtureClient.query(ELEMENTS_QUERY));
 		expect(elements).toHaveLength(26);
 		for (const element of elements) {
 			expect(element.inModel).toBe(MODEL);
 			expect(element.iri.startsWith(MODEL)).toBe(true);
-			expect(APPROVAL_STATES).toContain(element.approvalState);
+			if (element.approvalState !== undefined) expect(APPROVAL_STATES).toContain(element.approvalState);
 		}
+		expect(elements.map((e) => e.prefLabel)).toContain("首席架构师");
 		expect(elements.map((e) => e.iri)).not.toContain(`${MODEL}approval-20261119-arch-baseline`);
 		expect(elements.filter((e) => e.approvalState === "Approved").map((e) => e.prefLabel)).toEqual(["报价审批"]);
+	});
+
+	it("answers the pending query with Proposed elements only, without the approval record", async () => {
+		const { elements } = elementsFromRows(await fixtureClient.query(PENDING_QUERY));
+		expect(elements.length).toBeGreaterThan(0);
+		for (const element of elements) expect(element.approvalState).toBe("Proposed");
+		expect(elements.map((e) => e.prefLabel)).not.toContain("报价审批");
+		expect(elements.map((e) => e.iri)).not.toContain(`${MODEL}approval-20261119-arch-baseline`);
 	});
 
 	it("answers impact of 报价单 with structured paths within the default depth", async () => {

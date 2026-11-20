@@ -1,0 +1,9 @@
+{
+	"code": "WORKTREE_NOT_FOUND",
+	"message": "分支 feat/gone 没有检出的工作区",
+	"hint": "改用 Git 引用模式：head 传分支名字符串",
+	"retryable": false,
+	"details": {
+		"branchExists": true
+	}
+}

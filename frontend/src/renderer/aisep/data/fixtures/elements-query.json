@@ -122,10 +122,6 @@
 				"type": "literal",
 				"value": "首席架构师",
 				"lang": "zh"
-			},
-			"approvalState": {
-				"type": "iri",
-				"value": "https://meta.linked.archi/core#Proposed"
 			}
 		},
 		{

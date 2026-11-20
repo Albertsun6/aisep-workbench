@@ -1,0 +1,48 @@
+{
+	"result": "PASS",
+	"summary": {
+		"violations": 0,
+		"warnings": 1,
+		"infos": 2,
+		"violationsByLayer": {
+			"L0": 0,
+			"build": 0,
+			"L1": 0,
+			"L2": 0,
+			"L3": 0,
+			"L4": 0
+		},
+		"seconds": 28.23
+	},
+	"findings": [
+		{
+			"severity": "Warning",
+			"layer": "L2",
+			"rule": null,
+			"focus": "https://aisep.example/model/procurement/rel-procurementSystem-realizes-quoteManagementService",
+			"file": "models/procurement/am4.ttl",
+			"message": "procurement:rel-procurementSystem-realizes-quoteManagementService: derived-only relationship asserted — the ArchiMate 4.0 table permits procurement:procurementSystem (am4:ApplicationComponent) -[am4:Realization]-> procurement:quoteManagementService (am4:Service) only as a derivation (am4rt:permitsDirectRealization does not list it); model the underlying chain, or declare aisep:assertedShortcut true on the relationship class"
+		},
+		{
+			"severity": "Info",
+			"layer": "L4",
+			"rule": null,
+			"focus": "https://aisep.example/model/procurement/quotationLine",
+			"file": "models/procurement/am4.ttl",
+			"message": "procurement:quotationLine (报价行, am4:BusinessObject): isolated element — no relationship or link to another model member"
+		},
+		{
+			"severity": "Info",
+			"layer": "L4",
+			"rule": null,
+			"focus": "https://aisep.example/model/procurement/reviewer",
+			"file": "models/procurement/governance.ttl",
+			"message": "procurement:reviewer (评审人, arch:Stakeholder): isolated element — no relationship or link to another model member"
+		}
+	],
+	"source": {
+		"repo": "/fixture/repo",
+		"ref": "52b598fce4ee65c5c4fbac4d22f9c03fe0d24fd6",
+		"commit": "52b598fce4ee65c5c4fbac4d22f9c03fe0d24fd6"
+	}
+}

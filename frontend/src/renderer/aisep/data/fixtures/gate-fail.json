@@ -1,0 +1,40 @@
+{
+	"result": "FAIL",
+	"summary": {
+		"violations": 1,
+		"warnings": 1,
+		"infos": 0,
+		"violationsByLayer": {
+			"L0": 0,
+			"build": 0,
+			"L1": 1,
+			"L2": 0,
+			"L3": 0,
+			"L4": 0
+		},
+		"seconds": 52.88
+	},
+	"findings": [
+		{
+			"severity": "Violation",
+			"layer": "L1",
+			"rule": null,
+			"focus": "https://aisep.example/model/procurement/quoteApproval",
+			"file": "models/procurement/am4.ttl",
+			"message": "procurement:quoteApproval: direct triple written in source models/procurement/am4.ttl: procurement:quoteApproval am4:accesses procurement:quotation — write a qualified relationship resource (a am4:Access with arch:source/arch:target/arch:inModel) instead; `aisep build` generates the direct triple"
+		},
+		{
+			"severity": "Warning",
+			"layer": "L2",
+			"rule": null,
+			"focus": "https://aisep.example/model/procurement/rel-procurementSystem-realizes-quoteManagementService",
+			"file": "models/procurement/am4.ttl",
+			"message": "procurement:rel-procurementSystem-realizes-quoteManagementService: derived-only relationship asserted — the ArchiMate 4.0 table permits procurement:procurementSystem (am4:ApplicationComponent) -[am4:Realization]-> procurement:quoteManagementService (am4:Service) only as a derivation (am4rt:permitsDirectRealization does not list it); model the underlying chain, or declare aisep:assertedShortcut true on the relationship class"
+		}
+	],
+	"source": {
+		"repo": "/fixture/repo",
+		"ref": null,
+		"commit": null
+	}
+}

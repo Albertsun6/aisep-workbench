@@ -1,0 +1,195 @@
+{
+	"source": {
+		"repo": "/fixture/repo",
+		"ref": "52b598fce4ee65c5c4fbac4d22f9c03fe0d24fd6",
+		"commit": "52b598fce4ee65c5c4fbac4d22f9c03fe0d24fd6"
+	},
+	"kind": "select",
+	"variables": [
+		"element"
+	],
+	"rows": [
+		{
+			"element": {
+				"type": "iri",
+				"value": "https://aisep.example/model/procurement/reviewer"
+			}
+		},
+		{
+			"element": {
+				"type": "iri",
+				"value": "https://aisep.example/model/procurement/chiefArchitect"
+			}
+		},
+		{
+			"element": {
+				"type": "iri",
+				"value": "https://aisep.example/model/procurement/approval-20261119-arch-baseline"
+			}
+		},
+		{
+			"element": {
+				"type": "iri",
+				"value": "https://aisep.example/model/procurement/rel-tcSecondLevelApproval-verifies-acOver100kSecondLevel"
+			}
+		},
+		{
+			"element": {
+				"type": "iri",
+				"value": "https://aisep.example/model/procurement/rel-quotationAggregate-realizes-quotation"
+			}
+		},
+		{
+			"element": {
+				"type": "iri",
+				"value": "https://aisep.example/model/procurement/rel-quoteApproval-realizes-procurementSubdomain"
+			}
+		},
+		{
+			"element": {
+				"type": "iri",
+				"value": "https://aisep.example/model/procurement/rel-quotationPackage-realizes-quotationBC"
+			}
+		},
+		{
+			"element": {
+				"type": "iri",
+				"value": "https://aisep.example/model/procurement/rel-quoteApproval-realizes-reqTwoLevelApproval"
+			}
+		},
+		{
+			"element": {
+				"type": "iri",
+				"value": "https://aisep.example/model/procurement/rel-procurementSystem-realizes-quoteManagementService"
+			}
+		},
+		{
+			"element": {
+				"type": "iri",
+				"value": "https://aisep.example/model/procurement/rel-quoteApproval-accesses-quotation"
+			}
+		},
+		{
+			"element": {
+				"type": "iri",
+				"value": "https://aisep.example/model/procurement/rel-submitQuotation-accesses-quotation"
+			}
+		},
+		{
+			"element": {
+				"type": "iri",
+				"value": "https://aisep.example/model/procurement/rel-procurementManager-assigned-quoteApproval"
+			}
+		},
+		{
+			"element": {
+				"type": "iri",
+				"value": "https://aisep.example/model/procurement/rel-supplier-assigned-quoteApproval"
+			}
+		},
+		{
+			"element": {
+				"type": "iri",
+				"value": "https://aisep.example/model/procurement/rel-supplier-assigned-submitQuotation"
+			}
+		},
+		{
+			"element": {
+				"type": "iri",
+				"value": "https://aisep.example/model/procurement/sf6"
+			}
+		},
+		{
+			"element": {
+				"type": "iri",
+				"value": "https://aisep.example/model/procurement/sf5"
+			}
+		},
+		{
+			"element": {
+				"type": "iri",
+				"value": "https://aisep.example/model/procurement/sf4"
+			}
+		},
+		{
+			"element": {
+				"type": "iri",
+				"value": "https://aisep.example/model/procurement/sf3"
+			}
+		},
+		{
+			"element": {
+				"type": "iri",
+				"value": "https://aisep.example/model/procurement/sf2"
+			}
+		},
+		{
+			"element": {
+				"type": "iri",
+				"value": "https://aisep.example/model/procurement/sf1"
+			}
+		},
+		{
+			"element": {
+				"type": "iri",
+				"value": "https://aisep.example/model/procurement/rel-submitQuotation-triggers-quoteApproval"
+			}
+		},
+		{
+			"element": {
+				"type": "iri",
+				"value": "https://aisep.example/model/procurement/rel-quotationCode-implements-quotationBC"
+			}
+		},
+		{
+			"element": {
+				"type": "iri",
+				"value": "https://aisep.example/model/procurement/rel-quoteManagementService-serves-quoteApproval"
+			}
+		},
+		{
+			"element": {
+				"type": "iri",
+				"value": "https://aisep.example/model/procurement/rel-quotationAggregate-root-quotationRoot"
+			}
+		},
+		{
+			"element": {
+				"type": "iri",
+				"value": "https://aisep.example/model/procurement/rel-procurementSystem-composedOf-quotationBC"
+			}
+		},
+		{
+			"element": {
+				"type": "iri",
+				"value": "https://aisep.example/model/procurement/rel-QuotationEntity-refines-quotationAggregate"
+			}
+		},
+		{
+			"element": {
+				"type": "iri",
+				"value": "https://aisep.example/model/procurement/rel-bpmnQuoteApproval-refines-quoteApproval"
+			}
+		},
+		{
+			"element": {
+				"type": "iri",
+				"value": "https://aisep.example/model/procurement/rel-reqTwoLevelApproval-aggregates-acOver100kSecondLevel"
+			}
+		},
+		{
+			"element": {
+				"type": "iri",
+				"value": "https://aisep.example/model/procurement/rel-quotationBC-owns-quotationAggregate"
+			}
+		},
+		{
+			"element": {
+				"type": "iri",
+				"value": "https://aisep.example/model/procurement/rel-quotationBC-implements-procurementSubdomain"
+			}
+		}
+	],
+	"truncated": false,
+	"findings": []
+}

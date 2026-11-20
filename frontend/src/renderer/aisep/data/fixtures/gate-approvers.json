@@ -1,0 +1,38 @@
+{
+	"source": {
+		"repo": "/fixture/repo",
+		"ref": "52b598fce4ee65c5c4fbac4d22f9c03fe0d24fd6",
+		"commit": "52b598fce4ee65c5c4fbac4d22f9c03fe0d24fd6"
+	},
+	"kind": "select",
+	"variables": [
+		"approver",
+		"prefLabel"
+	],
+	"rows": [
+		{
+			"approver": {
+				"type": "iri",
+				"value": "https://aisep.example/model/procurement/reviewer"
+			},
+			"prefLabel": {
+				"type": "literal",
+				"value": "评审人",
+				"lang": "zh"
+			}
+		},
+		{
+			"approver": {
+				"type": "iri",
+				"value": "https://aisep.example/model/procurement/chiefArchitect"
+			},
+			"prefLabel": {
+				"type": "literal",
+				"value": "首席架构师",
+				"lang": "zh"
+			}
+		}
+	],
+	"truncated": false,
+	"findings": []
+}

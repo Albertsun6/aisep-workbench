@@ -1,0 +1,46 @@
+{
+	"approval": {
+		"iri": "https://aisep.example/model/procurement/approval-20261120184035-architecture-52b598f",
+		"file": "models/procurement/governance/approval-20261120184035-architecture-52b598f.ttl"
+	},
+	"activity": null,
+	"evidence": "52b598fce4ee65c5c4fbac4d22f9c03fe0d24fd6",
+	"baseCommit": "10314a373a7cb99dbfaf5ecf67a3f70476d1c612",
+	"commit": "923eeaed172db3a097ce122d5c01e0aa0b35a435",
+	"branch": "feat/approve",
+	"duplicate": false,
+	"gate": {
+		"result": "PASS",
+		"summary": {
+			"violations": 0,
+			"warnings": 1,
+			"infos": 2,
+			"violationsByLayer": {
+				"L0": 0,
+				"build": 0,
+				"L1": 0,
+				"L2": 0,
+				"L3": 0,
+				"L4": 0
+			}
+		}
+	},
+	"derivedApprovalState": [
+		{
+			"iri": "https://aisep.example/model/procurement/quotationLine",
+			"before": "Proposed",
+			"after": "Approved"
+		}
+	],
+	"findings": [
+		{
+			"severity": "Warning",
+			"layer": "L2",
+			"rule": null,
+			"focus": "https://aisep.example/model/procurement/rel-procurementSystem-realizes-quoteManagementService",
+			"file": "models/procurement/am4.ttl",
+			"message": "procurement:rel-procurementSystem-realizes-quoteManagementService: derived-only relationship asserted — the ArchiMate 4.0 table permits procurement:procurementSystem (am4:ApplicationComponent) -[am4:Realization]-> procurement:quoteManagementService (am4:Service) only as a derivation (am4rt:permitsDirectRealization does not list it); model the underlying chain, or declare aisep:assertedShortcut true on the relationship class",
+			"preexisting": true
+		}
+	]
+}

@@ -1,0 +1,90 @@
+{
+	"base": {
+		"ref": null,
+		"commit": "10314a373a7cb99dbfaf5ecf67a3f70476d1c612",
+		"viaMergeBase": true,
+		"mainRef": "refs/heads/main"
+	},
+	"head": {
+		"kind": "ref",
+		"ref": "feat/approve",
+		"commit": "52b598fce4ee65c5c4fbac4d22f9c03fe0d24fd6"
+	},
+	"incomplete": false,
+	"failedFiles": [],
+	"indeterminate": [],
+	"counts": {
+		"element": {
+			"added": 2,
+			"modified": 0,
+			"removed": 0
+		},
+		"relationship": {
+			"added": 0,
+			"modified": 0,
+			"removed": 0
+		},
+		"view": {
+			"added": 0,
+			"modified": 0,
+			"removed": 0
+		},
+		"governance": {
+			"added": 0,
+			"modified": 0,
+			"removed": 0
+		},
+		"schema": {
+			"added": 0,
+			"modified": 0,
+			"removed": 0
+		},
+		"other": {
+			"added": 0,
+			"modified": 0,
+			"removed": 0
+		}
+	},
+	"changedElementCount": 2,
+	"touchedElementCount": 2,
+	"items": [
+		{
+			"iri": "https://aisep.example/model/procurement/quotationLine",
+			"kind": "element",
+			"change": "added",
+			"types": [
+				"https://meta.linked.archi/archimate4/onto#BusinessObject"
+			],
+			"label": "报价行",
+			"files": {
+				"base": [],
+				"head": [
+					"models/procurement/am4.ttl"
+				]
+			}
+		},
+		{
+			"iri": "https://aisep.example/model/procurement/reviewer",
+			"kind": "element",
+			"change": "added",
+			"types": [
+				"https://meta.linked.archi/core#Stakeholder"
+			],
+			"label": "评审人",
+			"files": {
+				"base": [],
+				"head": [
+					"models/procurement/governance.ttl"
+				]
+			}
+		}
+	],
+	"touchedElements": [
+		"https://aisep.example/model/procurement/quotationLine",
+		"https://aisep.example/model/procurement/reviewer"
+	],
+	"moves": [],
+	"truncated": false,
+	"baseHasModels": true,
+	"headHasModels": true
+}

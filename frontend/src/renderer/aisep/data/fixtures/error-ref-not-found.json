@@ -1,0 +1,8 @@
+{
+	"code": "REF_NOT_FOUND",
+	"message": "找不到提交 feat/elsewhere",
+	"retryable": false,
+	"details": {
+		"ref": "feat/elsewhere"
+	}
+}

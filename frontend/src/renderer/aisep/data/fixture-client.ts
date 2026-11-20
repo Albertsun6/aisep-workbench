@@ -3,6 +3,7 @@
 import {
 	AisepToolError,
 	ELEMENTS_QUERY,
+	PENDING_QUERY,
 	type AisepModelClient,
 	type ApprovalResult,
 	type DiffInput,
@@ -17,6 +18,7 @@ import diffMain from "./fixtures/diff-main.json";
 import elementsQuery from "./fixtures/elements-query.json";
 import findingsFixture from "./fixtures/findings.json";
 import gateFixture from "./fixtures/gate.json";
+import pendingQuery from "./fixtures/pending-query.json";
 import quotationImpact from "./fixtures/impact-quotation.json";
 
 const impacts: Record<Iri, ImpactResult> = {
@@ -29,8 +31,9 @@ function noFixture(what: string): never {
 
 export class FixtureClient implements AisepModelClient {
 	async query(sparql: string): Promise<QueryResult> {
-		if (sparql !== ELEMENTS_QUERY) noFixture("this query (only ELEMENTS_QUERY)");
-		return elementsQuery as QueryResult;
+		if (sparql === ELEMENTS_QUERY) return elementsQuery as QueryResult;
+		if (sparql === PENDING_QUERY) return pendingQuery as QueryResult;
+		return noFixture("this query (only ELEMENTS_QUERY and PENDING_QUERY)");
 	}
 
 	async gate(): Promise<GateResult> {
