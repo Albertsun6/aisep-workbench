@@ -21,6 +21,13 @@ test('drafts and stacked PRs run no lanes, even with ci:full', () => {
   assert.deepEqual(pickLanes(pr(['backend/a.go'], { base: 'feat/parent' })), none);
 });
 
+test('a PR into aisep-main gets lanes like a PR into main', () => {
+  const files = ['frontend/src/renderer/aisep/data/client.ts'];
+  assert.deepEqual(pickLanes(pr(files, { base: 'aisep-main' })), pickLanes(pr(files)));
+  assert.ok(pickLanes(pr(files, { base: 'aisep-main' })).lanes.includes('frontend'));
+  assert.deepEqual(pickLanes(pr(files, { base: 'aisep-main', draft: true })).lanes, []);
+});
+
 test('a docs-only PR runs no lanes', () => {
   assert.deepEqual(pickLanes(pr(['README.md', 'docs/ci.md', 'AGENTS.md'])).lanes, []);
 });
