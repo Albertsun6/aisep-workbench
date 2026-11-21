@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { appI18n } from "../../i18n";
 
 const getUiSettings = vi.fn();
@@ -15,7 +15,7 @@ vi.mock("../../lib/bridge", () => ({
 }));
 
 import { useLocaleStore } from "../../stores/locale-store";
-import { initWebLocale, WEB_LOCALE_STORAGE_KEY } from "./web-locale";
+import { defaultEnv, initWebLocale, WEB_LOCALE_STORAGE_KEY } from "./web-locale";
 
 function memoryStorage(initial: Record<string, string> = {}) {
 	const data = new Map(Object.entries(initial));
@@ -90,5 +90,44 @@ describe("网页版语言记忆", () => {
 		};
 		await expect(initWebLocale({ hasDesktopBridge: false, storage })).resolves.toBeUndefined();
 		expect(useLocaleStore.getState().locale).toBe("zh-CN");
+	});
+
+	it("localStorage 里存的不是支持的语言时默认简体中文", async () => {
+		for (const stored of ["xx", "EN", "zh", ""]) {
+			await freshStart();
+			const storage = memoryStorage({ [WEB_LOCALE_STORAGE_KEY]: stored });
+			await initWebLocale({ hasDesktopBridge: false, storage });
+			expect(useLocaleStore.getState().locale, stored).toBe("zh-CN");
+			expect(appI18n.language, stored).toBe("zh-CN");
+		}
+	});
+
+	it("再次初始化时退掉上一次的订阅，只写回最新的存储", async () => {
+		const first = memoryStorage();
+		await initWebLocale({ hasDesktopBridge: false, storage: first });
+		const second = memoryStorage();
+		await initWebLocale({ hasDesktopBridge: false, storage: second });
+		await useLocaleStore.getState().setLocale("fr");
+		expect(second.getItem(WEB_LOCALE_STORAGE_KEY)).toBe("fr");
+		expect(first.getItem(WEB_LOCALE_STORAGE_KEY)).toBe("zh-CN");
+	});
+});
+
+describe("网页版语言记忆的生产环境判断（defaultEnv）", () => {
+	const win = window as { ao?: unknown };
+	afterEach(() => {
+		delete win.ao;
+	});
+
+	it("没有 window.ao 时按网页版处理，用 window.localStorage", () => {
+		delete win.ao;
+		const env = defaultEnv();
+		expect(env.hasDesktopBridge).toBe(false);
+		expect(env.storage).toBe(window.localStorage);
+	});
+
+	it("有 window.ao 时按桌面版处理", () => {
+		win.ao = {};
+		expect(defaultEnv().hasDesktopBridge).toBe(true);
 	});
 });
