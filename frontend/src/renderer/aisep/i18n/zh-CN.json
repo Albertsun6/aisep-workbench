@@ -77,7 +77,7 @@
 	"gate.approval.approve": "批准",
 	"gate.approval.reject": "驳回",
 	"gate.approval.writing": "正在写入：服务要先跑完整的关口校验，可能需要几十秒，期间不能再次提交。",
-	"gate.approval.alreadyApproved": "本分支顶端已经是一个批准提交（{{stage}}）。再批会在它上面再写一条批准记录，超出合并豁免允许的范围，只能走重评。",
+	"gate.approval.alreadyApproved": "本分支顶端已经是一个批准提交（{{stage}}）。再写一条记录（批准或驳回都算）会叠在它上面，超出合并豁免允许的范围，只能走重评。",
 	"gate.approval.progressUnknown": "读不到批准进度，无法确认本分支顶端是不是已经批准过。",
 	"gate.approval.confirmRepeat": "我确认要在这个分支上再写一条记录",
 	"gate.approval.gateFailed": "关口校验未通过，这个提交只能驳回。",

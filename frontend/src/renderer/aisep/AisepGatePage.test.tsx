@@ -133,6 +133,9 @@ describe("AisepGatePage", () => {
 		await waitFor(() =>
 			expect(within(progress).getByText(en["gate.progress.stage.approved"])).toHaveAttribute("aria-current", "step"),
 		);
+		// The tip is now this approval, but it is the one just recorded: no "already approved" warning under "Recorded".
+		expect(within(approval).getByText(/^Recorded /)).toBeInTheDocument();
+		expect(within(approval).queryByRole("note")).toBeNull();
 	});
 
 	it("does not prefill a Stakeholder the branch added: it can never be approved (R4-5)", async () => {
@@ -286,6 +289,69 @@ describe("AisepGatePage", () => {
 		expect(calls.approve).toHaveLength(0);
 		await userEvent.click(approve);
 		await waitFor(() => expect(calls.approve).toHaveLength(1));
+	});
+
+	it("holds both buttons while the approval progress is still being read", async () => {
+		let release: () => void = () => {};
+		const read = new Promise<void>((done) => (release = done));
+		const { client, calls } = gateClient({
+			query: async (sparql: string, target: { ref: string }) => {
+				if (sparql === APPROVAL_RECORDS_QUERY) return read.then(() => progressRecords(target.ref, false));
+				if (sparql === APPROVERS_QUERY) return gateApprovers as QueryResult;
+				if (sparql === NOT_APPROVABLE_QUERY) return gateNotApprovable as QueryResult;
+				throw new Error(`unexpected query ${sparql}`);
+			},
+		});
+		renderGate(client);
+		const approval = await screen.findByRole("region", { name: en["gate.approval.title"] });
+		// Everything else is ready (approver loaded, gate PASS): only the unread progress keeps the buttons off.
+		await within(approval).findByRole("combobox", { name: en["gate.approval.approver"] });
+		await screen.findByText(en["gate.check.pass"]);
+		const approve = within(approval).getByRole("button", { name: en["gate.approval.approve"] });
+		const reject = within(approval).getByRole("button", { name: en["gate.approval.reject"] });
+		expect(approve).toBeDisabled();
+		expect(reject).toBeDisabled();
+		fireEvent.click(reject);
+		fireEvent.click(approve);
+		await new Promise((r) => setTimeout(r, 20));
+		expect(calls.approve).toHaveLength(0);
+		await act(async () => release());
+		await waitFor(() => expect(reject).toBeEnabled());
+		expect(approve).toBeEnabled();
+	});
+
+	it("asks again when the warning changes from 'progress unknown' to 'already approved'", async () => {
+		let readable = false;
+		const { client, calls } = gateClient({
+			query: async (sparql: string, target: { ref: string }) => {
+				if (sparql === APPROVAL_RECORDS_QUERY) {
+					if (!readable) throw new Error("socket hang up");
+					return progressRecords(target.ref, true);
+				}
+				if (sparql === APPROVERS_QUERY) return gateApprovers as QueryResult;
+				if (sparql === NOT_APPROVABLE_QUERY) return gateNotApprovable as QueryResult;
+				throw new Error(`unexpected query ${sparql}`);
+			},
+		});
+		renderGate(client);
+		const approval = await screen.findByRole("region", { name: en["gate.approval.title"] });
+		expect(await within(approval).findByRole("note")).toHaveTextContent(en["gate.approval.progressUnknown"]);
+		await within(approval).findByRole("combobox", { name: en["gate.approval.approver"] });
+		await screen.findByText(en["gate.check.pass"]);
+		const approve = within(approval).getByRole("button", { name: en["gate.approval.approve"] });
+		await userEvent.click(within(approval).getByRole("checkbox", { name: en["gate.approval.confirmRepeat"] }));
+		expect(approve).toBeEnabled();
+		// The progress can be read now, and the tip turns out to be an approval commit already.
+		readable = true;
+		const progress = screen.getByRole("region", { name: en["gate.progress.title"] });
+		await userEvent.click(within(progress).getByRole("button", { name: en["gate.progress.refresh"] }));
+		expect(await within(approval).findByText(
+			en["gate.approval.alreadyApproved"].replace("{{stage}}", en["gate.progress.stage.approved"]),
+		)).toBeInTheDocument();
+		expect(within(approval).getByRole("checkbox", { name: en["gate.approval.confirmRepeat"] })).not.toBeChecked();
+		expect(approve).toBeDisabled();
+		expect(within(approval).getByRole("button", { name: en["gate.approval.reject"] })).toBeDisabled();
+		expect(calls.approve).toHaveLength(0);
 	});
 
 	it("still shows the running write after leaving the page and coming back, and does not send another", async () => {

@@ -559,9 +559,65 @@ describe("AisepWorkbenchPage gate entries (model_branches, §5.11)", () => {
 			fail = true;
 			await act(() => vi.advanceTimersByTimeAsync(GATE_BRANCHES_REFRESH_MS));
 			const alert = await within(region()).findByText(en["section.gates.branches.refreshFailed"]);
-			expect(alert).toHaveAttribute("title", "INTERNAL: boom");
+			// Same wording as the gate page's errors: message (and hint), no code in front.
+			expect(alert).toHaveAttribute("title", "boom");
 			expect(within(await list()).getAllByRole("link")).toHaveLength(3);
 			expect(within(region()).queryByText(en["section.gates.branches.error"])).toBeNull();
+		} finally {
+			vi.useRealTimers();
+		}
+	});
+
+	it("retries a row whose progress failed after the next list refresh", async () => {
+		vi.useFakeTimers({ shouldAdvanceTime: true });
+		try {
+			let progressDown = true;
+			const { client } = branchClient();
+			const query = client.query.bind(client);
+			client.query = async (sparql, target) => {
+				if (sparql === APPROVAL_RECORDS_QUERY && progressDown) throw new AisepToolError("INTERNAL", "boom", false);
+				return query(sparql, target);
+			};
+			renderPage(client);
+			const links = within(await list()).getAllByRole("link");
+			expect(await within(links[1]).findByText(en["section.gates.branches.progressUnknown"])).toBeInTheDocument();
+			progressDown = false;
+			await act(() => vi.advanceTimersByTimeAsync(GATE_BRANCHES_REFRESH_MS));
+			expect(await within(links[1]).findByText(en["gate.progress.stage.pending"])).toBeInTheDocument();
+			expect(await within(links[0]).findByText(en["gate.progress.stage.approved"])).toBeInTheDocument();
+		} finally {
+			vi.useRealTimers();
+		}
+	});
+
+	it("while the server stays down, only the list asks again: the rows do not multiply the calls", async () => {
+		vi.useFakeTimers({ shouldAdvanceTime: true });
+		try {
+			let listDown = false;
+			let listCalls = 0;
+			let rowCalls = 0;
+			const { client } = branchClient(async () => {
+				listCalls++;
+				if (listDown) throw new AisepToolError("INTERNAL", "boom", false);
+				return { branches: BRANCHES, main: MAIN };
+			});
+			const query = client.query.bind(client);
+			client.query = async (sparql, target) => {
+				if (sparql !== APPROVAL_RECORDS_QUERY) return query(sparql, target);
+				rowCalls++;
+				throw new AisepToolError("INTERNAL", "boom", false);
+			};
+			renderPage(client);
+			const links = within(await list()).getAllByRole("link");
+			for (const link of links) await within(link).findByText(en["section.gates.branches.progressUnknown"]);
+			listDown = true;
+			await act(() => vi.advanceTimersByTimeAsync(GATE_BRANCHES_REFRESH_MS));
+			await within(region()).findByText(en["section.gates.branches.refreshFailed"]);
+			const [lists, rows] = [listCalls, rowCalls];
+			await act(() => vi.advanceTimersByTimeAsync(5 * GATE_BRANCHES_REFRESH_MS));
+			// Five more intervals: five list calls, and none from the three failed rows.
+			expect(listCalls - lists).toBe(5);
+			expect(rowCalls - rows).toBe(0);
 		} finally {
 			vi.useRealTimers();
 		}

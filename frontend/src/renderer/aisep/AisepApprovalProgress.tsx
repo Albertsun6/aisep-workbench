@@ -16,14 +16,16 @@ export function approvalProgressKey(branch: string) {
 	return ["aisep", "approval-progress", branch] as const;
 }
 
-const STAGE_TEXT: Record<ApprovalStage, AisepMessageKey> = {
+/** Stage names, shared by the gate page and the home page's branch list. */
+export const APPROVAL_STAGE_TEXT: Record<ApprovalStage, AisepMessageKey> = {
 	pending: "gate.progress.stage.pending",
 	approved: "gate.progress.stage.approved",
 	pushed: "gate.progress.stage.pushed",
 	merged: "gate.progress.stage.merged",
 };
 
-function errorMessage(error: unknown): string {
+/** The one way AISEP pages show a server error: its message, then the hint in brackets (the code is not shown). */
+export function aisepErrorMessage(error: unknown): string {
 	if (error instanceof AisepToolError) return error.hint ? `${error.message}（${error.hint}）` : error.message;
 	return error instanceof Error ? error.message : String(error);
 }
@@ -94,14 +96,14 @@ export function AisepApprovalProgress({
 										className={isCurrent ? "size-2 rounded-full bg-logo-accent" : "size-2 rounded-full border border-border"}
 									/>
 								)}
-								{t(STAGE_TEXT[stage])}
+								{t(APPROVAL_STAGE_TEXT[stage])}
 							</li>
 						);
 					})}
 				</ol>
 			) : null}
 			{progress.isError ? (
-				<p role="alert" className="text-xs text-destructive">{t("gate.error", { message: errorMessage(progress.error) })}</p>
+				<p role="alert" className="text-xs text-destructive">{t("gate.error", { message: aisepErrorMessage(progress.error) })}</p>
 			) : null}
 			<p className="text-caption text-muted-foreground">{t("gate.progress.fetchNote")}</p>
 		</section>

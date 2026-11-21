@@ -77,7 +77,7 @@
 	"gate.approval.approve": "承認",
 	"gate.approval.reject": "却下",
 	"gate.approval.writing": "書き込み中：サーバーが先にゲートの全チェックを実行するため、数十秒かかることがあります。その間は再送信できません。",
-	"gate.approval.alreadyApproved": "このブランチの先端はすでに承認コミットです（{{stage}}）。もう一度承認するとその上に2件目の承認記録が書かれ、マージ免除の範囲を超えるため再レビューが必要になります。",
+	"gate.approval.alreadyApproved": "このブランチの先端はすでに承認コミットです（{{stage}}）。記録をもう1件書くと（承認でも却下でも）その上に重なり、マージ免除の範囲を超えるため再レビューが必要になります。",
 	"gate.approval.progressUnknown": "承認の進捗を読み取れないため、ブランチの先端が承認済みかどうか分かりません。",
 	"gate.approval.confirmRepeat": "このブランチにもう1件記録を書くことを確認します",
 	"gate.approval.gateFailed": "ゲートチェックが不合格のため、このコミットは却下のみ可能です。",
