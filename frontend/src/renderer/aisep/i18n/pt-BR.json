@@ -77,7 +77,7 @@
 	"gate.approval.approve": "Aprovar",
 	"gate.approval.reject": "Rejeitar",
 	"gate.approval.writing": "Gravando: o servidor executa primeiro a verificação completa do portão, o que pode levar dezenas de segundos. Enquanto isso, não é possível enviar de novo.",
-	"gate.approval.alreadyApproved": "A ponta do branch já é um commit de aprovação ({{stage}}). Aprovar de novo grava um segundo registro por cima, o que a isenção de merge não permite e exige nova revisão.",
+	"gate.approval.alreadyApproved": "A ponta do branch já é um commit de aprovação ({{stage}}). Gravar outro registro (aprovação ou rejeição) o coloca por cima, o que a isenção de merge não permite e exige nova revisão.",
 	"gate.approval.progressUnknown": "Não foi possível ler o progresso da aprovação; não se sabe se a ponta do branch já está aprovada.",
 	"gate.approval.confirmRepeat": "Confirmo gravar outro registro neste branch",
 	"gate.approval.gateFailed": "A verificação do portão falhou; este commit só pode ser rejeitado.",

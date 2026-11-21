@@ -1,12 +1,12 @@
 import { useQueries, useQuery } from "@tanstack/react-query";
-import { useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { Workflow } from "@/components/app-icons";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { PageTopbar, PageTopbarTitle } from "../components/PageTopbar";
-import { approvalProgressKey } from "./AisepApprovalProgress";
-import { approvalProgress, type ApprovalStage } from "./data/approval-progress";
+import { APPROVAL_STAGE_TEXT, aisepErrorMessage, approvalProgressKey } from "./AisepApprovalProgress";
+import { approvalProgress } from "./data/approval-progress";
 import { aoSessionSource, type AgentSessionBucket, type AgentSessionRow, type AgentSessionSource } from "./data/ao-sessions";
 import { branchChanges, changedElementsView } from "./data/changed-elements";
 import {
@@ -251,18 +251,6 @@ function ElementSection({
 /** The branch list follows pushes and merges done outside the workbench; the server reads refs only, never fetches. */
 export const GATE_BRANCHES_REFRESH_MS = 15_000;
 
-const STAGE_TEXT: Record<ApprovalStage, AisepMessageKey> = {
-	pending: "gate.progress.stage.pending",
-	approved: "gate.progress.stage.approved",
-	pushed: "gate.progress.stage.pushed",
-	merged: "gate.progress.stage.merged",
-};
-
-function errorText(error: unknown): string {
-	if (error instanceof AisepToolError) return error.hint ? `${error.code}: ${error.message}（${error.hint}）` : `${error.code}: ${error.message}`;
-	return error instanceof Error ? error.message : String(error);
-}
-
 /** "待批准关口" entry points (model_branches, §5.11): local branches with model changes not yet on main, each row a link. */
 function GateBranches({ client, gateLinks }: { client: AisepModelClient; gateLinks: boolean }) {
 	const t = useAisepT();
@@ -277,7 +265,7 @@ function GateBranches({ client, gateLinks }: { client: AisepModelClient; gateLin
 		retry: shouldRetryAisep,
 	});
 	const data = branches.data;
-	const errorTitle = branches.isError ? errorText(branches.error) : undefined;
+	const errorTitle = branches.isError ? aisepErrorMessage(branches.error) : undefined;
 	return (
 		<div className="flex flex-col gap-1">
 			<h3 id={headingId} className="text-xs font-medium text-muted-foreground">{t("section.gates.branches.title")}</h3>
@@ -290,7 +278,7 @@ function GateBranches({ client, gateLinks }: { client: AisepModelClient; gateLin
 					<ul aria-labelledby={headingId} className="divide-y divide-border">
 						{data.rows.map((info) => (
 							<li key={info.branch}>
-								<GateBranchRow client={client} info={info} main={data.main} gateLinks={gateLinks} />
+								<GateBranchRow client={client} info={info} main={data.main} gateLinks={gateLinks} listUpdatedAt={branches.dataUpdatedAt} />
 							</li>
 						))}
 					</ul>
@@ -313,11 +301,14 @@ function GateBranchRow({
 	info,
 	main,
 	gateLinks,
+	listUpdatedAt,
 }: {
 	client: AisepModelClient;
 	info: BranchInfo;
 	main: { ref: string; commit: string };
 	gateLinks: boolean;
+	/** When the branch list last loaded successfully: a failed row tries again only then. */
+	listUpdatedAt: number;
 }) {
 	const t = useAisepT();
 	// Every input of the stage is in the key (the refs' commits), so it is recomputed exactly when one moves; the gate
@@ -327,10 +318,18 @@ function GateBranchRow({
 		queryFn: ({ signal }) => approvalProgress(client, info.branch, main.ref, { signal }),
 		enabled: gateLinks,
 		staleTime: Number.POSITIVE_INFINITY,
-		// Nothing moves the key after a failure, so a failed computation tries again on the list's poll interval.
-		refetchInterval: (query) => (query.state.status === "error" ? GATE_BRANCHES_REFRESH_MS : false),
 		retry: shouldRetryAisep,
 	});
+	// Nothing moves the key after a failure, so a failed computation tries again, but only after the list itself was read
+	// again: while the server is down the list's one call per interval fails and no row asks (not one call per row).
+	// A read already running is left alone (refetch would cancel and resend it).
+	const { isError: progressFailed, isFetching: progressFetching, refetch: refetchProgress } = progress;
+	const seenListUpdate = useRef(listUpdatedAt);
+	useEffect(() => {
+		if (seenListUpdate.current === listUpdatedAt) return;
+		seenListUpdate.current = listUpdatedAt;
+		if (progressFailed && !progressFetching) void refetchProgress();
+	}, [listUpdatedAt, progressFailed, progressFetching, refetchProgress]);
 	const content = (
 		<>
 			<span className="min-w-0 truncate font-mono text-foreground">{info.branch}</span>
@@ -338,9 +337,9 @@ function GateBranchRow({
 			{info.unpushed ? <Badge variant="warning">{t("section.gates.branches.unpushed")}</Badge> : null}
 			<span className="ml-auto shrink-0 text-muted-foreground">
 				{!gateLinks ? null : progress.data ? (
-					t(STAGE_TEXT[progress.data.stage])
+					t(APPROVAL_STAGE_TEXT[progress.data.stage])
 				) : progress.isError ? (
-					<span title={errorText(progress.error)}>
+					<span title={aisepErrorMessage(progress.error)}>
 						{t("section.gates.branches.progressUnknown")}
 					</span>
 				) : (

@@ -77,7 +77,7 @@
 	"gate.approval.approve": "Approve",
 	"gate.approval.reject": "Reject",
 	"gate.approval.writing": "Writing: the server runs the full gate check first, which can take tens of seconds. You cannot submit again meanwhile.",
-	"gate.approval.alreadyApproved": "The branch tip is already an approval commit ({{stage}}). Approving again writes a second approval record on top of it, which the merge exemption does not allow and which needs a fresh review.",
+	"gate.approval.alreadyApproved": "The branch tip is already an approval commit ({{stage}}). Writing another record (an approval or a rejection) puts it on top, which the merge exemption does not allow and which needs a fresh review.",
 	"gate.approval.progressUnknown": "Could not read the approval progress, so it is unknown whether the branch tip is already approved.",
 	"gate.approval.confirmRepeat": "I confirm writing another record on this branch",
 	"gate.approval.gateFailed": "The gate check failed, so this commit can only be rejected.",

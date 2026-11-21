@@ -8,8 +8,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { PageTopbar, PageTopbarTitle } from "../components/PageTopbar";
-import { AisepApprovalProgress, approvalProgressKey } from "./AisepApprovalProgress";
-import { DEFAULT_MAIN_REF, approvalProgress, type ApprovalStage } from "./data/approval-progress";
+import { APPROVAL_STAGE_TEXT, AisepApprovalProgress, aisepErrorMessage, approvalProgressKey } from "./AisepApprovalProgress";
+import { DEFAULT_MAIN_REF, approvalProgress } from "./data/approval-progress";
 import { modelClient } from "./AisepWorkbenchPage";
 import {
 	AisepToolError,
@@ -106,13 +106,6 @@ export function approvalMutationKey(branch: string, commit: string) {
 	return ["aisep", "approval", branch, commit] as const;
 }
 
-const STAGE_TEXT: Record<ApprovalStage, AisepMessageKey> = {
-	pending: "gate.progress.stage.pending",
-	approved: "gate.progress.stage.approved",
-	pushed: "gate.progress.stage.pushed",
-	merged: "gate.progress.stage.merged",
-};
-
 const CHANGE_TEXT: Record<Change, AisepMessageKey> = {
 	added: "gate.change.added",
 	modified: "gate.change.modified",
@@ -140,11 +133,6 @@ const GATE_TEXT: Record<(typeof BRANCH_GATES)[number], AisepMessageKey> = {
 
 function localName(iri: Iri): string {
 	return iri.slice(Math.max(iri.lastIndexOf("/"), iri.lastIndexOf("#")) + 1);
-}
-
-function errorMessage(error: unknown): string {
-	if (error instanceof AisepToolError) return error.hint ? `${error.message}（${error.hint}）` : error.message;
-	return error instanceof Error ? error.message : String(error);
 }
 
 export function AisepGatePage({ branch, client = modelClient }: { branch: string; client?: AisepModelClient }) {
@@ -179,7 +167,7 @@ export function AisepGatePage({ branch, client = modelClient }: { branch: string
 					{diff.isLoading ? (
 						<p role="status" className="text-xs text-muted-foreground">{t("section.loading")}</p>
 					) : diff.isError ? (
-						<p role="alert" className="text-xs text-destructive">{t("gate.error", { message: errorMessage(diff.error) })}</p>
+						<p role="alert" className="text-xs text-destructive">{t("gate.error", { message: aisepErrorMessage(diff.error) })}</p>
 					) : diff.data && head ? (
 						<>
 							<p className="font-mono text-caption text-muted-foreground">
@@ -256,7 +244,7 @@ function CheckSection({ client, commit }: { client: AisepModelClient; commit: st
 			{gate.isLoading ? (
 				<p role="status" className="text-xs text-muted-foreground">{t("section.loading")}</p>
 			) : gate.isError ? (
-				<p role="alert" className="text-xs text-destructive">{t("gate.error", { message: errorMessage(gate.error) })}</p>
+				<p role="alert" className="text-xs text-destructive">{t("gate.error", { message: aisepErrorMessage(gate.error) })}</p>
 			) : gate.data ? (
 				<>
 					<p className="text-xs">
@@ -347,7 +335,8 @@ function ApprovalSection({
 		queryFn: ({ signal }) => approvalProgress(client, branch, mainRef, { signal }),
 		retry: shouldRetryAisep,
 	});
-	const [confirmedRepeat, setConfirmedRepeat] = useState(false);
+	// Which warning the user confirmed: a confirmation of "progress unknown" does not carry over to "already approved".
+	const [confirmedFor, setConfirmedFor] = useState<"approved" | "unknown">();
 	useEffect(() => {
 		if (approver === undefined && approvers.data?.length) setApprover(approvers.data[0].iri);
 	}, [approver, approvers.data]);
@@ -396,7 +385,7 @@ function ApprovalSection({
 		return (
 			<GateSection titleKey="gate.approval.title">
 				<p role="alert" className="text-xs text-destructive">
-					{t("gate.approval.notApprovableFailed", { message: errorMessage(notApprovable.error) })}
+					{t("gate.approval.notApprovableFailed", { message: aisepErrorMessage(notApprovable.error) })}
 				</p>
 			</GateSection>
 		);
@@ -418,7 +407,9 @@ function ApprovalSection({
 	const gateFailed = gateCheck.data?.result === "FAIL";
 	// Already approved (tip adds Approved records), or unknown because the progress could not be read: ask first.
 	const alreadyStage = progress.data && progress.data.stage !== "pending" ? progress.data.stage : undefined;
-	const needsConfirm = alreadyStage !== undefined || (progress.isError && !progress.data);
+	const confirmReason = alreadyStage !== undefined ? "approved" : progress.isError && !progress.data ? "unknown" : undefined;
+	const needsConfirm = confirmReason !== undefined;
+	const confirmedRepeat = confirmReason !== undefined && confirmedFor === confirmReason;
 	const ready =
 		approves.length > 0 &&
 		approver !== undefined &&
@@ -466,11 +457,11 @@ function ApprovalSection({
 				<div role="note" className="flex flex-col gap-1 text-xs text-warning">
 					<p>
 						{alreadyStage
-							? t("gate.approval.alreadyApproved", { stage: t(STAGE_TEXT[alreadyStage]) })
+							? t("gate.approval.alreadyApproved", { stage: t(APPROVAL_STAGE_TEXT[alreadyStage]) })
 							: t("gate.approval.progressUnknown")}
 					</p>
 					<label className="flex items-center gap-2 text-foreground">
-						<Checkbox checked={confirmedRepeat} disabled={writing} onCheckedChange={(checked) => setConfirmedRepeat(checked === true)} />
+						<Checkbox checked={confirmedRepeat} disabled={writing} onCheckedChange={(checked) => setConfirmedFor(checked === true ? confirmReason : undefined)} />
 						{t("gate.approval.confirmRepeat")}
 					</label>
 				</div>
@@ -497,7 +488,7 @@ function ApprovalSection({
 				<p role="alert" className="text-xs text-destructive">
 					{failure instanceof AisepToolError && failure.code === "STALE_HEAD"
 						? t("gate.approval.staleHead")
-						: t("gate.approval.failed", { message: errorMessage(failure) })}
+						: t("gate.approval.failed", { message: aisepErrorMessage(failure) })}
 				</p>
 			) : null}
 		</GateSection>

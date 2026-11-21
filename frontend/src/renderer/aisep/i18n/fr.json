@@ -77,7 +77,7 @@
 	"gate.approval.approve": "Approuver",
 	"gate.approval.reject": "Rejeter",
 	"gate.approval.writing": "Écriture en cours : le serveur exécute d'abord la vérification complète du jalon, ce qui peut prendre plusieurs dizaines de secondes. Impossible de soumettre à nouveau entre-temps.",
-	"gate.approval.alreadyApproved": "Le sommet de la branche est déjà un commit d'approbation ({{stage}}). Approuver à nouveau écrit un second enregistrement par-dessus, ce que l'exemption de fusion n'autorise pas et qui exige une nouvelle revue.",
+	"gate.approval.alreadyApproved": "Le sommet de la branche est déjà un commit d'approbation ({{stage}}). Écrire un autre enregistrement (approbation ou rejet) le place par-dessus, ce que l'exemption de fusion n'autorise pas et qui exige une nouvelle revue.",
 	"gate.approval.progressUnknown": "Impossible de lire l'avancement de l'approbation : on ne sait pas si le sommet de la branche est déjà approuvé.",
 	"gate.approval.confirmRepeat": "Je confirme écrire un autre enregistrement sur cette branche",
 	"gate.approval.gateFailed": "Le contrôle de la porte a échoué : ce commit ne peut qu’être rejeté.",
