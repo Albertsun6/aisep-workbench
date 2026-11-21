@@ -205,16 +205,20 @@ describe("AisepGatePage", () => {
 
 	it("tells the user to refresh when the branch moved on (STALE_HEAD)", async () => {
 		const e = staleHead as { code: string; message: string; hint?: string; retryable: boolean; details?: Record<string, unknown> };
-		const { client } = gateClient({
-			recordApproval: () => Promise.reject(new AisepToolError(e.code, e.message, e.retryable, e.hint, e.details)),
+		const { client, calls } = gateClient({
+			recordApproval: (input: ApprovalInput) => (
+				calls.approve.push(input), Promise.reject(new AisepToolError(e.code, e.message, e.retryable, e.hint, e.details))
+			),
 		});
 		renderGate(client);
 		const approve = await screen.findByRole("button", { name: en["gate.approval.approve"] });
 		await waitFor(() => expect(approve).toBeEnabled());
 		await userEvent.click(approve);
 		expect(await screen.findByRole("alert")).toHaveTextContent(en["gate.approval.staleHead"]);
-		// A failed write frees the buttons again.
+		// A failed write frees the buttons again, and a retry really sends a second call.
 		expect(approve).toBeEnabled();
+		await userEvent.click(approve);
+		await waitFor(() => expect(calls.approve).toHaveLength(2));
 	});
 
 	it("shows the write in progress and sends one approval however fast the buttons are clicked", async () => {

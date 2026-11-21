@@ -34,8 +34,10 @@ const READ_ONLY_TOOLS = new Set(["model_diff", "model_gate", "model_query"]);
 const GATE_TIMEOUT_MS = 600_000;
 // start 运行期间每隔这么多秒 git fetch origin 一次（--fetch-interval，0 关闭）。
 const DEFAULT_FETCH_INTERVAL_S = 60;
-// 专用检出自动跟进时，这些路径一变就不跟：运行中的服务用的是启动时导入的代码（见 scripts/aisep-dev.md「refresh」）。
-const SERVE_CODE_PATHS = ["aisep", "requirements.txt"];
+// 专用检出自动跟进时，这些路径一变就不跟：运行中的服务在进程里留着它们的旧版本。aisep/ 是启动时导入的代码；
+// modules/ 与 vendor/ 里有按路径缓存的文件（aisep core.py 的 _SC：aisep-core shapes 的 SHACL-SPARQL 约束；_RT：
+// ArchiMate 关系表），路径不变就不会重读。见 scripts/aisep-dev.md「自动刷新」。
+const SERVE_LOADED_PATHS = ["aisep", "modules", "vendor", "requirements.txt"];
 const WORKBENCH_DEFAULT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
 // 与工作台关口页 APPROVERS_QUERY（AisepGatePage.tsx）逐字相同，行数与顺序才和页面下拉一致。改页面时同步改这里。
@@ -198,17 +200,18 @@ async function gitAsync(cwd, args, signal) {
 /**
  * start 运行期间的一轮：git fetch origin（只更新远端跟踪引用，关口页的「已推送」「已合入」靠它），
  * 再看专用检出能不能自动跟到新的 origin/main（首页的「已批准」靠它）。只在同时满足下面几条时才移动：
- * 是登记过的游离 worktree、工作区干净、只是快进、这段提交没改服务代码（SERVE_CODE_PATHS）。否则只提示。
+ * 是登记过的游离 worktree、工作区干净、只是快进、从服务启动时的提交（loadedHead）到新 main 没改服务已加载的
+ * 文件（SERVE_LOADED_PATHS）。否则只提示。
  * 从不抛错、从不退出进程；返回这一轮的结论，log 只在结论变了时打印（断网时不会每分钟刷屏）。
  */
-export async function autoFetchOnce(state, { repo = AISEP_REPO, serveDir = SERVE_DIR, log = console.log, signal } = {}) {
+export async function autoFetchOnce(state, { repo = AISEP_REPO, serveDir = SERVE_DIR, loadedHead, log = console.log, signal } = {}) {
 	const say = (outcome, message) => {
 		if (message !== state.lastMessage) log(message);
 		state.lastMessage = message;
 		return outcome;
 	};
 	try {
-		await gitAsync(repo, ["fetch", "--quiet", "--no-auto-maintenance", "origin"], signal);
+		await gitAsync(repo, ["fetch", "--quiet", "--no-auto-maintenance", "--no-write-fetch-head", "origin"], signal);
 	} catch (e) {
 		const reason = String(e.stderr || e.message).trim().split("\n")[0];
 		return say("fetch-failed", `[fetch] git fetch origin 失败，服务照常运行，下一轮再试：${reason}`);
@@ -218,8 +221,8 @@ export async function autoFetchOnce(state, { repo = AISEP_REPO, serveDir = SERVE
 		const head = await gitAsync(serveDir, ["rev-parse", "HEAD"], signal);
 		const short = (c) => c.slice(0, 7);
 		if (head === target) return say("current", `[fetch] 已 fetch；专用检出 = origin/main = ${short(target)}`);
-		const hold = (why) =>
-			say("held", `[fetch] origin/main 已到 ${short(target)}，专用检出仍在 ${short(head)}，没有自动跟进：${why}。首页要看新的 main 就处理后跑 refresh`);
+		const hold = (why, next = "首页要看新的 main 就处理后跑 refresh") =>
+			say("held", `[fetch] origin/main 已到 ${short(target)}，专用检出仍在 ${short(head)}，没有自动跟进：${why}。${next}`);
 		const registered = worktrees(repo).find((w) => real(w.worktree) === real(serveDir));
 		if (!registered?.detached) return hold("专用检出不是登记过的游离 worktree");
 		try {
@@ -229,12 +232,14 @@ export async function autoFetchOnce(state, { repo = AISEP_REPO, serveDir = SERVE
 		}
 		const dirty = await gitAsync(serveDir, ["status", "--porcelain", "--untracked-files=all"], signal);
 		if (dirty) return hold("专用检出有未提交改动");
-		const code = await gitAsync(repo, ["diff", "--name-only", head, target, "--", ...SERVE_CODE_PATHS], signal);
-		if (code) {
-			return hold(`这段提交改了服务代码（${code.split("\n").slice(0, 3).join("、")}${code.includes("\n") ? " 等" : ""}），要停掉服务后重新 start`);
+		// 基准是服务启动时的提交，不是专用检出当前的 HEAD：手动 refresh 移动过检出后，HEAD 已不是进程里加载的版本。
+		const loaded = await gitAsync(repo, ["diff", "--name-only", loadedHead ?? head, target, "--", ...SERVE_LOADED_PATHS], signal);
+		if (loaded) {
+			const files = `${loaded.split("\n").slice(0, 3).join("、")}${loaded.split("\n").length > 3 ? " 等" : ""}`;
+			return hold(`服务启动后 main 改了服务已加载的代码或规则文件（${files}）`, "要先停掉服务，再重新 start；服务运行中不要 refresh");
 		}
 		await gitAsync(serveDir, ["checkout", "--quiet", "--detach", target], signal);
-		return say("followed", `[fetch] 专用检出已快进 ${short(head)} → ${short(target)}（这段提交没改服务代码，服务不用重启）`);
+		return say("followed", `[fetch] 专用检出已快进 ${short(head)} → ${short(target)}（服务启动以来没改代码与规则文件，不用重启）`);
 	} catch (e) {
 		const reason = String(e.stderr || e.message).trim().split("\n")[0];
 		return say("error", `[fetch] 检查专用检出时出错，服务照常运行：${reason}`);
@@ -475,7 +480,7 @@ async function start(opts) {
 	else console.log(`关口页     ${base}/#/aisep/gate/<分支名>（start 加 --branch 直接打印）`);
 	if (opts.branch && approve) console.log(`预检       node ${join(WORKBENCH_DEFAULT, "scripts/aisep-dev.mjs")} preflight ${opts.branch} --mcp-port ${mcpPort}`);
 	console.log(
-		`自动刷新   ${fetchInterval ? `每 ${fetchInterval} 秒 git fetch origin；专用检出在干净、快进、没改服务代码时自动跟到 origin/main` : "关（--fetch-interval 0），需要时手动 refresh"}`,
+		`自动刷新   ${fetchInterval ? `每 ${fetchInterval} 秒 git fetch origin；专用检出在干净、快进、没改 ${SERVE_LOADED_PATHS.join("、")} 时自动跟到 origin/main` : "关（--fetch-interval 0），需要时手动 refresh"}`,
 	);
 	console.log("Ctrl-C（或对本进程 PID 发 SIGTERM）停止两项服务");
 	console.log("====================================================");
@@ -483,7 +488,7 @@ async function start(opts) {
 	if (fetchInterval) {
 		const state = {};
 		const tick = async () => {
-			await autoFetchOnce(state, { signal: fetchAbort.signal });
+			await autoFetchOnce(state, { loadedHead: head, signal: fetchAbort.signal });
 			if (!stopping) fetchTimer = setTimeout(tick, fetchInterval * 1000);
 		};
 		fetchTimer = setTimeout(tick, fetchInterval * 1000);

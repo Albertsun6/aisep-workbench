@@ -2,7 +2,7 @@
 // node --test scripts/aisep-dev.test.mjs
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from 'node:fs';
+import { existsSync, mkdtempSync, rmSync, writeFileSync, mkdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import test from 'node:test';
@@ -48,9 +48,9 @@ function push(env, file, content) {
 	return sha;
 }
 
-async function once(env, state = {}) {
+async function once(env, state = {}, options = {}) {
 	const lines = [];
-	const outcome = await autoFetchOnce(state, { repo: env.repo, serveDir: env.serve, log: (l) => lines.push(l) });
+	const outcome = await autoFetchOnce(state, { repo: env.repo, serveDir: env.serve, log: (l) => lines.push(l), ...options });
 	return { outcome, lines, state };
 }
 
@@ -61,20 +61,64 @@ test('跟进只改模型的快进：远端跟踪引用与专用检出都到新 m
 	assert.equal(outcome, 'followed');
 	assert.equal(git(env.repo, 'rev-parse', 'refs/remotes/origin/main'), sha);
 	assert.equal(git(env.serve, 'rev-parse', 'HEAD'), sha);
-	// 主检出（repo）的工作区与分支不动。
+	// 主检出（repo）的工作区与分支不动，也不写 .git/FETCH_HEAD。
 	assert.equal(git(env.repo, 'status', '--porcelain'), '');
 	assert.notEqual(git(env.repo, 'rev-parse', 'HEAD'), sha);
+	assert.equal(existsSync(join(env.repo, '.git', 'FETCH_HEAD')), false);
 });
 
-test('改了服务代码只提示，不移动专用检出；但远端跟踪引用照样更新', async (t) => {
+for (const file of ['aisep/core.py', 'modules/aisep-core/shapes.ttl', 'vendor/meta.linked.archi/ttl/relationships.ttl', 'requirements.txt']) {
+	test(`改了服务已加载的 ${file} 只提示停服务重启，不移动专用检出；远端跟踪引用照样更新`, async (t) => {
+		const env = setup(t);
+		const before = git(env.serve, 'rev-parse', 'HEAD');
+		const sha = push(env, file, 'v2');
+		const { outcome, lines } = await once(env);
+		assert.equal(outcome, 'held');
+		assert.ok(lines[0].includes(`代码或规则文件（${file}）`), lines[0]);
+		// 服务运行中 refresh 同样会新旧混用：这一种只让人停服务、重新 start。
+		assert.match(lines[0], /要先停掉服务，再重新 start；服务运行中不要 refresh$/);
+		assert.equal(git(env.serve, 'rev-parse', 'HEAD'), before);
+		assert.equal(git(env.repo, 'rev-parse', 'refs/remotes/origin/main'), sha);
+	});
+}
+
+test('服务代码的比较基准是启动时的提交：手动 refresh 越过规则改动后，之后只改模型也不跟', async (t) => {
 	const env = setup(t);
+	const loadedHead = git(env.serve, 'rev-parse', 'HEAD');
+	// main 改了 shapes，有人在服务运行中手动 refresh 把检出移了过去；之后 main 又只改了模型。
+	const shapes = push(env, 'modules/aisep-core/shapes.ttl', 'v2');
+	git(env.repo, 'fetch', '--quiet', 'origin');
+	git(env.serve, 'checkout', '--quiet', '--detach', shapes);
+	push(env, 'models/a/model.ttl', 'v2');
+	const { outcome, lines } = await once(env, {}, { loadedHead });
+	assert.equal(outcome, 'held');
+	assert.match(lines[0], /modules\/aisep-core\/shapes\.ttl/);
+	assert.equal(git(env.serve, 'rev-parse', 'HEAD'), shapes);
+});
+
+test('专用检出检出了分支时不移动', async (t) => {
+	const env = setup(t);
+	git(env.serve, 'switch', '--quiet', '-c', 'local-work');
 	const before = git(env.serve, 'rev-parse', 'HEAD');
-	const sha = push(env, 'aisep/core.py', 'v2');
+	push(env, 'models/a/model.ttl', 'v2');
 	const { outcome, lines } = await once(env);
 	assert.equal(outcome, 'held');
-	assert.match(lines[0], /服务代码（aisep\/core\.py）/);
+	assert.match(lines[0], /不是登记过的游离 worktree/);
 	assert.equal(git(env.serve, 'rev-parse', 'HEAD'), before);
-	assert.equal(git(env.repo, 'rev-parse', 'refs/remotes/origin/main'), sha);
+	assert.equal(git(env.serve, 'branch', '--show-current'), 'local-work');
+});
+
+test('专用检出不是该仓库登记的 worktree（另一个克隆）时不移动', async (t) => {
+	const env = setup(t);
+	const other = join(env.origin, '..', 'other');
+	execFileSync('git', ['clone', '--quiet', env.origin, other], { env: ENV, stdio: 'ignore' });
+	git(other, 'checkout', '--quiet', '--detach');
+	const before = git(other, 'rev-parse', 'HEAD');
+	push(env, 'models/a/model.ttl', 'v2');
+	const { outcome, lines } = await once({ ...env, serve: other });
+	assert.equal(outcome, 'held');
+	assert.match(lines[0], /不是登记过的游离 worktree/);
+	assert.equal(git(other, 'rev-parse', 'HEAD'), before);
 });
 
 test('专用检出有未提交改动时不移动', async (t) => {
