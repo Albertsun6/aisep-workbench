@@ -16,6 +16,7 @@ import {
 	type GateResult,
 	type QueryResult,
 } from "./data/client";
+import { APPROVAL_RECORDS_QUERY } from "./data/approval-progress";
 import { fixtureClient } from "./data/fixture-client";
 import staleHead from "./data/fixtures/error-stale-head.json";
 import gateApproval from "./data/fixtures/gate-approval.json";
@@ -32,12 +33,33 @@ const BRANCH = "feat/approve";
 const diff = gateDiff as DiffResult;
 const head = diff.head.kind === "ref" ? diff.head.commit : "";
 
+/** Before approving no ref holds a record (nothing pushed: origin/<branch> missing); after it the branch tip added one. */
+function progressRecords(ref: string, approved: boolean): QueryResult {
+	if (ref.startsWith("refs/remotes/origin/feat/") || ref.endsWith("^2")) {
+		throw new AisepToolError("REF_NOT_FOUND", `找不到提交 ${ref}`, false);
+	}
+	const rows =
+		approved && ref === `refs/heads/${BRANCH}`
+			? [{ record: { type: "iri" as const, value: gateApproval.approval.iri }, decision: { type: "iri" as const, value: DECISION_APPROVED } }]
+			: [];
+	return { kind: "select", variables: ["record", "decision"], rows, truncated: false };
+}
+const DECISION_APPROVED = "https://aisep.example/ont/aisep#DecisionApproved";
+
 function gateClient(overrides: Partial<AisepModelClient> = {}) {
-	const calls = { diff: [] as unknown[], gate: [] as unknown[], query: [] as unknown[], approve: [] as ApprovalInput[] };
+	const calls = {
+		diff: [] as unknown[],
+		gate: [] as unknown[],
+		query: [] as unknown[],
+		progress: [] as string[],
+		approve: [] as ApprovalInput[],
+	};
 	const client = Object.assign(Object.create(fixtureClient) as AisepModelClient, {
 		diff: async (input: unknown) => (calls.diff.push(input), diff),
 		gate: async (target: unknown) => (calls.gate.push(target), gateCheck as GateResult),
-		query: async (sparql: string, target: unknown) => {
+		query: async (sparql: string, target: { ref: string }) => {
+			// The approval progress follows the branch refs, not the pinned commit (AisepApprovalProgress).
+			if (sparql === APPROVAL_RECORDS_QUERY) return (calls.progress.push(target.ref), progressRecords(target.ref, calls.approve.length > 0));
 			calls.query.push([sparql, target]);
 			if (sparql === APPROVERS_QUERY) return gateApprovers as QueryResult;
 			if (sparql === NOT_APPROVABLE_QUERY) return gateNotApprovable as QueryResult;
@@ -81,6 +103,11 @@ describe("AisepGatePage", () => {
 			expect.arrayContaining([[APPROVERS_QUERY, { ref: head }], [NOT_APPROVABLE_QUERY, { ref: head, limit: 10_000 }]]),
 		);
 		expect(calls.query).toHaveLength(2);
+		const progress = screen.getByRole("region", { name: en["gate.progress.title"] });
+		expect(await within(progress).findByText(en["gate.progress.stage.pending"])).toHaveAttribute("aria-current", "step");
+		expect(calls.progress).toEqual(
+			expect.arrayContaining([`refs/heads/${BRANCH}`, `refs/heads/${BRANCH}^`, `refs/remotes/origin/${BRANCH}`]),
+		);
 	});
 
 	it("approves exactly the commit that was shown, with the prefilled elements and the first approver", async () => {
@@ -101,6 +128,11 @@ describe("AisepGatePage", () => {
 		]);
 		// One decision per page visit: the buttons stay off after it is recorded.
 		expect(approve).toBeDisabled();
+		// The progress is read again right away, not at the next poll: the branch tip now adds the record.
+		const progress = screen.getByRole("region", { name: en["gate.progress.title"] });
+		await waitFor(() =>
+			expect(within(progress).getByText(en["gate.progress.stage.approved"])).toHaveAttribute("aria-current", "step"),
+		);
 	});
 
 	it("does not prefill a Stakeholder the branch added: it can never be approved (R4-5)", async () => {

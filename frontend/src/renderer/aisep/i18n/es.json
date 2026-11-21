@@ -86,5 +86,12 @@
 	"section.gates.approvedOnBranch": "Aprobado en {{branch}}, aún sin fusionar",
 	"section.aiActivity.gateNeedsServer": "La página de puerta necesita el servidor de modelos (VITE_AISEP_MCP_URL).",
 	"section.gates.branchMarksUnknown": "No se pudieron leer las aprobaciones en {{branches}}: los elementos ya aprobados allí pueden no estar marcados.",
-	"gate.approval.notApprovableFailed": "No se pudo comprobar qué elementos se pueden aprobar, así que no se rellena nada: {{message}}"
+	"gate.approval.notApprovableFailed": "No se pudo comprobar qué elementos se pueden aprobar, así que no se rellena nada: {{message}}",
+	"gate.progress.title": "Progreso de la aprobación",
+	"gate.progress.refresh": "Actualizar",
+	"gate.progress.stage.pending": "Pendiente de aprobación",
+	"gate.progress.stage.approved": "Aprobado, sin enviar",
+	"gate.progress.stage.pushed": "Enviado, sin fusionar",
+	"gate.progress.stage.merged": "Fusionado",
+	"gate.progress.fetchNote": "Se deriva de Git en el repositorio que lee el servidor de modelos y se comprueba cada 15 segundos. El servidor nunca hace fetch: «Enviado» y «Fusionado» reflejan origin según el último git fetch en ese repositorio."
 }

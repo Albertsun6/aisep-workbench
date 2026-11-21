@@ -1,6 +1,6 @@
 # UPSTREAM.md：上游同步记录
 
-本仓库是 [OrchestratorInc/agent-orchestrator](https://github.com/OrchestratorInc/agent-orchestrator)（Apache-2.0）的**私有镜像**，AISEP 改动在 `aisep-main` 分支上。为什么用私有镜像而不是 GitHub fork：GitHub 的 fork 只能公开。决策见 AISEP `decisions.md` ADR-006。
+本仓库是 [OrchestratorInc/agent-orchestrator](https://github.com/OrchestratorInc/agent-orchestrator)（Apache-2.0）的**镜像**（不是 GitHub fork），AISEP 改动在 `aisep-main` 分支上。最初建成私有镜像，是因为 GitHub 的 fork 只能公开（决策见 AISEP `decisions.md` ADR-006）；仓库已于 2026-11-21 改为公开，仍保持镜像而不是 fork。
 
 ## 当前锁定版本
 
@@ -14,11 +14,11 @@
 ## Remote 约定
 
 - `upstream` = OrchestratorInc/agent-orchestrator，**只拉不推**：push 地址已设成无效值 `DISABLED-no-push-to-upstream`。
-- `origin` = Albertsun6/aisep-workbench（私有）。
+- `origin` = Albertsun6/aisep-workbench（公开，2026-11-21 起）。
 
 ## AISEP 接触面（合并时只需关注这些）
 
-AISEP 代码全部在 `frontend/src/renderer/aisep/`（上游没有这个目录，合并永不冲突）。碰到上游的只有：
+AISEP 代码全部在 `frontend/src/renderer/aisep/`（上游没有这个目录，合并永不冲突），外加 `scripts/aisep-dev.mjs` 与说明 `scripts/aisep-dev.md`（一键启动 aisep MCP HTTP 服务与工作台网页版、批准前只读预检；AISEP 新增，上游没有同名文件，只读取上游的 `frontend/scripts/dev-web.mjs` 与 `vite.renderer.config.ts` 的 `AO_DEV_API_TARGET`，这两处改名或改参数时要跟着改）。碰到上游的只有：
 
 | 文件 | AISEP 改了什么 |
 |---|---|
@@ -27,7 +27,7 @@ AISEP 代码全部在 `frontend/src/renderer/aisep/`（上游没有这个目录�
 | `frontend/src/renderer/routeTree.gen.ts` | 生成文件，多出 aisep 路由的几行 |
 | `scripts/ci-lanes.mjs` | 3 行：新增 `TRUNKS = new Set(['main', 'aisep-main'])`，两处 `base !== 'main'` 改为 `!TRUNKS.has(base)`，让目标为 `aisep-main` 的 PR 像目标为 `main` 的 PR 一样跑 frontend/go 等检查（原逻辑把它当叠加 PR，一项不跑）。测试 `scripts/ci-lanes.test.mjs` 加了一例。上游改这两行时手工合并 |
 | `.github/workflows/ci-retarget.yml` | 1 行条件 + 1 行注释：`github.base_ref == 'main'` 改为 `(github.base_ref == 'main' || github.base_ref == 'aisep-main')`，与 `ci-lanes.mjs` 的 `TRUNKS` 保持一致，PR 改目标到 `aisep-main` 时也重跑 CI。上游改这行时手工合并 |
-| `frontend/playwright.config.ts` | 1 行配置 + 5 行注释：`expect: { timeout: process.env.CI ? 15_000 : 5_000 }`，CI 下把断言默认等待从 5 s 放宽到 15 s（renderer-smoke 偶发失败是首屏断言在慢机器上超时，证据见 wb PR #6 描述）。本地不设 CI 时不变。**代价**：首屏变慢 5–15 s 这一档的回归，CI 的 renderer-smoke 不会再报出来（本地不设 CI 时 5 s 仍能抓到）。**依据的局限**："CI runner 比开发机慢"这条理由目前只有本地负载数据支撑（本机高负载下复现首屏超时），没有 CI runner 上的实测。上游改 `defineConfig` 顶层字段时手工合并 |
+| `frontend/playwright.config.ts` | 1 行配置 + 5 行注释：`expect: { timeout: process.env.CI ? 15_000 : 5_000 }`，CI 下把断言默认等待从 5 s 放宽到 15 s（renderer-smoke 偶发失败是首屏断言在慢机器上超时，证据见 wb PR #6 描述）。本地不设 CI 时不变。**代价**：受影响的是 CI 里这份配置跑的所有 spec 中、没有显式设 timeout 的 expect 断言，不只首屏：任何这类等待变慢到 5–15 s 这一档的回归，CI 都不会再报出来（本地不设 CI 时 5 s 仍能抓到）。**依据的局限**："CI runner 比开发机慢"这条理由目前只有本地负载数据支撑（本机高负载下复现首屏超时），没有 CI runner 上的实测。上游改 `defineConfig` 顶层字段时手工合并 |
 | `.github/workflows/ci.yml` | 1 行触发条件 + 1 行注释：push 分支从 `[main]` 改为 `[main, aisep-main]`，PR 合入 `aisep-main` 后也跑 CI（push 事件走全通道：`ci-lanes.mjs` 对非 PR 事件取 `full=true`，含 Windows/macOS 原生 job）。上游改这行时手工合并 |
 | `.github/workflows/frontend.yml`、`scripts/ci-sharding.test.mjs` | vitest job 分片数 2 → 3：`matrix.shard` 改为 `[1, 2, 3]`，两处 `--shard=${{ matrix.shard }}/2` 改为 `/3`，加 2 行注释；测试里同一条用例的标题和 3 处断言跟着改（`[1, 2]` → `[1, 2, 3]`、两处 `/2` → `/3`），其他断言不动。理由：全量模式下 2 片时 vitest(1) 474 s，是整轮 CI 最慢的 job（数字见 wb PR #10）。renderer-smoke 的 `[1, 2]` 不变。上游改 vitest 分片时手工合并 |
 | 上游 `APP_LOCALES`（`frontend/src/shared/ui-locale.ts`） | AISEP 不改它，但 `aisep/i18n/index.ts` 按它做类型约束：上游加语言时 typecheck 会报 `Property '<locale>' is missing`，补一个 `aisep/i18n/<locale>.json` 即可 |
