@@ -258,6 +258,11 @@ const STAGE_TEXT: Record<ApprovalStage, AisepMessageKey> = {
 	merged: "gate.progress.stage.merged",
 };
 
+function errorText(error: unknown): string {
+	if (error instanceof AisepToolError) return error.hint ? `${error.code}: ${error.message}（${error.hint}）` : `${error.code}: ${error.message}`;
+	return error instanceof Error ? error.message : String(error);
+}
+
 /** "待批准关口" entry points (model_branches, §5.11): local branches with model changes not yet on main, each row a link. */
 function GateBranches({ client, gateLinks }: { client: AisepModelClient; gateLinks: boolean }) {
 	const t = useAisepT();
@@ -271,25 +276,33 @@ function GateBranches({ client, gateLinks }: { client: AisepModelClient; gateLin
 		refetchInterval: GATE_BRANCHES_REFRESH_MS,
 		retry: shouldRetryAisep,
 	});
-	const rows = branches.data?.rows ?? [];
+	const data = branches.data;
+	const errorTitle = branches.isError ? errorText(branches.error) : undefined;
 	return (
 		<div className="flex flex-col gap-1">
 			<h3 id={headingId} className="text-xs font-medium text-muted-foreground">{t("section.gates.branches.title")}</h3>
 			{branches.isLoading ? (
 				<p role="status" className="text-xs text-muted-foreground">{t("section.loading")}</p>
-			) : branches.isError ? (
-				<p role="alert" className="text-xs text-destructive">{t("section.gates.branches.error")}</p>
-			) : rows.length && branches.data ? (
-				<ul aria-labelledby={headingId} className="divide-y divide-border">
-					{rows.map((info) => (
-						<li key={info.branch}>
-							<GateBranchRow client={client} info={info} main={branches.data.main} gateLinks={gateLinks} />
-						</li>
-					))}
-				</ul>
-			) : (
-				<p className="text-xs text-muted-foreground">{t("section.gates.branches.empty")}</p>
-			)}
+			) : null}
+			{/* A failed poll keeps the last list on screen and says the refresh failed (as the gate page's progress does). */}
+			{data ? (
+				data.rows.length ? (
+					<ul aria-labelledby={headingId} className="divide-y divide-border">
+						{data.rows.map((info) => (
+							<li key={info.branch}>
+								<GateBranchRow client={client} info={info} main={data.main} gateLinks={gateLinks} />
+							</li>
+						))}
+					</ul>
+				) : (
+					<p className="text-xs text-muted-foreground">{t("section.gates.branches.empty")}</p>
+				)
+			) : null}
+			{branches.isError ? (
+				<p role="alert" title={errorTitle} className="text-xs text-destructive">
+					{t(data ? "section.gates.branches.refreshFailed" : "section.gates.branches.error")}
+				</p>
+			) : null}
 			<p className="text-caption text-muted-foreground">{t("section.gates.branches.note")}</p>
 		</div>
 	);
@@ -314,6 +327,8 @@ function GateBranchRow({
 		queryFn: ({ signal }) => approvalProgress(client, info.branch, main.ref, { signal }),
 		enabled: gateLinks,
 		staleTime: Number.POSITIVE_INFINITY,
+		// Nothing moves the key after a failure, so a failed computation tries again on the list's poll interval.
+		refetchInterval: (query) => (query.state.status === "error" ? GATE_BRANCHES_REFRESH_MS : false),
 		retry: shouldRetryAisep,
 	});
 	const content = (
@@ -325,7 +340,7 @@ function GateBranchRow({
 				{!gateLinks ? null : progress.data ? (
 					t(STAGE_TEXT[progress.data.stage])
 				) : progress.isError ? (
-					<span title={progress.error instanceof Error ? progress.error.message : String(progress.error)}>
+					<span title={errorText(progress.error)}>
 						{t("section.gates.branches.progressUnknown")}
 					</span>
 				) : (

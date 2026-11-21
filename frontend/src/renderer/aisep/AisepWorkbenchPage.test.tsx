@@ -3,7 +3,14 @@ import { act, cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { appI18n } from "../i18n";
-import { AGENT_SESSIONS_REFRESH_MS, AisepWorkbenchPage, CHANGED_ELEMENTS_REFRESH_MS, defaultModelClient, gateHref } from "./AisepWorkbenchPage";
+import {
+	AGENT_SESSIONS_REFRESH_MS,
+	AisepWorkbenchPage,
+	CHANGED_ELEMENTS_REFRESH_MS,
+	GATE_BRANCHES_REFRESH_MS,
+	defaultModelClient,
+	gateHref,
+} from "./AisepWorkbenchPage";
 import type { AgentSessionRow, AgentSessionSource } from "./data/ao-sessions";
 import {
 	APPROVED_QUERY,
@@ -458,29 +465,33 @@ describe("AisepWorkbenchPage gate entries (model_branches, §5.11)", () => {
 	const info = (branch: string, facts: Partial<BranchInfo>): BranchInfo => ({
 		branch, head: sha("1"), remoteHead: null, unpushed: true, mergedIntoMain: false, hasModelChanges: true, ...facts,
 	});
+	/** Space, #, ? and CJK: the link must carry it percent-encoded per segment. */
+	const ODD = "feat/报价 #1?";
 	const BRANCHES = [
 		info("feat/approved", { head: sha("a") }),
 		info("feat/docs", { hasModelChanges: false }),
 		info("feat/merged", { mergedIntoMain: true, unpushed: false, remoteHead: sha("1") }),
 		info("feat/model", { head: sha("b"), remoteHead: sha("b"), unpushed: false }),
+		info(ODD, { head: sha("c") }),
 		info("main", { mergedIntoMain: true, hasModelChanges: false, unpushed: false, remoteHead: sha("1") }),
 	];
-	const MAIN = { ref: "refs/remotes/origin/main", commit: sha("1") };
+	/** Not origin/main (the client's default), so the test shows the server's main is the one used. */
+	const MAIN = { ref: "refs/heads/main", commit: sha("1") };
 	const APPROVED = "https://aisep.example/ont/aisep#DecisionApproved";
 	const select = (records: string[]): QueryResult => ({
 		kind: "select", variables: ["record", "decision"], truncated: false,
 		rows: records.map((r) => ({ record: { type: "iri", value: r }, decision: { type: "iri", value: APPROVED } })),
 	});
-	/** feat/approved's tip adds one Approved record (not pushed yet); feat/model's tip adds none. */
-	function branchClient(): { client: AisepModelClient; refs: string[] } {
+	/** feat/approved's tip adds one Approved record (not pushed yet); the others' tips add none. */
+	function branchClient(list: () => Promise<{ branches: BranchInfo[]; main: typeof MAIN }> = async () => ({ branches: BRANCHES, main: MAIN })) {
 		const refs: string[] = [];
 		const client = liveLike(Object.assign(Object.create(fixtureClient) as AisepModelClient, {
-			branches: async () => ({ branches: BRANCHES, main: MAIN }),
+			branches: list,
 			query: async (sparql: string, target: { ref?: string } = {}) => {
 				if (sparql !== APPROVAL_RECORDS_QUERY) return fixtureClient.query(sparql);
 				const ref = target.ref ?? "";
 				refs.push(ref);
-				if (ref.endsWith("^2") || ref.startsWith("refs/remotes/origin/feat/approved")) throw toolError(refNotFound);
+				if (ref.endsWith("^2") || ref.startsWith("refs/remotes/origin/")) throw toolError(refNotFound);
 				if (ref === "refs/heads/feat/approved") return select(["urn:r1"]);
 				return select([]);
 			},
@@ -488,49 +499,95 @@ describe("AisepWorkbenchPage gate entries (model_branches, §5.11)", () => {
 		return { client, refs };
 	}
 	const region = () => screen.getByRole("region", { name: en["section.gates.title"] });
+	const list = () => within(region()).findByRole("list", { name: en["section.gates.branches.title"] });
+	const tipQueries = (refs: string[], branch: string) => refs.filter((r) => r === `refs/heads/${branch}`).length;
 
 	it("lists only unmerged branches with model changes, each row a link to its gate page with its approval stage", async () => {
 		const { client, refs } = branchClient();
 		renderPage(client);
-		const list = await within(region()).findByRole("list", { name: en["section.gates.branches.title"] });
-		const links = within(list).getAllByRole("link");
-		expect(links.map((a) => a.getAttribute("href"))).toEqual([gateHref("feat/approved"), gateHref("feat/model")]);
+		const links = within(await list()).getAllByRole("link");
+		expect(links.map((a) => a.getAttribute("href"))).toEqual([
+			"#/aisep/gate/feat/approved",
+			"#/aisep/gate/feat/model",
+			"#/aisep/gate/feat/%E6%8A%A5%E4%BB%B7%20%231%3F",
+		]);
 		expect(links[0]).toHaveAttribute("title", en["section.aiActivity.openGate"].replace("{{branch}}", "feat/approved"));
+		expect(within(links[2]).getByText(ODD)).toBeInTheDocument();
 		expect(await within(links[0]).findByText(en["gate.progress.stage.approved"])).toBeInTheDocument();
 		expect(within(links[0]).getByText(en["section.gates.branches.unpushed"])).toBeInTheDocument();
 		expect(within(links[0]).getByText("aaaaaaa")).toBeInTheDocument();
 		expect(await within(links[1]).findByText(en["gate.progress.stage.pending"])).toBeInTheDocument();
 		expect(within(links[1]).queryByText(en["section.gates.branches.unpushed"])).toBeNull();
-		// Progress is judged against the main the server resolved.
+		// Progress is judged against the main the server resolved, never the client's default.
 		expect(refs).toContain(MAIN.ref);
+		expect(refs).not.toContain("refs/remotes/origin/main");
 		expect(within(region()).queryByText("feat/docs")).toBeNull();
 		expect(within(region()).queryByText("feat/merged")).toBeNull();
 	});
 
+	it("recomputes a row's progress when its head moves, and only then", async () => {
+		vi.useFakeTimers({ shouldAdvanceTime: true });
+		try {
+			let branches = BRANCHES;
+			const { client, refs } = branchClient(async () => ({ branches, main: MAIN }));
+			renderPage(client);
+			const links = within(await list()).getAllByRole("link");
+			await within(links[1]).findByText(en["gate.progress.stage.pending"]);
+			await vi.waitFor(() => expect(tipQueries(refs, "feat/approved")).toBe(1));
+			expect(tipQueries(refs, "feat/model")).toBe(1);
+
+			branches = BRANCHES.map((b) => (b.branch === "feat/approved" ? { ...b, head: sha("d") } : b));
+			await act(() => vi.advanceTimersByTimeAsync(GATE_BRANCHES_REFRESH_MS));
+			await vi.waitFor(() => expect(tipQueries(refs, "feat/approved")).toBe(2));
+			expect(within(await list()).getByText("ddddddd")).toBeInTheDocument();
+			expect(tipQueries(refs, "feat/model")).toBe(1);
+		} finally {
+			vi.useRealTimers();
+		}
+	});
+
+	it("keeps the list when a later poll fails, and says the refresh failed", async () => {
+		vi.useFakeTimers({ shouldAdvanceTime: true });
+		try {
+			let fail = false;
+			const { client } = branchClient(async () => {
+				if (fail) throw new AisepToolError("INTERNAL", "boom", false);
+				return { branches: BRANCHES, main: MAIN };
+			});
+			renderPage(client);
+			expect(within(await list()).getAllByRole("link")).toHaveLength(3);
+			fail = true;
+			await act(() => vi.advanceTimersByTimeAsync(GATE_BRANCHES_REFRESH_MS));
+			const alert = await within(region()).findByText(en["section.gates.branches.refreshFailed"]);
+			expect(alert).toHaveAttribute("title", "INTERNAL: boom");
+			expect(within(await list()).getAllByRole("link")).toHaveLength(3);
+			expect(within(region()).queryByText(en["section.gates.branches.error"])).toBeNull();
+		} finally {
+			vi.useRealTimers();
+		}
+	});
+
 	it("says so when no branch is waiting", async () => {
-		const client = liveLike(Object.assign(Object.create(fixtureClient) as AisepModelClient, {
-			branches: async () => ({ branches: [BRANCHES[1], BRANCHES[2]], main: MAIN }),
-		}));
+		const { client } = branchClient(async () => ({ branches: [BRANCHES[1], BRANCHES[2]], main: MAIN }));
 		renderPage(client);
 		expect(await within(region()).findByText(en["section.gates.branches.empty"])).toBeInTheDocument();
 	});
 
-	it("says the branch list is unavailable when the server cannot list branches", async () => {
-		const client = liveLike(Object.assign(Object.create(fixtureClient) as AisepModelClient, {
-			branches: () => Promise.reject(new Error("unknown tool")),
-		}));
+	it("says the branch list is unavailable, with the original error, when the first call fails", async () => {
+		const { client } = branchClient(() => Promise.reject(new Error("unknown tool")));
 		renderPage(client);
-		expect(await within(region()).findByText(en["section.gates.branches.error"])).toBeInTheDocument();
+		const alert = await within(region()).findByText(en["section.gates.branches.error"]);
+		expect(alert).toHaveAttribute("title", "unknown tool");
+		expect(within(region()).queryByRole("list", { name: en["section.gates.branches.title"] })).toBeNull();
 		// The pending elements still load.
 		expect(await within(region()).findByText("Total: 24")).toBeInTheDocument();
 	});
 
 	it("with the offline fixtures shows the recorded branches without links or progress, and says why", async () => {
 		renderPage(fixtureClient);
-		const list = await within(region()).findByRole("list", { name: en["section.gates.branches.title"] });
-		expect(within(list).queryByRole("link")).toBeNull();
-		const rows = within(list).getAllByTitle(en["section.aiActivity.gateNeedsServer"]);
-		expect(rows.length).toBeGreaterThan(0);
-		expect(within(list).queryByText(en["gate.progress.stage.pending"])).toBeNull();
+		const l = await list();
+		expect(within(l).queryByRole("link")).toBeNull();
+		expect(within(l).getAllByTitle(en["section.aiActivity.gateNeedsServer"]).length).toBeGreaterThan(0);
+		expect(within(l).queryByText(en["gate.progress.stage.pending"])).toBeNull();
 	});
 });
