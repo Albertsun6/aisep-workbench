@@ -429,6 +429,13 @@ async function waitFor(what, check, timeoutMs) {
 
 // ---------------------------------------------------------------- 子命令
 
+/** 专用检出 root 里面别的 git 检出（worktree 或 clone）所在的目录。 */
+export function findNestedCheckouts(root) {
+	return readdirSync(root, { recursive: true })
+		.filter((p) => basename(p) === ".git" && p !== ".git" && !p.includes(`${sep}.git${sep}`))
+		.map((p) => dirname(join(root, p)));
+}
+
 async function start(opts) {
 	const mcpPort = port(opts["mcp-port"], DEFAULT_MCP_PORT, "--mcp-port");
 	const webPort = port(opts["web-port"], DEFAULT_WEB_PORT, "--web-port");
@@ -457,9 +464,7 @@ async function start(opts) {
 	// 预览模式的 allow-root 是专用检出：建在它里面的任何 git 检出（aisep 登记的 worktree，或独立的 clone）也在
 	// allow-root 内，上面的分支就能被批准。只在启动时查一次；服务运行期间再建的查不到（见 scripts/aisep-dev.md「已知风险」）。
 	if (!approve) {
-		const inside = readdirSync(SERVE_DIR, { recursive: true })
-			.filter((p) => basename(p) === ".git" && p !== ".git" && !p.includes(`${sep}.git${sep}`))
-			.map((p) => dirname(join(SERVE_DIR, p)));
+		const inside = findNestedCheckouts(SERVE_DIR);
 		if (inside.length) fail(`专用检出 ${SERVE_DIR} 里面有别的 git 检出（worktree 或 clone），预览模式下上面的分支能被批准：${inside.join("、")}`);
 	}
 	// 服务从专用检出导入 aisep（工作目录在 sys.path 首位），确认没有导入到别处的代码。
