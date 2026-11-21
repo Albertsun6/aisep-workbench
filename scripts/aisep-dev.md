@@ -40,6 +40,7 @@ node scripts/aisep-dev.mjs refresh
 | `--mcp-port` | `18790` | MCP 服务端口。`preflight` 也用它找服务 |
 | `--web-port` | `15190` | Vite 端口，带 `--strictPort`：端口被占就直接失败，不会自动换端口 |
 | `--ao-api` | `http://127.0.0.1:9` | 网页版 `/api`、`/mux` 的代理目标（`AO_DEV_API_TARGET`） |
+| `--fetch-interval` | `60` | 运行期间每隔多少秒自动 `git fetch origin` 一次，`0` 关闭。见下节「自动刷新」 |
 
 默认端口避开了 3001（AO 守护进程）、5173（`electron-forge` 等开发服务）和 18765、15173（规划会话在用）。
 
@@ -72,6 +73,8 @@ node scripts/aisep-dev.mjs refresh
    - 首页：`http://localhost:<web-port>/#/aisep`
    - 关口页：`http://localhost:<web-port>/#/aisep/gate/<分支>`。现在首页没有进入关口页的入口，要直接输地址，分支名里的 `/` 原样保留。
 
+7. 就绪后开始自动刷新（见下节）。
+
 两个服务各自成一个进程组。按 Ctrl-C，或对 `start` 进程的 PID 发 `SIGTERM`，脚本向两个进程组发 `SIGTERM`；组里 5 秒后还有进程就 `SIGKILL` 整组。判断看整个进程组，不只看组长，所以 `dev-web.mjs` 先退出时它拉起的 Vite 也会被停掉。任一服务意外退出，另一个也会被停掉，并且不再打印就绪信息。
 
 来源必须精确匹配：页面来源是 `http://localhost:<web-port>`，所以 Vite 端口和 `--allow-origin` 由同一个参数决定。来源对不上时，服务对页面的请求一律回 403，前端只报「no response」。
@@ -87,11 +90,34 @@ node scripts/aisep-dev.mjs refresh
 
 `--repo` 也必须在 allow-root 之内（aisep `gitio.locate_repo`），所以专用检出本身总是 allow-root。批准模式另加的 `~/Desktop/AISEP/aisep` 覆盖各会话放在 `aisep/.claude/worktrees` 和 `aisep/aisep/.claude/worktrees` 下的分支 worktree。
 
+### 自动刷新
+
+`start` 运行期间，每隔 `--fetch-interval` 秒（默认 60）在 aisep 仓库跑一次 `git fetch origin`。一轮做完再等下一轮，不会叠在一起。
+
+- **远端跟踪引用每轮都更新。** 关口页的「已推送」「已合入」读的是 `refs/remotes/origin/*`，所以推送、合并之后最多一个间隔加一次进度轮询（15 秒）就能看到，不用再手动 `refresh`。fetch 只更新远端跟踪引用（带 `--no-auto-maintenance`，不顺带跑 gc；带 `--no-write-fetch-head`，不改写主检出的 `.git/FETCH_HEAD`），不动主检出和任何分支 worktree 的工作区。
+- **和别的 fetch 并发。** 本机其他会话同时在这个仓库 `git fetch` 时，对方偶尔会报 `cannot lock ref`（两边抢同一个远端跟踪引用的锁），重试即可，仓库不会损坏。本脚本这边遇到同样的情况只打印一行，下一轮再试。
+- **专用检出只在安全时自动跟到新的 `origin/main`。** 首页的「已批准」读的是专用检出的工作区，所以它要跟上 main 才会变。四条同时满足才移动（`git checkout --detach`，与 `refresh` 相同）：
+  1. 专用检出是 aisep 仓库登记过的游离 worktree；
+  2. 工作区干净（含未跟踪文件）；
+  3. 只是快进：专用检出的 HEAD 在新 `origin/main` 的历史上；
+  4. 从**服务启动时的提交**到新 `origin/main`，服务已加载的文件都没变：`aisep/`（服务的全部 Python 代码）、`modules/`、`vendor/`、`requirements.txt`。`aisep-mcp/` 只有测试，不算。比较基准是启动时记下的提交，不是专用检出当前的 HEAD：服务运行中有人手动 `refresh` 过，HEAD 就已经不是进程里加载的版本。
+
+  不满足时不动，只打印一行原因。前三条的提示是「…首页要看新的 main 就处理后跑 refresh」；第 4 条的提示是「服务启动后 main 改了服务已加载的代码或规则文件（modules/aisep-core/shapes.ttl），要先停掉服务，再重新 start；服务运行中不要 refresh」。
+- **为什么第 4 条不跟。** 运行中的服务在进程里留着这些文件的旧版本，换了文件不重启就会新旧混用：
+  - `aisep/`：启动时导入的 Python 代码。之后才懒加载的模块会读到新代码。
+  - `modules/`、`vendor/`：aisep `core.py` 里有两份**按路径**缓存的数据。`_SC` 是 `modules/aisep-core/shapes.ttl` 的 SHACL-SPARQL 约束（`ApprovalRecordShape` 等），`_RT` 是 vendor 的 ArchiMate 关系表。专用检出的路径不变，文件换了也不会重读，于是同一次校验里一部分用新规则、一部分用旧规则。
+  - 模型文件（`models/`）没有按路径的缓存：pyshacl 那层按文件内容缓存（`_content_key`），其余每次请求现读。所以只改模型、文档、测试、CI 的 main 可以不重启地跟过去，这也是合并批准后最常见的情况。
+
+  改了上面四类的 main，要人来决定什么时候停服务、重新 `start`。
+- **切换时不等在途请求。** 自动 `checkout` 不会等服务正在处理的请求，切换恰好落在一次请求中间时，这次结果可能新旧文件混读。下一次请求就正常了。手动 `refresh` 也是一样。
+- **断网不退出。** fetch 失败只打印一行 `git fetch origin 失败，服务照常运行，下一轮再试：…`，服务照常运行。同样的结论连续出现只打印一次，变了才再打印，断网时不会每分钟刷屏。
+- 自动刷新只在 `start` 进程里跑。`preflight` 仍然不 fetch；服务本身也从不 fetch。
+
 ### refresh
 
-只移动专用检出的工作区。首页不传 ref，读的是 `--repo` 的工作区，所以合并后要跑一次 `refresh`，首页才会把新模型显示为已批准。服务按文件内容缓存解析结果，不会读到旧数据（aisep `core.py`），所以只换模型数据时不用重启服务。
+只移动专用检出的工作区。首页不传 ref，读的是 `--repo` 的工作区。`start` 的自动刷新已经会在安全时跟进 main（见上节），`refresh` 留给这几种情况：没有在跑 `start`、用了 `--fetch-interval 0`、或者自动刷新提示「没有自动跟进」而你处理完了想立刻移动。`refresh` 不检查快进和服务已加载的文件，只要检出干净就移动。
 
-运行中的服务用的仍是启动时导入的 Python 代码。`refresh` 后不用重启，只在新的 main 没改 `aisep/**` 时成立，例如冻结窗口内。main 改了 `aisep/**`，就要停掉服务后重新 `start`。
+服务运行中 `refresh`，只在新的 main 相对服务启动时的提交没改 `aisep/`、`modules/`、`vendor/`、`requirements.txt` 时安全，例如冻结窗口内只合了模型。理由见上节「为什么第 4 条不跟」：模型文件不按路径缓存，换了会被读到；代码和这两份按路径缓存的规则不会重读。改了这四类，就要停掉服务后重新 `start`，不要在服务运行中 `refresh`。
 
 ### preflight
 
