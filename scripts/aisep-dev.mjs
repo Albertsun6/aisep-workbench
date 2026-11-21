@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // AISEP 一键启动：aisep 的 MCP HTTP 服务（workbench 画像）+ 工作台网页版（dev:web），外加批准前只读预检。
 // 用法见 scripts/aisep-dev.md。只用 Node 内置模块，不碰上游依赖。
-// 默认是预览模式：allow-root 只含专用检出（游离 HEAD），批准工具在这里一定被拒。
+// 默认是预览模式：allow-root 只含专用检出，分支 worktree 都不在里面，批准工具在这里会被拒（PATH_OUTSIDE_ROOT）。
 // --approve 才把 allow-root 扩到整个 aisep 目录，只由 Albert 本人在批准那一步启动。
 //
 //   node scripts/aisep-dev.mjs start [--approve] [--branch <分支>] [--workbench <工作台检出>] [--mcp-port N] [--web-port N] [--fetch-interval 秒]
@@ -140,20 +140,45 @@ function allowRoots(approve) {
 	return approve ? [AISEP_REPO, SERVE_DIR] : [SERVE_DIR];
 }
 
+/**
+ * ps 打出的整条命令行 → 服务的 --allow-root 与 --profile；不是 aisep.server 时 undefined。
+ * ps 把参数用空格拼成一行，分不出参数边界：一个选项的值取到下一个「 --」之前，所以路径里可以有空格（不能含「 --」）。
+ */
+export function parseServerCommand(line) {
+	if (!/(^|\s)-m aisep\.server(\s|$)/.test(line) && !/(^|\s)aisep\.server(\s|$)/.test(line)) return undefined;
+	const values = (flag) => [...line.matchAll(new RegExp(`(?:^|\\s)${flag}[ =](.+?)(?=\\s--|$)`, "g"))].map((m) => m[1].trim());
+	return { roots: values("--allow-root"), profile: values("--profile")[0] ?? "agent" };
+}
+
 /** 正在 port 上监听的那个服务实际的 --allow-root 与 --profile（读进程命令行，只读）。 */
 function serverArgs(p) {
 	try {
-		const pid = execFileSync("lsof", ["-nP", "-t", `-iTCP:${p}`, "-sTCP:LISTEN"], { encoding: "utf8" }).trim().split("\n")[0];
-		const cmd = execFileSync("ps", ["-ww", "-o", "command=", "-p", pid], { encoding: "utf8" }).trim().split(/\s+/);
-		const roots = [];
-		let profile = "agent";
-		cmd.forEach((a, i) => {
-			if (a === "--allow-root") roots.push(cmd[i + 1]);
-			if (a === "--profile") profile = cmd[i + 1];
-		});
-		return cmd.includes("aisep.server") ? { pid, roots, profile } : undefined;
+		// 只看 IPv4：预检连的是 127.0.0.1。同一端口在 IPv6 上另有一个服务时，不取它的进程号。
+		const pids = [...new Set(execFileSync("lsof", ["-nP", "-t", `-i4TCP:${p}`, "-sTCP:LISTEN"], { encoding: "utf8" }).trim().split("\n"))];
+		if (pids.length !== 1) return undefined;
+		const [pid] = pids;
+		const parsed = parseServerCommand(execFileSync("ps", ["-ww", "-o", "command=", "-p", pid], { encoding: "utf8" }).trim());
+		return parsed && { pid, ...parsed };
 	} catch {
 		return undefined;
+	}
+}
+
+/**
+ * 沿第一父提交往回跳过批准提交，得到「有效内容」提交（aisep mergecheck._effective_content）。
+ * 批准提交按形状的 (a)(b) 认（不查文件模式）：单父、恰好新增一个 models/<slug>/governance/<名>.ttl、恰好一个 AISEP-Evidence
+ * trailer。服务端还查 (c)（新文件只加批准记录），这里不查，只用于预检提示。
+ */
+export function effectiveContent(repo, commit) {
+	let c = commit;
+	for (;;) {
+		const parents = git(repo, "rev-list", "--parents", "-n", "1", c).split(" ").slice(1);
+		if (parents.length !== 1) return c;
+		const changes = git(repo, "diff-tree", "-r", "--no-renames", "--no-commit-id", "--name-status", parents[0], c).split("\n").filter(Boolean);
+		const [status, path] = changes[0]?.split("\t") ?? [];
+		const trailers = git(repo, "log", "-1", "--format=%(trailers:key=AISEP-Evidence,valueonly)", c).split("\n").filter((l) => l.trim());
+		if (changes.length !== 1 || status !== "A" || !/^models\/[^/]+\/governance\/[^/]+\.ttl$/.test(path) || trailers.length !== 1) return c;
+		c = parents[0];
 	}
 }
 
@@ -204,7 +229,7 @@ async function gitAsync(cwd, args, signal) {
  * 文件（SERVE_LOADED_PATHS）。否则只提示。
  * 从不抛错、从不退出进程；返回这一轮的结论，log 只在结论变了时打印（断网时不会每分钟刷屏）。
  */
-export async function autoFetchOnce(state, { repo = AISEP_REPO, serveDir = SERVE_DIR, loadedHead, log = console.log, signal } = {}) {
+export async function autoFetchOnce(state, { repo = AISEP_REPO, serveDir = SERVE_DIR, loadedHead, log = console.log, signal }) {
 	const say = (outcome, message) => {
 		if (message !== state.lastMessage) log(message);
 		state.lastMessage = message;
@@ -223,6 +248,8 @@ export async function autoFetchOnce(state, { repo = AISEP_REPO, serveDir = SERVE
 		if (head === target) return say("current", `[fetch] 已 fetch；专用检出 = origin/main = ${short(target)}`);
 		const hold = (why, next = "首页要看新的 main 就处理后跑 refresh") =>
 			say("held", `[fetch] origin/main 已到 ${short(target)}，专用检出仍在 ${short(head)}，没有自动跟进：${why}。${next}`);
+		// 不知道服务进程加载的是哪个提交，就无从判断代码变没变：不跟。
+		if (!loadedHead) return hold("不知道服务启动时的提交（调用方没给 loadedHead）");
 		const registered = worktrees(repo).find((w) => real(w.worktree) === real(serveDir));
 		if (!registered?.detached) return hold("专用检出不是登记过的游离 worktree");
 		try {
@@ -233,7 +260,7 @@ export async function autoFetchOnce(state, { repo = AISEP_REPO, serveDir = SERVE
 		const dirty = await gitAsync(serveDir, ["status", "--porcelain", "--untracked-files=all"], signal);
 		if (dirty) return hold("专用检出有未提交改动");
 		// 基准是服务启动时的提交，不是专用检出当前的 HEAD：手动 refresh 移动过检出后，HEAD 已不是进程里加载的版本。
-		const loaded = await gitAsync(repo, ["diff", "--name-only", loadedHead ?? head, target, "--", ...SERVE_LOADED_PATHS], signal);
+		const loaded = await gitAsync(repo, ["diff", "--name-only", loadedHead, target, "--", ...SERVE_LOADED_PATHS], signal);
 		if (loaded) {
 			const files = `${loaded.split("\n").slice(0, 3).join("、")}${loaded.split("\n").length > 3 ? " 等" : ""}`;
 			return hold(`服务启动后 main 改了服务已加载的代码或规则文件（${files}）`, "要先停掉服务，再重新 start；服务运行中不要 refresh");
@@ -415,6 +442,12 @@ async function start(opts) {
 	}
 
 	const head = refreshServeCheckout();
+	// 预览模式的 allow-root 是专用检出：建在它里面的分支 worktree 也在 allow-root 内，批准工具就不再被拒。
+	// 只在启动时查一次；服务运行期间再建的查不到（见 scripts/aisep-dev.md「已知风险」）。
+	if (!approve) {
+		const inside = worktrees(AISEP_REPO).filter((w) => w.branch && under(w.worktree, SERVE_DIR));
+		if (inside.length) fail(`专用检出 ${SERVE_DIR} 里面有分支 worktree，预览模式下它们能被批准：${inside.map((w) => w.worktree).join("、")}`);
+	}
 	// 服务从专用检出导入 aisep（工作目录在 sys.path 首位），确认没有导入到别处的代码。
 	const imported = execFileSync(PYTHON, ["-c", "import aisep, os; print(os.path.realpath(aisep.__file__))"], {
 		cwd: SERVE_DIR,
@@ -472,7 +505,7 @@ async function start(opts) {
 	console.log("================ AISEP 工作台已就绪 ================");
 	console.log(`服务检出   ${SERVE_DIR} @ ${head.slice(0, 7)}（origin/main）`);
 	console.log(`工作台检出 ${workbench} @ ${tryGit(workbench, "rev-parse", "--short", "HEAD") ?? "?"}（${tryGit(workbench, "branch", "--show-current") || "游离"}）`);
-	console.log(`模式       ${approve ? "批准模式（--approve）：allow-root 覆盖所有会话的 worktree，只由 Albert 本人启动，批准完立即停止" : "预览模式：批准工具在这里一定被拒（批准要用 --approve 重新启动）"}`);
+	console.log(`模式       ${approve ? "批准模式（--approve）：allow-root 覆盖所有会话的 worktree，只由 Albert 本人启动，批准完立即停止" : "预览模式：分支 worktree 不在 allow-root 内，批准会被拒（批准要用 --approve 重新启动）"}`);
 	console.log(`MCP        http://127.0.0.1:${mcpPort}/mcp  画像 workbench  allow-root ${roots.join(" , ")}`);
 	console.log(`AO 代理    ${aoApi}（「AI 进行中」一栏需要 AO 守护进程，默认不接）`);
 	console.log(`首页       ${base}/#/aisep`);
@@ -566,10 +599,11 @@ async function preflight(branch, opts) {
 		if (head) {
 			let inMain = false;
 			try {
-				execFileSync("git", ["-C", AISEP_REPO, "merge-base", "--is-ancestor", head, "refs/remotes/origin/main"], { env: GIT_ENV, stdio: "ignore" });
+				// 与服务端同一判据：先跳过分支头上的批准提交（approval.py 用 mergecheck._effective_content）。
+				execFileSync("git", ["-C", AISEP_REPO, "merge-base", "--is-ancestor", effectiveContent(AISEP_REPO, head), "refs/remotes/origin/main"], { env: GIT_ENV, stdio: "ignore" });
 				inMain = true;
 			} catch {}
-			report(!inMain, "分支头还不在 origin/main 上", inMain ? "已在本地记录的 origin/main 里，关口页的关口批准会被拒" : "");
+			report(!inMain, "分支头还不在 origin/main 上", inMain ? "去掉顶端的批准提交后已在本地记录的 origin/main 里，关口页的关口批准会被拒" : "");
 		}
 	} catch (e) {
 		report(false, "model_diff", e.message);

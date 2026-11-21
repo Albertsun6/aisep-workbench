@@ -7,7 +7,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import test from 'node:test';
 
-import { autoFetchOnce } from './aisep-dev.mjs';
+import { autoFetchOnce, effectiveContent, parseServerCommand } from './aisep-dev.mjs';
 
 const ENV = {
 	...process.env,
@@ -31,7 +31,9 @@ function setup(t) {
 	git(upstream, 'push', '--quiet', 'origin', 'HEAD:main');
 	execFileSync('git', ['clone', '--quiet', origin, repo], { env: ENV, stdio: 'ignore' });
 	git(repo, 'worktree', 'add', '--quiet', '--detach', serve, 'origin/main');
-	return { origin, upstream, repo, serve };
+	// 服务启动时加载的提交（start 传给 autoFetchOnce 的 loadedHead）。
+	const loadedHead = git(serve, 'rev-parse', 'HEAD');
+	return { origin, upstream, repo, serve, loadedHead };
 }
 
 function commit(cwd, file, content) {
@@ -50,7 +52,7 @@ function push(env, file, content) {
 
 async function once(env, state = {}, options = {}) {
 	const lines = [];
-	const outcome = await autoFetchOnce(state, { repo: env.repo, serveDir: env.serve, log: (l) => lines.push(l), ...options });
+	const outcome = await autoFetchOnce(state, { repo: env.repo, serveDir: env.serve, loadedHead: env.loadedHead, log: (l) => lines.push(l), ...options });
 	return { outcome, lines, state };
 }
 
@@ -158,4 +160,43 @@ test('fetch 失败（远端不可达）不抛错，同样的失败只打印一�
 	const third = await once(env, state);
 	assert.equal(third.outcome, 'current');
 	assert.equal(third.lines.length, 1);
+});
+
+test('调用方没给 loadedHead 时不跟进（不悄悄拿专用检出当前的 HEAD 当基准）', async (t) => {
+	const env = setup(t);
+	const before = git(env.serve, 'rev-parse', 'HEAD');
+	push(env, 'models/a/model.ttl', 'v2');
+	const { outcome, lines } = await once(env, {}, { loadedHead: undefined });
+	assert.equal(outcome, 'held');
+	assert.match(lines[0], /不知道服务启动时的提交/);
+	assert.equal(git(env.serve, 'rev-parse', 'HEAD'), before);
+});
+
+test('服务命令行：路径里有空格也取全；不是 aisep.server 时不认', () => {
+	const line = '/Users/a b/.venv/bin/python -m aisep.server --transport http --profile workbench --port 18790 --repo /Users/a b/aisep-serve --allow-root /Users/a b/aisep-serve --allow-root /Users/a b/aisep --allow-origin http://localhost:15190';
+	assert.deepEqual(parseServerCommand(line), { roots: ['/Users/a b/aisep-serve', '/Users/a b/aisep'], profile: 'workbench' });
+	assert.deepEqual(parseServerCommand('python -m aisep.server --allow-root /x'), { roots: ['/x'], profile: 'agent' });
+	assert.equal(parseServerCommand('python -m http.server --allow-root /x'), undefined);
+	assert.equal(parseServerCommand('python -m aisep.serverless --allow-root /x'), undefined);
+});
+
+test('有效内容提交：跳过顶端的批准提交，停在第一个普通提交', (t) => {
+	const env = setup(t);
+	const content = git(env.upstream, 'rev-parse', 'HEAD');
+	const approval = (file) => {
+		mkdirSync(dirname(join(env.upstream, file)), { recursive: true });
+		writeFileSync(join(env.upstream, file), 'record');
+		git(env.upstream, 'add', '--', file);
+		git(env.upstream, 'commit', '--quiet', '-m', `approve\n\nAISEP-Evidence: ${content}`);
+		return git(env.upstream, 'rev-parse', 'HEAD');
+	};
+	approval('models/a/governance/r1.ttl');
+	const top = approval('models/a/governance/r2.ttl');
+	assert.equal(effectiveContent(env.upstream, top), content);
+	// 没有 trailer 的、或者新增文件不在 governance/ 下的，都不是批准提交。
+	const plain = commit(env.upstream, 'models/a/governance/r3.ttl', 'x');
+	assert.equal(effectiveContent(env.upstream, plain), plain);
+	git(env.upstream, 'commit', '--quiet', '--allow-empty', '-m', `x\n\nAISEP-Evidence: ${content}`);
+	const empty = git(env.upstream, 'rev-parse', 'HEAD');
+	assert.equal(effectiveContent(env.upstream, empty), empty);
 });
