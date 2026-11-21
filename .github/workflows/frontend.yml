@@ -223,8 +223,6 @@ jobs:
           AO_AGENT_BROWSER_TEST_BINARY: ${{ github.workspace }}/frontend/agent-browser/agent-browser
           VITEST_FILES: ${{ inputs.vitest }}
         run: |
-          # 证伪用临时改动（PR #10），下一提交去掉：让第 2 片必败，检验 ci-ok 是否随之失败。
-          if [ "${{ matrix.shard }}" = 2 ]; then echo "::error::证伪：第 2 片故意失败"; exit 1; fi
           mapfile -t always < scripts/ci-vitest-always-run.txt
           for f in "${always[@]}"; do
             test -f "$f" || { echo "::error::$f is in scripts/ci-vitest-always-run.txt but does not exist"; exit 1; }
