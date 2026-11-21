@@ -13,6 +13,7 @@ import ko from "./ko.json";
 import ptBR from "./pt-BR.json";
 import ru from "./ru.json";
 import zhCN from "./zh-CN.json";
+import { initWebLocale } from "./web-locale";
 
 export const AISEP_NS = "aisep";
 
@@ -44,6 +45,10 @@ export function registerAisepCatalogs(instance: I18n = appI18n): void {
 }
 
 registerAisepCatalogs();
+
+// 网页版默认简体中文并记住语言（web-locale.ts）。测试里不自动跑：
+// 共享的 i18n 实例会被切到中文，断言英文文案的测试就会受影响。
+if (import.meta.env.MODE !== "test") void initWebLocale();
 
 export type AisepT = (key: AisepMessageKey, options?: Record<string, unknown>) => string;
 

@@ -154,6 +154,6 @@ node scripts/aisep-dev.mjs refresh
 - 预览模式的 allow-root 是专用检出本身。服务运行期间有人在 `aisep-serve` 里面再建一个分支 worktree 或放一个独立 clone（服务端只要求仓库在 allow-root 下），上面的分支在预览模式下也能被批准；启动时的检查只覆盖启动那一刻。不要在专用检出里面放任何 git 检出。
 - `--approve` 只是一个开关，没有二次确认。脚本拦不住会话自己加 `--approve`（交互确认也能被管道喂过去），靠的是规则：只由 Albert 本人启动。
 - 预览模式下批准工具同样列在 `tools/list` 里，关口页的批准表单也照常显示，点了会被服务拒绝：分支 worktree 不在 allow-root 内，`gitio.locate_worktree` 报 `PATH_OUTSIDE_ROOT`（读代码得出，没有实际点过批准）。
-- 界面语言是英文。
+- 网页版界面默认简体中文，在设置里改过的语言记在浏览器的 `localStorage`（`aisep.locale`）里，换浏览器或清站点数据后回到简体中文。
 - 只验证了网页版。Electron 版没有验证；`--ignore-scripts` 跳过了原生模块构建，对网页版没有影响。
 - Claude 桌面应用的内置浏览器面板隐藏时，页面停在启动画面不往下走；在普通浏览器或无头 Chrome 里正常。原因未查。
