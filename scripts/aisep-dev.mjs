@@ -1,0 +1,470 @@
+#!/usr/bin/env node
+// AISEP 一键启动：aisep 的 MCP HTTP 服务（workbench 画像）+ 工作台网页版（dev:web），外加批准前只读预检。
+// 用法见 scripts/aisep-dev.md。只用 Node 内置模块，不碰上游依赖。
+//
+//   node scripts/aisep-dev.mjs start [--branch <分支>] [--workbench <工作台检出>] [--mcp-port N] [--web-port N]
+//   node scripts/aisep-dev.mjs refresh
+//   node scripts/aisep-dev.mjs preflight <分支> [--mcp-port N]
+//
+// 服务的代码与 --repo 用一个专用的游离检出（默认 ~/Desktop/AISEP/aisep-serve，跟随 origin/main），
+// 从不读写 aisep 主检出的工作区。预检只调用只读工具，脚本里没有任何调用批准工具的代码路径。
+import { execFileSync, spawn } from "node:child_process";
+import { existsSync, realpathSync } from "node:fs";
+import { connect } from "node:net";
+import { homedir } from "node:os";
+import { dirname, join, resolve, sep } from "node:path";
+import { fileURLToPath } from "node:url";
+
+const HOME = homedir();
+const AISEP_ROOT = process.env.AISEP_ROOT ?? join(HOME, "Desktop/AISEP");
+const AISEP_REPO = process.env.AISEP_REPO ?? join(AISEP_ROOT, "aisep");
+const SERVE_DIR = process.env.AISEP_SERVE_DIR ?? join(AISEP_ROOT, "aisep-serve");
+const PYTHON = process.env.AISEP_PYTHON ?? join(AISEP_REPO, ".venv/bin/python");
+// 默认避开 3001（AO 守护进程）、5173（electron-forge / 别的 dev server）、18765 与 15173（规划会话在用）。
+const DEFAULT_MCP_PORT = 18790;
+const DEFAULT_WEB_PORT = 15190;
+// 网页版把 /api、/mux 代理到这里。默认指向一个不监听的端口，避免连到本机 3001 上别的会话的守护进程。
+const DEFAULT_AO_API_TARGET = "http://127.0.0.1:9";
+const MCP_PROTOCOL_VERSION = "2026-07-28";
+// 预检只允许这几个只读工具；governance_record_approval 不在其中，callTool 遇到别的名字直接抛错。
+const READ_ONLY_TOOLS = new Set(["model_diff", "model_gate", "model_query"]);
+const GATE_TIMEOUT_MS = 600_000;
+const WORKBENCH_DEFAULT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+
+// 与工作台关口页 APPROVERS_QUERY 同条件（AisepGatePage.tsx），多取 inModel 便于辨认是哪个模型的人。
+const APPROVERS_QUERY = `PREFIX aisep: <https://aisep.example/ont/aisep#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+SELECT ?approver ?prefLabel ?model WHERE {
+  ?approver a/rdfs:subClassOf* arch:Stakeholder ; skos:prefLabel ?prefLabel .
+  OPTIONAL { ?approver arch:inModel ?model }
+  FILTER NOT EXISTS { ?approver a/rdfs:subClassOf* aisep:AIAgent }
+  FILTER(lang(?prefLabel) = "zh")
+}`;
+
+function fail(message) {
+	console.error(`错误：${message}`);
+	process.exit(1);
+}
+
+function parseArgs(argv) {
+	const positional = [];
+	const opts = {};
+	for (let i = 0; i < argv.length; i++) {
+		const a = argv[i];
+		if (a.startsWith("--")) {
+			const key = a.slice(2);
+			const value = argv[i + 1];
+			if (value === undefined || value.startsWith("--")) fail(`${a} 缺少取值`);
+			opts[key] = value;
+			i++;
+		} else {
+			positional.push(a);
+		}
+	}
+	return { positional, opts };
+}
+
+function port(value, fallback, name) {
+	if (value === undefined) return fallback;
+	const n = Number(value);
+	if (!Number.isInteger(n) || n < 1024 || n > 65535) fail(`${name} 不是合法端口：${value}`);
+	return n;
+}
+
+function git(cwd, ...args) {
+	return execFileSync("git", ["-C", cwd, ...args], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
+}
+
+function tryGit(cwd, ...args) {
+	try {
+		return git(cwd, ...args);
+	} catch {
+		return undefined;
+	}
+}
+
+/** git worktree list --porcelain → [{worktree, head, branch, detached, prunable}] */
+function worktrees(repo) {
+	const out = git(repo, "worktree", "list", "--porcelain");
+	const list = [];
+	let cur;
+	for (const line of out.split("\n")) {
+		if (line.startsWith("worktree ")) {
+			cur = { worktree: line.slice(9) };
+			list.push(cur);
+		} else if (cur && line.startsWith("HEAD ")) cur.head = line.slice(5);
+		else if (cur && line.startsWith("branch ")) cur.branch = line.slice(7);
+		else if (cur && line === "detached") cur.detached = true;
+		else if (cur && line.startsWith("prunable")) cur.prunable = true;
+	}
+	return list;
+}
+
+function real(p) {
+	try {
+		return realpathSync(p);
+	} catch {
+		return resolve(p);
+	}
+}
+
+function under(path, root) {
+	const p = real(path);
+	const r = real(root);
+	return p === r || p.startsWith(r + sep);
+}
+
+function allowRoots() {
+	// 服务的 --repo 本身也必须在 allow-root 之下（aisep gitio.locate_repo），所以专用检出单独列一项。
+	return [AISEP_REPO, SERVE_DIR];
+}
+
+// ---------------------------------------------------------------- 专用检出
+
+function refreshServeCheckout() {
+	if (!existsSync(join(AISEP_REPO, ".git"))) fail(`找不到 aisep 仓库：${AISEP_REPO}`);
+	console.log(`[refresh] git fetch origin（${AISEP_REPO}，只更新远端跟踪引用，不动主检出工作区）`);
+	git(AISEP_REPO, "fetch", "origin");
+	const target = git(AISEP_REPO, "rev-parse", "refs/remotes/origin/main^{commit}");
+	const registered = worktrees(AISEP_REPO).find((w) => real(w.worktree) === real(SERVE_DIR));
+	if (!existsSync(SERVE_DIR)) {
+		if (registered) fail(`${SERVE_DIR} 已登记为 worktree 但目录不存在；先在 aisep 仓库跑 git worktree prune`);
+		console.log(`[refresh] 新建专用检出 ${SERVE_DIR}（游离 HEAD）`);
+		git(AISEP_REPO, "worktree", "add", "--detach", SERVE_DIR, target);
+	} else {
+		if (!registered) fail(`${SERVE_DIR} 已存在但不是 aisep 仓库登记的 worktree；换 AISEP_SERVE_DIR 或手工处理`);
+		if (!registered.detached) fail(`${SERVE_DIR} 检出了分支 ${registered.branch}，专用检出必须是游离 HEAD`);
+		const dirty = git(SERVE_DIR, "status", "--porcelain", "--untracked-files=all");
+		if (dirty) fail(`专用检出 ${SERVE_DIR} 有未提交改动，拒绝移动：\n${dirty}`);
+		const before = git(SERVE_DIR, "rev-parse", "HEAD");
+		if (before !== target) git(SERVE_DIR, "checkout", "--quiet", "--detach", target);
+		console.log(`[refresh] ${before.slice(0, 7)} → ${target.slice(0, 7)}`);
+	}
+	const head = git(SERVE_DIR, "rev-parse", "HEAD");
+	if (head !== target) fail(`专用检出 HEAD ${head} 不等于 origin/main ${target}`);
+	console.log(`[refresh] 专用检出 = origin/main = ${git(SERVE_DIR, "log", "--oneline", "-1")}`);
+	return head;
+}
+
+// ---------------------------------------------------------------- MCP 客户端（与工作台 mcp-client.ts 同一信封）
+
+async function mcp(mcpPort, method, params, name, timeoutMs = 60_000) {
+	const headers = {
+		"Content-Type": "application/json",
+		Accept: "application/json, text/event-stream",
+		"MCP-Protocol-Version": MCP_PROTOCOL_VERSION,
+		"Mcp-Method": method,
+	};
+	if (name) headers["Mcp-Name"] = name;
+	const body = {
+		jsonrpc: "2.0",
+		id: 1,
+		method,
+		params: {
+			...params,
+			_meta: {
+				"io.modelcontextprotocol/protocolVersion": MCP_PROTOCOL_VERSION,
+				"io.modelcontextprotocol/clientCapabilities": {},
+				"io.modelcontextprotocol/clientInfo": { name: "aisep-dev-preflight", version: "0.1.0" },
+			},
+		},
+	};
+	const res = await fetch(`http://127.0.0.1:${mcpPort}/mcp`, {
+		method: "POST",
+		headers,
+		body: JSON.stringify(body),
+		signal: AbortSignal.timeout(timeoutMs),
+	});
+	const text = await res.text();
+	let json;
+	try {
+		json = JSON.parse(text);
+	} catch {
+		throw new Error(`HTTP ${res.status}: ${text.slice(0, 200)}`);
+	}
+	if (json.error) throw new Error(`JSON-RPC ${json.error.code}: ${json.error.message}`);
+	return json.result;
+}
+
+async function callTool(mcpPort, name, args, timeoutMs) {
+	if (!READ_ONLY_TOOLS.has(name)) throw new Error(`预检不允许调用 ${name}`);
+	const result = await mcp(mcpPort, "tools/call", { name, arguments: args }, name, timeoutMs);
+	const sc = result?.structuredContent;
+	if (result?.isError) {
+		const e = sc?.error;
+		throw new Error(e ? `${e.code}: ${e.message}` : "isError（无错误信封）");
+	}
+	if (!sc) throw new Error("没有 structuredContent");
+	return sc;
+}
+
+// ---------------------------------------------------------------- 进程与端口
+
+function portInUse(p) {
+	const probe = (host) =>
+		new Promise((done) => {
+			const s = connect({ port: p, host });
+			s.once("connect", () => {
+				s.destroy();
+				done(true);
+			});
+			s.once("error", () => done(false));
+		});
+	return Promise.all([probe("127.0.0.1"), probe("::1")]).then((r) => r.some(Boolean));
+}
+
+const children = [];
+
+function launch(label, command, args, options, drop) {
+	// detached：子进程自成进程组，停的时候按组 PID 一起停（dev-web.mjs 会再拉起 vite 子进程）。
+	const child = spawn(command, args, { ...options, detached: true, stdio: ["ignore", "pipe", "pipe"] });
+	children.push({ label, child });
+	const prefix = (stream, out) => {
+		let buf = "";
+		stream.setEncoding("utf8");
+		stream.on("data", (chunk) => {
+			buf += chunk;
+			const lines = buf.split("\n");
+			buf = lines.pop();
+			for (const line of lines) if (!drop?.test(line)) out.write(`[${label}] ${line}\n`);
+		});
+	};
+	prefix(child.stdout, process.stdout);
+	prefix(child.stderr, process.stderr);
+	console.log(`[start] ${label} PID ${child.pid}（进程组 ${child.pid}）`);
+	return child;
+}
+
+let stopping = false;
+async function stopAll(code) {
+	if (stopping) return;
+	stopping = true;
+	for (const { label, child } of children) {
+		if (child.exitCode !== null || child.signalCode !== null) continue;
+		console.log(`[stop] 停止 ${label}（进程组 ${child.pid}）`);
+		try {
+			process.kill(-child.pid, "SIGTERM");
+		} catch {}
+	}
+	const deadline = Date.now() + 5000;
+	for (const { label, child } of children) {
+		while (child.exitCode === null && child.signalCode === null && Date.now() < deadline) {
+			await new Promise((r) => setTimeout(r, 100));
+		}
+		if (child.exitCode === null && child.signalCode === null) {
+			console.log(`[stop] ${label} 5 秒未退出，SIGKILL 进程组 ${child.pid}`);
+			try {
+				process.kill(-child.pid, "SIGKILL");
+			} catch {}
+		}
+	}
+	process.exit(code);
+}
+
+async function waitFor(what, check, timeoutMs) {
+	const deadline = Date.now() + timeoutMs;
+	for (;;) {
+		if (stopping) return;
+		try {
+			if (await check()) return;
+		} catch {}
+		if (Date.now() > deadline) {
+			console.error(`错误：${what} 在 ${timeoutMs / 1000} 秒内没有就绪`);
+			await stopAll(1);
+		}
+		await new Promise((r) => setTimeout(r, 500));
+	}
+}
+
+// ---------------------------------------------------------------- 子命令
+
+async function start(opts) {
+	const mcpPort = port(opts["mcp-port"], DEFAULT_MCP_PORT, "--mcp-port");
+	const webPort = port(opts["web-port"], DEFAULT_WEB_PORT, "--web-port");
+	const workbench = resolve(opts.workbench ?? WORKBENCH_DEFAULT);
+	const aoApi = opts["ao-api"] ?? DEFAULT_AO_API_TARGET;
+	const frontend = join(workbench, "frontend");
+	if (!existsSync(join(frontend, "scripts/dev-web.mjs"))) fail(`${workbench} 不是工作台检出（缺 frontend/scripts/dev-web.mjs）`);
+	if (!existsSync(join(frontend, "node_modules/vite/bin/vite.js"))) {
+		fail(
+			`${frontend} 还没装依赖。先跑：\n  cd ${frontend} && ELECTRON_SKIP_BINARY_DOWNLOAD=1 PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 npm ci --ignore-scripts --no-audit --no-fund`,
+		);
+	}
+	if (!existsSync(PYTHON)) fail(`找不到解释器 ${PYTHON}`);
+	for (const [p, name] of [
+		[mcpPort, "--mcp-port"],
+		[webPort, "--web-port"],
+	]) {
+		if (await portInUse(p)) fail(`端口 ${p}（${name}）已被占用，换一个端口`);
+	}
+
+	const head = refreshServeCheckout();
+	// 服务从专用检出导入 aisep（工作目录在 sys.path 首位），确认没有导入到别处的代码。
+	const imported = execFileSync(PYTHON, ["-c", "import aisep, os; print(os.path.realpath(aisep.__file__))"], {
+		cwd: SERVE_DIR,
+		encoding: "utf8",
+	}).trim();
+	if (!under(imported, SERVE_DIR)) fail(`解释器导入的 aisep 来自 ${imported}，不在专用检出 ${SERVE_DIR} 里`);
+
+	const origins = [`http://localhost:${webPort}`, `http://127.0.0.1:${webPort}`];
+	const mcpArgs = [
+		"-m",
+		"aisep.server",
+		"--transport",
+		"http",
+		"--profile",
+		"workbench",
+		"--port",
+		String(mcpPort),
+		"--repo",
+		SERVE_DIR,
+		...allowRoots().flatMap((r) => ["--allow-root", r]),
+		...origins.flatMap((o) => ["--allow-origin", o]),
+	];
+	const mcpChild = launch("mcp", PYTHON, mcpArgs, { cwd: SERVE_DIR, env: process.env });
+	const webChild = launch(
+		"web",
+		process.execPath,
+		[join(frontend, "scripts/dev-web.mjs"), "--port", String(webPort), "--strictPort"],
+		{
+			cwd: frontend,
+			env: { ...process.env, VITE_AISEP_MCP_URL: `http://127.0.0.1:${mcpPort}/mcp`, AO_DEV_API_TARGET: aoApi },
+		},
+		// 默认不接 AO 时，页面每隔几秒重连 /api 都会让 vite 打一段代理报错，这里不转发。
+		aoApi === DEFAULT_AO_API_TARGET ? /http proxy error|ECONNREFUSED 127\.0\.0\.1:9\b|TCPConnectWrap\.afterConnect/ : undefined,
+	);
+	for (const { label, child } of [
+		{ label: "mcp", child: mcpChild },
+		{ label: "web", child: webChild },
+	]) {
+		child.once("exit", (code, signal) => {
+			if (stopping) return;
+			console.error(`[${label}] 意外退出（code ${code}, signal ${signal}），停止全部`);
+			stopAll(1);
+		});
+	}
+	for (const sig of ["SIGINT", "SIGTERM", "SIGHUP"]) process.on(sig, () => stopAll(0));
+
+	await waitFor("MCP 服务", async () => (await mcp(mcpPort, "tools/list", {}, undefined, 5000))?.tools?.length > 0, 60_000);
+	await waitFor("网页版", async () => (await fetch(`http://localhost:${webPort}/`, { signal: AbortSignal.timeout(5000) })).ok, 120_000);
+
+	const base = `http://localhost:${webPort}`;
+	console.log("");
+	console.log("================ AISEP 工作台已就绪 ================");
+	console.log(`服务检出   ${SERVE_DIR} @ ${head.slice(0, 7)}（origin/main）`);
+	console.log(`工作台检出 ${workbench} @ ${tryGit(workbench, "rev-parse", "--short", "HEAD") ?? "?"}（${tryGit(workbench, "branch", "--show-current") || "游离"}）`);
+	console.log(`MCP        http://127.0.0.1:${mcpPort}/mcp  画像 workbench  allow-root ${allowRoots().join(" , ")}`);
+	console.log(`AO 代理    ${aoApi}（「AI 进行中」一栏需要 AO 守护进程，默认不接）`);
+	console.log(`首页       ${base}/#/aisep`);
+	if (opts.branch) console.log(`关口页     ${base}/#/aisep/gate/${opts.branch}`);
+	else console.log(`关口页     ${base}/#/aisep/gate/<分支名>（start 加 --branch 直接打印）`);
+	if (opts.branch) console.log(`预检       node ${join(WORKBENCH_DEFAULT, "scripts/aisep-dev.mjs")} preflight ${opts.branch} --mcp-port ${mcpPort}`);
+	console.log("Ctrl-C（或对本进程 PID 发 SIGTERM）停止两项服务");
+	console.log("====================================================");
+}
+
+async function preflight(branch, opts) {
+	if (!branch) fail("用法：preflight <分支> [--mcp-port N]");
+	const mcpPort = port(opts["mcp-port"], DEFAULT_MCP_PORT, "--mcp-port");
+	let failed = 0;
+	const report = (ok, title, detail = "") => {
+		if (!ok) failed++;
+		console.log(`${ok ? "通过" : "不通过"}  ${title}${detail ? `：${detail}` : ""}`);
+	};
+	const info = (title, detail) => console.log(`信息  ${title}：${detail}`);
+	console.log(`预检分支 ${branch}（只读：不 fetch、不写任何文件，只调用 ${[...READ_ONLY_TOOLS].join("、")}）\n`);
+
+	// 1. 已在 allow-root 下的 worktree 检出（服务按 git 登记的第一条匹配，aisep gitio.locate_worktree）
+	const hit = worktrees(AISEP_REPO).find((w) => w.branch === `refs/heads/${branch}`);
+	const wt = hit && !hit.prunable && existsSync(hit.worktree) ? hit.worktree : undefined;
+	const inRoot = wt && allowRoots().some((r) => under(wt, r));
+	report(Boolean(wt && inRoot), "分支已在 allow-root 下的 worktree 检出", wt ? `${wt}${inRoot ? "" : "（不在 allow-root 内）"}` : "没有检出该分支的 worktree");
+
+	// 2. models/ 干净（批准时 DIRTY_WORKTREE 的条件）
+	if (wt) {
+		const dirty = git(wt, "status", "--porcelain", "--untracked-files=all", "--", "models/");
+		report(!dirty, "该 worktree 的 models/ 干净", dirty ? dirty.split("\n").slice(0, 5).join("；") : "");
+	} else report(false, "该 worktree 的 models/ 干净", "没有 worktree，无法检查");
+
+	// 3. 本地头 = 远端头（ls-remote 直接问远端，不改本地引用）
+	const local = tryGit(AISEP_REPO, "rev-parse", "--verify", "--quiet", `refs/heads/${branch}^{commit}`);
+	const remoteLine = tryGit(AISEP_REPO, "ls-remote", "origin", `refs/heads/${branch}`);
+	const remote = remoteLine?.split(/\s+/)[0] || undefined;
+	report(
+		Boolean(local && remote && local === remote),
+		"本地头等于远端头",
+		`本地 ${local?.slice(0, 7) ?? "无"} / 远端 ${remote?.slice(0, 7) ?? (remoteLine === undefined ? "ls-remote 失败" : "未推送")}`,
+	);
+
+	// 服务检出是否还是最新 origin/main（合并后首页要靠它显示已批准）
+	const serveHead = tryGit(SERVE_DIR, "rev-parse", "HEAD");
+	const mainRemote = tryGit(AISEP_REPO, "ls-remote", "origin", "refs/heads/main")?.split(/\s+/)[0];
+	info("服务检出", `${serveHead?.slice(0, 7) ?? "不存在"}；远端 main ${mainRemote?.slice(0, 7) ?? "?"}${serveHead && serveHead === mainRemote ? "（一致）" : "（不一致，需要时跑 refresh）"}`);
+
+	// 4. tools/list 里有批准工具（说明服务是 workbench 画像）
+	let tools;
+	try {
+		tools = ((await mcp(mcpPort, "tools/list", {}, undefined, 10_000))?.tools ?? []).map((t) => t.name);
+		report(tools.includes("governance_record_approval"), "tools/list 含 governance_record_approval", tools.join(", "));
+	} catch (e) {
+		report(false, "tools/list 含 governance_record_approval", `连不上 http://127.0.0.1:${mcpPort}/mcp：${e.message}`);
+		console.log(`\n服务没起来，后续检查跳过。共 ${failed} 项不通过。`);
+		process.exit(1);
+	}
+
+	// 5. 分支头 model_gate PASS（与关口页同：先 model_diff 拿头提交，再在该提交上跑 gate）
+	let head;
+	try {
+		const diff = await callTool(mcpPort, "model_diff", { head: branch, detail: "items" });
+		head = diff.head?.commit;
+		const items = diff.items ?? [];
+		info("model_diff", `head ${head?.slice(0, 7)} · base ${diff.base?.commit?.slice(0, 7)} · 条目 ${items.length}`);
+		if (local && head !== local) report(false, "服务看到的分支头等于本地分支头", `${head?.slice(0, 7)} ≠ ${local.slice(0, 7)}`);
+	} catch (e) {
+		report(false, "model_diff", e.message);
+	}
+	if (head) {
+		try {
+			const t0 = Date.now();
+			const gate = await callTool(mcpPort, "model_gate", { ref: head }, GATE_TIMEOUT_MS);
+			const s = gate.summary ?? {};
+			report(
+				gate.result === "PASS",
+				"分支头 model_gate 为 PASS",
+				`${gate.result}，违规 ${s.violations ?? "?"}，警告 ${s.warnings ?? "?"}（${((Date.now() - t0) / 1000).toFixed(1)} 秒）`,
+			);
+		} catch (e) {
+			report(false, "分支头 model_gate 为 PASS", e.message);
+		}
+
+		// 6. 批准人下拉会出现的 Stakeholder（顺序同下拉，第一行是默认值）
+		try {
+			const q = await callTool(mcpPort, "model_query", { sparql: APPROVERS_QUERY, ref: head });
+			const rows = q.rows ?? [];
+			console.log(`\n批准人下拉（${rows.length} 人，顺序同页面，第 1 行是默认选中）：`);
+			rows.forEach((r, i) => {
+				const iri = r.approver?.value ?? "?";
+				const label = r.prefLabel?.value ?? "?";
+				const model = r.model?.value ?? "（无 inModel）";
+				const mark = label.includes("项目负责人") && !iri.includes("/procurement/") ? "  ← 新模型的项目负责人？" : "";
+				console.log(`  ${i + 1}. ${label}  ${iri}  模型 ${model}${mark}`);
+			});
+			console.log("提醒：选新模型的「项目负责人」，不要选 procurement 的人；默认第 1 行不一定是他。");
+		} catch (e) {
+			report(false, "查询批准人列表", e.message);
+		}
+	}
+
+	console.log(`\n${failed === 0 ? "全部通过。" : `${failed} 项不通过。`}预检没有调用批准工具，也没有写入任何东西。`);
+	process.exit(failed === 0 ? 0 : 1);
+}
+
+const [cmd, ...rest] = process.argv.slice(2);
+const { positional, opts } = parseArgs(rest);
+if (cmd === "start") await start(opts);
+else if (cmd === "refresh") refreshServeCheckout();
+else if (cmd === "preflight") await preflight(positional[0], opts);
+else {
+	console.log("用法：node scripts/aisep-dev.mjs <start|refresh|preflight> …（详见 scripts/aisep-dev.md）");
+	process.exit(cmd ? 1 : 0);
+}
