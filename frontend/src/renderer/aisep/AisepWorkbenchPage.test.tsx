@@ -10,6 +10,7 @@ import {
 	AisepToolError,
 	ELEMENTS_QUERY,
 	type AisepModelClient,
+	type BranchInfo,
 	type DiffInput,
 	type DiffResult,
 	type FindingsResult,
@@ -26,6 +27,7 @@ import elementsQuery from "./data/fixtures/elements-query.json";
 import refNotFound from "./data/fixtures/error-ref-not-found.json";
 import worktreeNotFound from "./data/fixtures/error-worktree-not-found.json";
 import findingsViolation from "./data/fixtures/findings-violation.json";
+import { APPROVAL_RECORDS_QUERY } from "./data/approval-progress";
 import { McpModelClient } from "./data/mcp-client";
 import { aisepCatalogs } from "./i18n";
 
@@ -255,6 +257,7 @@ function liveLike(client: AisepModelClient): AisepModelClient {
 		impact: (...a) => client.impact(...a),
 		diff: (...a) => client.diff(...a),
 		recordApproval: (...a) => client.recordApproval(...a),
+		branches: (...a) => client.branches(...a),
 	};
 }
 
@@ -332,7 +335,8 @@ describe("AisepWorkbenchPage changed-elements column (§8 step 4)", () => {
 describe("AisepWorkbenchPage with the offline fixtures", () => {
 	it("does not link branches to a gate page that could only fail, and says why", async () => {
 		renderPage(fixtureClient, fakeSessions([branchRow("feat/edit")]));
-		const branch = await screen.findByText("feat/edit");
+		const ai = screen.getByRole("region", { name: aisepCatalogs.en["section.aiActivity.title"] });
+		const branch = await within(ai).findByText("feat/edit");
 		expect(screen.queryByRole("link", { name: "feat/edit" })).toBeNull();
 		expect(branch).toHaveAttribute("title", aisepCatalogs.en["section.aiActivity.gateNeedsServer"]);
 	});
@@ -445,5 +449,88 @@ describe("AisepWorkbenchPage truncated element list", () => {
 		renderPage(diffingClient({ query: () => Promise.resolve(truncated) }).client);
 		const architecture = screen.getByRole("region", { name: aisepCatalogs.en["section.architecture.title"] });
 		expect(await within(architecture).findByRole("note")).toHaveTextContent("first 26");
+	});
+});
+
+describe("AisepWorkbenchPage gate entries (model_branches, §5.11)", () => {
+	const en = aisepCatalogs.en;
+	const sha = (c: string) => c.repeat(40);
+	const info = (branch: string, facts: Partial<BranchInfo>): BranchInfo => ({
+		branch, head: sha("1"), remoteHead: null, unpushed: true, mergedIntoMain: false, hasModelChanges: true, ...facts,
+	});
+	const BRANCHES = [
+		info("feat/approved", { head: sha("a") }),
+		info("feat/docs", { hasModelChanges: false }),
+		info("feat/merged", { mergedIntoMain: true, unpushed: false, remoteHead: sha("1") }),
+		info("feat/model", { head: sha("b"), remoteHead: sha("b"), unpushed: false }),
+		info("main", { mergedIntoMain: true, hasModelChanges: false, unpushed: false, remoteHead: sha("1") }),
+	];
+	const MAIN = { ref: "refs/remotes/origin/main", commit: sha("1") };
+	const APPROVED = "https://aisep.example/ont/aisep#DecisionApproved";
+	const select = (records: string[]): QueryResult => ({
+		kind: "select", variables: ["record", "decision"], truncated: false,
+		rows: records.map((r) => ({ record: { type: "iri", value: r }, decision: { type: "iri", value: APPROVED } })),
+	});
+	/** feat/approved's tip adds one Approved record (not pushed yet); feat/model's tip adds none. */
+	function branchClient(): { client: AisepModelClient; refs: string[] } {
+		const refs: string[] = [];
+		const client = liveLike(Object.assign(Object.create(fixtureClient) as AisepModelClient, {
+			branches: async () => ({ branches: BRANCHES, main: MAIN }),
+			query: async (sparql: string, target: { ref?: string } = {}) => {
+				if (sparql !== APPROVAL_RECORDS_QUERY) return fixtureClient.query(sparql);
+				const ref = target.ref ?? "";
+				refs.push(ref);
+				if (ref.endsWith("^2") || ref.startsWith("refs/remotes/origin/feat/approved")) throw toolError(refNotFound);
+				if (ref === "refs/heads/feat/approved") return select(["urn:r1"]);
+				return select([]);
+			},
+		}));
+		return { client, refs };
+	}
+	const region = () => screen.getByRole("region", { name: en["section.gates.title"] });
+
+	it("lists only unmerged branches with model changes, each row a link to its gate page with its approval stage", async () => {
+		const { client, refs } = branchClient();
+		renderPage(client);
+		const list = await within(region()).findByRole("list", { name: en["section.gates.branches.title"] });
+		const links = within(list).getAllByRole("link");
+		expect(links.map((a) => a.getAttribute("href"))).toEqual([gateHref("feat/approved"), gateHref("feat/model")]);
+		expect(links[0]).toHaveAttribute("title", en["section.aiActivity.openGate"].replace("{{branch}}", "feat/approved"));
+		expect(await within(links[0]).findByText(en["gate.progress.stage.approved"])).toBeInTheDocument();
+		expect(within(links[0]).getByText(en["section.gates.branches.unpushed"])).toBeInTheDocument();
+		expect(within(links[0]).getByText("aaaaaaa")).toBeInTheDocument();
+		expect(await within(links[1]).findByText(en["gate.progress.stage.pending"])).toBeInTheDocument();
+		expect(within(links[1]).queryByText(en["section.gates.branches.unpushed"])).toBeNull();
+		// Progress is judged against the main the server resolved.
+		expect(refs).toContain(MAIN.ref);
+		expect(within(region()).queryByText("feat/docs")).toBeNull();
+		expect(within(region()).queryByText("feat/merged")).toBeNull();
+	});
+
+	it("says so when no branch is waiting", async () => {
+		const client = liveLike(Object.assign(Object.create(fixtureClient) as AisepModelClient, {
+			branches: async () => ({ branches: [BRANCHES[1], BRANCHES[2]], main: MAIN }),
+		}));
+		renderPage(client);
+		expect(await within(region()).findByText(en["section.gates.branches.empty"])).toBeInTheDocument();
+	});
+
+	it("says the branch list is unavailable when the server cannot list branches", async () => {
+		const client = liveLike(Object.assign(Object.create(fixtureClient) as AisepModelClient, {
+			branches: () => Promise.reject(new Error("unknown tool")),
+		}));
+		renderPage(client);
+		expect(await within(region()).findByText(en["section.gates.branches.error"])).toBeInTheDocument();
+		// The pending elements still load.
+		expect(await within(region()).findByText("Total: 24")).toBeInTheDocument();
+	});
+
+	it("with the offline fixtures shows the recorded branches without links or progress, and says why", async () => {
+		renderPage(fixtureClient);
+		const list = await within(region()).findByRole("list", { name: en["section.gates.branches.title"] });
+		expect(within(list).queryByRole("link")).toBeNull();
+		const rows = within(list).getAllByTitle(en["section.aiActivity.gateNeedsServer"]);
+		expect(rows.length).toBeGreaterThan(0);
+		expect(within(list).queryByText(en["gate.progress.stage.pending"])).toBeNull();
 	});
 });

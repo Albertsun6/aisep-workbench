@@ -47,6 +47,13 @@ describe("FixtureClient (recorded from the real server)", () => {
 		expect((await fixtureClient.diff({ head: "main" })).changedElementCount).toBe(0);
 	});
 
+	it("answers model_branches with branches recorded off a live server", async () => {
+		const { branches, main } = await fixtureClient.branches();
+		expect(main.ref).toBe("refs/heads/main");
+		expect(branches.map((b) => b.branch)).toEqual([...branches.map((b) => b.branch)].sort());
+		expect(branches.find((b) => b.branch === "feat/clean")).toMatchObject({ hasModelChanges: true, mergedIntoMain: false });
+	});
+
 	it("is read-only and rejects calls it has no fixture for", async () => {
 		const approval = fixtureClient.recordApproval({
 			model: "procurement", gate: "GateArchitecture", decision: "Approved", approvedBy: `${MODEL}x`,

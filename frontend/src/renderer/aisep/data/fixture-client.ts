@@ -6,6 +6,7 @@ import {
 	PENDING_QUERY,
 	type AisepModelClient,
 	type ApprovalResult,
+	type BranchesResult,
 	type DiffInput,
 	type DiffResult,
 	type FindingsResult,
@@ -14,6 +15,7 @@ import {
 	type Iri,
 	type QueryResult,
 } from "./client";
+import branchesFixture from "./fixtures/branches.json";
 import diffMain from "./fixtures/diff-main.json";
 import elementsQuery from "./fixtures/elements-query.json";
 import findingsFixture from "./fixtures/findings.json";
@@ -55,6 +57,10 @@ export class FixtureClient implements AisepModelClient {
 
 	async recordApproval(): Promise<ApprovalResult> {
 		throw new AisepToolError("READ_ONLY_FIXTURE", "fixture client is read-only", false);
+	}
+
+	async branches(): Promise<BranchesResult> {
+		return branchesFixture as BranchesResult;
 	}
 }
 

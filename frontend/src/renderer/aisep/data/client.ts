@@ -1,5 +1,5 @@
 // Workbench view of the AISEP MCP Server (aisep docs/mcp-interface.md §8; shapes per §5, errors per §7).
-// The workbench does not write the model (§2): only the six workbench-profile tools appear here.
+// The workbench does not write the model (§2): only the workbench-profile tools appear here.
 
 export type Iri = string;
 /** 40 hex characters. */
@@ -189,6 +189,26 @@ export interface ApprovalResult {
 	findings: Finding[];
 }
 
+/** model_branches (§5.11): Git facts of one local branch. The server never fetches: remote facts are as of the last fetch. */
+export interface BranchInfo {
+	/** Short name, as governance_record_approval's `branch`. */
+	branch: string;
+	head: Sha;
+	/** refs/remotes/origin/<branch>; null when there is none. */
+	remoteHead: Sha | null;
+	/** The local head has commits the remote branch lacks (or there is no remote branch). */
+	unpushed: boolean;
+	mergedIntoMain: boolean;
+	/** models/**.ttl changed between the merge-base with main and the head. */
+	hasModelChanges: boolean;
+}
+export interface BranchesResult {
+	/** Every local branch, sorted by name. */
+	branches: BranchInfo[];
+	/** The main branch the server resolved (§3.3: the remote-tracking branch first). */
+	main: { ref: string; commit: Sha };
+}
+
 /** Client-side, never sent to the server: a caller signal (TanStack Query passes one per query) and a timeout. */
 export interface CallOptions {
 	signal?: AbortSignal;
@@ -196,7 +216,7 @@ export interface CallOptions {
 }
 
 /**
- * The six workbench tools. The four model-writing tools are not part of the workbench (phase one).
+ * The workbench tools. The four model-writing tools are not part of the workbench (phase one).
  * The trailing CallOptions is a workbench addition to the §8 sketch: cancellation and a timeout per call.
  */
 export interface AisepModelClient {
@@ -210,6 +230,7 @@ export interface AisepModelClient {
 	): Promise<ImpactResult>;
 	diff(input: DiffInput, options?: CallOptions): Promise<DiffResult>;
 	recordApproval(input: ApprovalInput, options?: CallOptions): Promise<ApprovalResult>;
+	branches(target?: { repo?: string }, options?: CallOptions): Promise<BranchesResult>;
 }
 
 /** A tool result with isError: true; code is one of §7.2 (or a client-side code such as UNEXPECTED_RESULT_KIND). */

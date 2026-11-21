@@ -7,6 +7,7 @@ import {
 	type ApprovalInput,
 	type CallOptions,
 	type ApprovalResult,
+	type BranchesResult,
 	type DiffInput,
 	type DiffResult,
 	type FindingsResult,
@@ -186,5 +187,9 @@ export class McpModelClient implements AisepModelClient {
 
 	recordApproval(input: ApprovalInput, options?: CallOptions): Promise<ApprovalResult> {
 		return this.call("governance_record_approval", { ...input }, options);
+	}
+
+	branches(target: { repo?: string } = {}, options?: CallOptions): Promise<BranchesResult> {
+		return this.call("model_branches", { ...target }, options);
 	}
 }

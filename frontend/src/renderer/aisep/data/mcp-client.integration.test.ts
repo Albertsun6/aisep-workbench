@@ -151,6 +151,7 @@ describe.skipIf(!AISEP_ROOT)("McpModelClient against a real AISEP MCP Server (HT
 			["findings", (c) => c.findings()],
 			["impact", (c) => c.impact(`${M}quotation`)],
 			["diff", (c) => c.diff({ head: "main", detail: "items" })],
+			["branches", (c) => c.branches()],
 		];
 		for (const [name, run] of pairs) {
 			const live = await run(client);
@@ -261,6 +262,20 @@ describe.skipIf(!AISEP_ROOT)("the AI activity column's model_diff states against
 		expect(viaRef).toBe(true);
 		expect(result.head).toMatchObject({ kind: "ref", ref: "feat/gone" });
 		expect(result.changedElementCount).toBe(1);
+	});
+
+	it("lists every local branch with its Git facts (model_branches, §5.11)", async () => {
+		const result = await client.branches();
+		record("branches.json", result, base);
+		expect(result.main).toEqual({ ref: "refs/heads/main", commit: git(repo, "rev-parse", "main") });
+		const by = Object.fromEntries(result.branches.map((b) => [b.branch, b]));
+		expect(Object.keys(by)).toEqual(["feat/broken", "feat/clean", "feat/edit", "feat/gone", "main"]);
+		// Committed model changes count; uncommitted ones (feat/broken's half-written file) do not.
+		for (const branch of ["feat/clean", "feat/edit", "feat/gone"]) {
+			expect(by[branch], branch).toMatchObject({ hasModelChanges: true, mergedIntoMain: false, unpushed: true, remoteHead: null });
+		}
+		expect(by["feat/broken"]).toMatchObject({ hasModelChanges: false, mergedIntoMain: true });
+		expect(by.main).toMatchObject({ hasModelChanges: false, mergedIntoMain: true, head: result.main.commit });
 	});
 
 	it("fails with REF_NOT_FOUND when the branch is not in the model repo at all", async () => {
