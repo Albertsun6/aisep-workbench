@@ -415,10 +415,10 @@ jobs:
     if: contains(fromJSON(inputs.lanes), 'frontend')
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    # Two runners, half the spec files each: the suite is bound by the single
-    # Vite dev server, so more workers on one runner don't help.
-    # AISEP: 3 runners, not 2: at 2 this job was every PR's critical path
-    # (test step 182-305 s); measurements are in the aisep-workbench T4 PR.
+    # Several runners, a slice of the specs each: the suite is bound by the
+    # single Vite dev server, so more workers on one runner don't help.
+    # AISEP: 3 runners (upstream: 2): at 2 this job was every PR's critical
+    # path (test step 182-305 s); measurements are in aisep-workbench PR #12.
     strategy:
       fail-fast: false
       matrix:

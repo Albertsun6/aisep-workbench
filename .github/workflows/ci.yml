@@ -76,11 +76,9 @@ jobs:
           node-version: 24
 
       - name: Test CI scripts
-        # AISEP: also run AISEP script tests (scripts/aisep-*.test.mjs); nullglob
-        # lets the list be empty until such a file exists.
-        run: |
-          shopt -s nullglob
-          node --test scripts/ci-lanes.test.mjs scripts/ci-sharding.test.mjs scripts/create-migration.test.mjs scripts/aisep-*.test.mjs
+        # AISEP: also run AISEP script tests, named one by one (no glob): a
+        # missing or renamed file fails the step instead of being skipped.
+        run: node --test scripts/ci-lanes.test.mjs scripts/ci-sharding.test.mjs scripts/create-migration.test.mjs scripts/aisep-dev.test.mjs
 
   ci-ok:
     if: always()
