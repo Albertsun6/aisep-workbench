@@ -9,8 +9,11 @@ const port = Number(process.env.AO_E2E_PORT ?? 5173);
 export default defineConfig({
 	testDir: "e2e",
 	retries: process.env.CI ? 1 : 0,
-	// AISEP: CI runners are slower than dev machines; first-render assertions
-	// on a busy runner can exceed the 5 s default without anything being wrong.
+	// AISEP: CI runners are presumed slower than dev machines; first-render
+	// assertions on a busy runner can exceed the 5 s default without anything
+	// being wrong. That premise rests only on local load data so far (see wb PR
+	// #6), not on runner measurements. Cost: a regression that slows first
+	// render by 5–15 s no longer fails renderer-smoke in CI.
 	expect: { timeout: process.env.CI ? 15_000 : 5_000 },
 	reporter: process.env.CI ? [["list"], ["github"]] : "list",
 	use: {
