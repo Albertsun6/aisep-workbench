@@ -1,7 +1,7 @@
 // The gate page (§8 step 5) on answers recorded from a real server (AisepGatePage.integration.test.tsx and
 // data/mcp-client.integration.test.ts with AISEP_RECORD_FIXTURES=1).
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { act, cleanup, render, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { appI18n } from "../i18n";
@@ -213,6 +213,68 @@ describe("AisepGatePage", () => {
 		await waitFor(() => expect(approve).toBeEnabled());
 		await userEvent.click(approve);
 		expect(await screen.findByRole("alert")).toHaveTextContent(en["gate.approval.staleHead"]);
+		// A failed write frees the buttons again.
+		expect(approve).toBeEnabled();
+	});
+
+	it("shows the write in progress and sends one approval however fast the buttons are clicked", async () => {
+		let finish: (result: ApprovalResult) => void = () => {};
+		const { client, calls } = gateClient({
+			recordApproval: (input: ApprovalInput) => (calls.approve.push(input), new Promise<ApprovalResult>((done) => (finish = done))),
+		});
+		renderGate(client);
+		const approve = await screen.findByRole("button", { name: en["gate.approval.approve"] });
+		const reject = screen.getByRole("button", { name: en["gate.approval.reject"] });
+		await waitFor(() => expect(approve).toBeEnabled());
+		// Several clicks in one task, before React re-renders the button as disabled.
+		act(() => {
+			fireEvent.click(approve);
+			fireEvent.click(approve);
+			fireEvent.click(reject);
+		});
+		const approval = screen.getByRole("region", { name: en["gate.approval.title"] });
+		expect(await within(approval).findByRole("status")).toHaveTextContent(en["gate.approval.writing"]);
+		expect(approve).toBeDisabled();
+		expect(reject).toBeDisabled();
+		fireEvent.click(approve);
+		await new Promise((r) => setTimeout(r, 20));
+		expect(calls.approve).toHaveLength(1);
+		expect(calls.approve[0].decision).toBe("Approved");
+		await act(async () => finish(gateApproval as ApprovalResult));
+		expect(await within(approval).findByText(/^Recorded /)).toBeInTheDocument();
+		expect(approve).toBeDisabled();
+		expect(calls.approve).toHaveLength(1);
+	});
+
+	it("still shows the running write after leaving the page and coming back, and does not send another", async () => {
+		let finish: (result: ApprovalResult) => void = () => {};
+		const { client, calls } = gateClient({
+			recordApproval: (input: ApprovalInput) => (calls.approve.push(input), new Promise<ApprovalResult>((done) => (finish = done))),
+		});
+		const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+		const page = (
+			<QueryClientProvider client={queryClient}>
+				<AisepGatePage branch={BRANCH} client={client} />
+			</QueryClientProvider>
+		);
+		const first = render(page);
+		const approve = await screen.findByRole("button", { name: en["gate.approval.approve"] });
+		await waitFor(() => expect(approve).toBeEnabled());
+		await userEvent.click(approve);
+		await waitFor(() => expect(calls.approve).toHaveLength(1));
+		first.unmount();
+		render(page);
+		const approval = await screen.findByRole("region", { name: en["gate.approval.title"] });
+		expect(await within(approval).findByText(en["gate.approval.writing"])).toBeInTheDocument();
+		const again = within(approval).getByRole("button", { name: en["gate.approval.approve"] });
+		// The approvers and the gate have loaded: only the running write keeps the button off.
+		await within(approval).findByRole("combobox", { name: en["gate.approval.approver"] });
+		expect(again).toBeDisabled();
+		expect(within(approval).getByRole("button", { name: en["gate.approval.reject"] })).toBeDisabled();
+		await act(async () => finish(gateApproval as ApprovalResult));
+		expect(await within(approval).findByText(/^Recorded /)).toBeInTheDocument();
+		expect(again).toBeDisabled();
+		expect(calls.approve).toHaveLength(1);
 	});
 
 	it("shows the server's message when the diff fails", async () => {

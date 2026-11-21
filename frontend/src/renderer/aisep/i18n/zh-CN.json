@@ -69,6 +69,7 @@
 	"gate.approval.noApprovers": "模型里没有可以批准的干系人。",
 	"gate.approval.approve": "批准",
 	"gate.approval.reject": "驳回",
+	"gate.approval.writing": "正在写入：服务要先跑完整的关口校验，可能需要几十秒，期间不能再次提交。",
 	"gate.approval.gateFailed": "关口校验未通过，这个提交只能驳回。",
 	"gate.approval.recorded": "已记录 {{record}}，提交 {{commit}}。",
 	"gate.approval.duplicate": "已有相同记录（{{record}}，提交 {{commit}}），没有重复写入。",

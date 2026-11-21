@@ -18,7 +18,7 @@
 
 ## AISEP 接触面（合并时只需关注这些）
 
-AISEP 代码全部在 `frontend/src/renderer/aisep/`（上游没有这个目录，合并永不冲突），外加 `scripts/aisep-dev.mjs` 与说明 `scripts/aisep-dev.md`（一键启动 aisep MCP HTTP 服务与工作台网页版、批准前只读预检；AISEP 新增，上游没有同名文件，只读取上游的 `frontend/scripts/dev-web.mjs` 与 `vite.renderer.config.ts` 的 `AO_DEV_API_TARGET`，这两处改名或改参数时要跟着改）。碰到上游的只有：
+AISEP 代码全部在 `frontend/src/renderer/aisep/`（上游没有这个目录，合并永不冲突），外加 `scripts/aisep-dev.mjs`、它的测试 `scripts/aisep-dev.test.mjs` 与说明 `scripts/aisep-dev.md`（一键启动 aisep MCP HTTP 服务与工作台网页版、运行期间定时 `git fetch origin` 并在安全时让专用检出跟进 `origin/main`、批准前只读预检；AISEP 新增，上游没有同名文件，只读取上游的 `frontend/scripts/dev-web.mjs` 与 `vite.renderer.config.ts` 的 `AO_DEV_API_TARGET`，这两处改名或改参数时要跟着改）。碰到上游的只有：
 
 | 文件 | AISEP 改了什么 |
 |---|---|

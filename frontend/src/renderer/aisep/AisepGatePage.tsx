@@ -1,7 +1,7 @@
 // Gate page (aisep docs/mcp-interface.md §8 step 5, §2 "关口页"): the branch's committed model changes against the
 // main branch, the gate check on that same commit, and the one write the workbench does: record an approval.
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useId, useState } from "react";
+import { useMutation, useMutationState, useQuery, useQueryClient, type MutationState } from "@tanstack/react-query";
+import { useEffect, useId, useRef, useState } from "react";
 import { Workflow } from "@/components/app-icons";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -17,6 +17,7 @@ import {
 	iriColumn,
 	type AisepModelClient,
 	type ApprovalInput,
+	type ApprovalResult,
 	type Change,
 	type DiffItem,
 	type DiffKind,
@@ -92,6 +93,16 @@ export function approvalInput(
 ): ApprovalInput {
 	if (diff.head.kind !== "ref") throw new Error("a gate approves a commit, never a worktree (§5.8)");
 	return { ...choice, branch, headCommit: diff.head.commit, expectedBaseCommit: diff.base.commit };
+}
+
+type Decision = "Approved" | "Rejected";
+
+/**
+ * One approval write per branch head. The key lives in the shared mutation cache, so a page that is left and entered
+ * again while the write is still running (the server runs the whole gate first: tens of seconds) sees it and waits.
+ */
+export function approvalMutationKey(branch: string, commit: string) {
+	return ["aisep", "approval", branch, commit] as const;
 }
 
 const CHANGE_TEXT: Record<Change, AisepMessageKey> = {
@@ -325,14 +336,22 @@ function ApprovalSection({
 
 	const items = model ? (candidates.get(model) ?? []) : [];
 	const approves = items.map((item) => item.iri).filter((iri) => !unchecked.has(iri));
+	const mutationKey = approvalMutationKey(branch, commit);
+	// Set in the click handler itself: a second click before React re-renders the disabled button must not write again.
+	const submitting = useRef(false);
 	const record = useMutation({
-		mutationFn: (decision: "Approved" | "Rejected") =>
+		mutationKey,
+		mutationFn: (decision: Decision) =>
 			client.recordApproval(
 				approvalInput(branch, diff, { model: model as string, gate, decision, approvedBy: approver as Iri, approves }),
 				{ timeoutMs: GATE_TIMEOUT_MS },
 			),
 		// Main-branch rows stay Proposed until merge (§2); only the branch's own reads change: its changed-elements
 		// count and its "approved on the branch, not merged" marks in the pending gates.
+		// Only a failure frees the buttons again; a recorded decision is final for this head.
+		onError: () => {
+			submitting.current = false;
+		},
 		onSuccess: () =>
 			Promise.all([
 				queryClient.invalidateQueries({ queryKey: ["aisep", "diff"] }),
@@ -340,6 +359,20 @@ function ApprovalSection({
 				queryClient.invalidateQueries({ queryKey: approvalProgressKey(branch) }),
 			]),
 	});
+	// Every write for this head in this app, including one started by an earlier visit of the page.
+	const attempts = useMutationState({
+		filters: { mutationKey, exact: true },
+		select: (mutation) => mutation.state as MutationState<ApprovalResult, Error, Decision>,
+	});
+	const writing = attempts.some((state) => state.status === "pending");
+	const recorded = attempts.find((state) => state.status === "success")?.data;
+	const last = attempts.at(-1);
+	const failure = !writing && !recorded && last?.status === "error" ? last.error : null;
+	const submit = (decision: Decision) => {
+		if (submitting.current || writing || recorded) return;
+		submitting.current = true;
+		record.mutate(decision);
+	};
 
 	if (notApprovable.isError) {
 		return (
@@ -365,7 +398,7 @@ function ApprovalSection({
 		);
 	}
 	const gateFailed = gateCheck.data?.result === "FAIL";
-	const ready = approves.length > 0 && approver !== undefined && !record.isPending && !record.isSuccess;
+	const ready = approves.length > 0 && approver !== undefined && !writing && !recorded;
 	return (
 		<GateSection titleKey="gate.approval.title">
 			<div className="flex flex-wrap items-end gap-3 text-xs">
@@ -404,25 +437,27 @@ function ApprovalSection({
 			{gateFailed ? <p className="text-xs text-destructive">{t("gate.approval.gateFailed")}</p> : null}
 			<div className="flex gap-2">
 				<Button variant="accent" size="sm" disabled={!ready || gateFailed || !gateCheck.isSuccess}
-					onClick={() => record.mutate("Approved")}>
+					onClick={() => submit("Approved")}>
 					{t("gate.approval.approve")}
 				</Button>
-				<Button variant="secondary" size="sm" disabled={!ready} onClick={() => record.mutate("Rejected")}>
+				<Button variant="secondary" size="sm" disabled={!ready} onClick={() => submit("Rejected")}>
 					{t("gate.approval.reject")}
 				</Button>
 			</div>
-			{record.isSuccess ? (
+			{writing ? (
+				<p role="status" className="text-xs text-muted-foreground">{t("gate.approval.writing")}</p>
+			) : recorded ? (
 				<p role="status" className="text-xs text-success">
-					{t(record.data.duplicate ? "gate.approval.duplicate" : "gate.approval.recorded", {
-						record: localName(record.data.approval.iri),
-						commit: record.data.commit.slice(0, 7),
+					{t(recorded.duplicate ? "gate.approval.duplicate" : "gate.approval.recorded", {
+						record: localName(recorded.approval.iri),
+						commit: recorded.commit.slice(0, 7),
 					})}
 				</p>
-			) : record.isError ? (
+			) : failure ? (
 				<p role="alert" className="text-xs text-destructive">
-					{record.error instanceof AisepToolError && record.error.code === "STALE_HEAD"
+					{failure instanceof AisepToolError && failure.code === "STALE_HEAD"
 						? t("gate.approval.staleHead")
-						: t("gate.approval.failed", { message: errorMessage(record.error) })}
+						: t("gate.approval.failed", { message: errorMessage(failure) })}
 				</p>
 			) : null}
 		</GateSection>

@@ -69,6 +69,7 @@
 	"gate.approval.noApprovers": "モデルに承認できるステークホルダーがいません。",
 	"gate.approval.approve": "承認",
 	"gate.approval.reject": "却下",
+	"gate.approval.writing": "書き込み中：サーバーが先にゲートの全チェックを実行するため、数十秒かかることがあります。その間は再送信できません。",
 	"gate.approval.gateFailed": "ゲートチェックが不合格のため、このコミットは却下のみ可能です。",
 	"gate.approval.recorded": "{{record}} をコミット {{commit}} に記録しました。",
 	"gate.approval.duplicate": "同じ記録が既にあります（{{record}}、コミット {{commit}}）。新しくは書き込んでいません。",

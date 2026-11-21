@@ -69,6 +69,7 @@
 	"gate.approval.noApprovers": "No stakeholder in the model can approve.",
 	"gate.approval.approve": "Approve",
 	"gate.approval.reject": "Reject",
+	"gate.approval.writing": "Writing: the server runs the full gate check first, which can take tens of seconds. You cannot submit again meanwhile.",
 	"gate.approval.gateFailed": "The gate check failed, so this commit can only be rejected.",
 	"gate.approval.recorded": "Recorded {{record}} in commit {{commit}}.",
 	"gate.approval.duplicate": "The same record already exists ({{record}}, commit {{commit}}); nothing new was written.",
