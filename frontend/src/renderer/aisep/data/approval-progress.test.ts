@@ -153,7 +153,7 @@ describe("approval progress", () => {
 
 // A commit's history for approvalCoverage: history[k] is the record set at `${HEAD}~${k}`; `merges` lists the k whose
 // commit has a second parent; `content` lists the k whose commit also changed model content (model_diff against its
-// parent shows more than added governance). `approves` answers APPROVAL_COVERAGE_QUERY at HEAD (record -> gate, elements).
+// parent shows more than added governance); `shapes` gives other commits' added counts outright. `approves` answers APPROVAL_COVERAGE_QUERY at HEAD (record -> gate, elements).
 const HEAD = "0123456789abcdef0123456789abcdef01234567";
 const ARCH = `${AISEP}GateArchitecture`;
 const DESIGN = `${AISEP}GateDesign`;
@@ -166,6 +166,7 @@ function historyServer(
 	approves: Record<string, [gate: string, elements: string[]]>,
 	merges: number[] = [],
 	content: number[] = [],
+	shapes: Record<number, Partial<Record<"element" | "governance", number>>> = {},
 ) {
 	const refs: string[] = [];
 	const diffs: DiffInput[] = [];
@@ -174,7 +175,7 @@ function historyServer(
 			diffs.push(input);
 			const k = Number(String(input.head).slice(`${HEAD}~`.length));
 			expect(input).toEqual({ head: `${HEAD}~${k}`, base: `${HEAD}~${k + 1}`, detail: "summary" });
-			return modelDiff(content.includes(k) ? { governance: 1, element: 1 } : { governance: 1 });
+			return modelDiff(shapes[k] ?? (content.includes(k) ? { governance: 1, element: 1 } : { governance: 1 }));
 		},
 		query: async (sparql: string, target: { ref: string }): Promise<QueryResult> => {
 			refs.push(target.ref);
@@ -235,7 +236,7 @@ describe("approval coverage", () => {
 		expect(coverage.records).toEqual([A1]);
 		expect(isCovered(coverage, "GateArchitecture", [`${W}a`, `${W}b`])).toBe(true);
 		expect(isCovered(coverage, "GateArchitecture", [`${W}a`])).toBe(true);
-		expect(coveringRecords(coverage, "GateArchitecture")).toEqual([A1]);
+		expect(coveringRecords(coverage, "GateArchitecture", [`${W}a`, `${W}b`])).toEqual([A1]);
 	});
 
 	it("looks past the tip: after Architecture then Design, Architecture is still covered", async () => {
@@ -258,7 +259,10 @@ describe("approval coverage", () => {
 		const coverage = await approvalCoverage(client, HEAD);
 		expect(isCovered(coverage, "GateArchitecture", [`${W}a`, `${W}b`])).toBe(true);
 		expect(isCovered(coverage, "GateArchitecture", [`${W}a`, `${W}c`])).toBe(false);
-		expect(coveringRecords(coverage, "GateArchitecture")).toEqual([A2, A1]);
+		expect(coveringRecords(coverage, "GateArchitecture", [`${W}a`, `${W}b`])).toEqual([A2, A1]);
+		// Only the records that cover the current selection, not every Approved record of the gate.
+		expect(coveringRecords(coverage, "GateArchitecture", [`${W}a`])).toEqual([A1]);
+		expect(coveringRecords(coverage, "GateArchitecture", [`${W}b`])).toEqual([A2]);
 	});
 
 	it("does not cover another gate, an element outside the approved set, or nothing at all", async () => {
@@ -290,6 +294,25 @@ describe("approval coverage", () => {
 			[],
 			[0],
 		);
+		const coverage = await approvalCoverage(client, HEAD);
+		expect(coverage.records).toEqual([]);
+		expect(isCovered(coverage, "GateArchitecture", [`${W}a`])).toBe(false);
+	});
+
+	it("counts an approval commit that also added its AgentActivity (two governance subjects added)", async () => {
+		const { client } = historyServer([{ ...before, [A1]: APPROVED }, before], { [A1]: [ARCH, [`${W}a`]] }, [], [], {
+			0: { governance: 2 },
+		});
+		const coverage = await approvalCoverage(client, HEAD);
+		expect(coverage.records).toEqual([A1]);
+		expect(isCovered(coverage, "GateArchitecture", [`${W}a`])).toBe(true);
+	});
+
+	it("does not take a commit adding a record and two more governance subjects for an approval commit", async () => {
+		// More than one record and one activity: mergecheck's _commit_shape rejects it, so it is the content commit.
+		const { client } = historyServer([{ ...before, [A1]: APPROVED }, before], { [A1]: [ARCH, [`${W}a`]] }, [], [], {
+			0: { governance: 3 },
+		});
 		const coverage = await approvalCoverage(client, HEAD);
 		expect(coverage.records).toEqual([]);
 		expect(isCovered(coverage, "GateArchitecture", [`${W}a`])).toBe(false);

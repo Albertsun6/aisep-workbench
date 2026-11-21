@@ -80,6 +80,7 @@
 	"gate.approval.writing": "Wird geschrieben: Der Server führt zuerst die vollständige Gate-Prüfung aus, das kann einige Dutzend Sekunden dauern. Bis dahin ist kein erneutes Absenden möglich.",
 	"gate.approval.alreadyApproved": "Die Spitze des Branches ist bereits ein Freigabe-Commit ({{stage}}). Ein weiterer Datensatz (Freigabe oder Ablehnung) wird darüber geschrieben; das deckt die Merge-Ausnahme nicht ab und erfordert eine neue Prüfung.",
 	"gate.approval.progressUnknown": "Der Freigabefortschritt konnte nicht gelesen werden; ob die Branch-Spitze bereits freigegeben ist, ist unbekannt.",
+	"gate.approval.coverageUnknown": "Was dieser Head bereits freigegeben hat, konnte nicht gelesen werden; ob dieses Gate und diese Elemente bereits freigegeben sind, ist unbekannt.",
 	"gate.approval.confirmRepeat": "Ich bestätige, einen weiteren Datensatz auf diesem Branch zu schreiben",
 	"gate.approval.alreadyCovered": "Dieser Branch hat diese Auswahl bereits freigegeben ({{records}}), daher ist „Freigeben“ deaktiviert: eine erneute Freigabe würde nur einen zweiten Datensatz schreiben. Ablehnen, ein anderes Gate oder andere Elemente sind weiterhin möglich.",
 	"gate.approval.gateFailed": "Die Gate-Prüfung ist fehlgeschlagen, daher kann dieser Commit nur abgelehnt werden.",
