@@ -425,7 +425,7 @@ const ARCH_RECORD = `${M}approval-20261121000001-architecture-1eb5dbc`;
 const DESIGN_RECORD = `${M}approval-20261121000002-design-aaaaaaa`;
 const QUOTATION_LINE = `${M}quotationLine`;
 function guardClient(
-	history: Record<string, string>[] | (() => never),
+	history: Record<string, string>[],
 	approves: Record<string, [gate: string, elements: string[]]>,
 ) {
 	return gateClient({
@@ -433,7 +433,6 @@ function guardClient(
 			if (sparql === APPROVERS_QUERY) return gateApprovers as QueryResult;
 			if (sparql === NOT_APPROVABLE_QUERY) return gateNotApprovable as QueryResult;
 			if (sparql === APPROVAL_COVERAGE_QUERY) {
-				if (typeof history === "function") history();
 				return {
 					kind: "select",
 					variables: ["record", "gate", "element"],
@@ -449,7 +448,6 @@ function guardClient(
 			}
 			if (sparql !== APPROVAL_RECORDS_QUERY) throw new Error(`unexpected query ${sparql}`);
 			if (!target.ref.startsWith(`${head}~`)) return progressRecords(target.ref, true);
-			if (typeof history === "function") history();
 			const m = target.ref.slice(head.length).match(/^~(\d+)(\^2)?$/);
 			const records = m && !m[2] ? history[Number(m[1])] : undefined;
 			if (!records) throw new AisepToolError("REF_NOT_FOUND", `找不到提交 ${target.ref}`, false);
