@@ -14,7 +14,7 @@ import { execFile, execFileSync, spawn } from "node:child_process";
 import { existsSync, readdirSync, realpathSync } from "node:fs";
 import { connect } from "node:net";
 import { homedir } from "node:os";
-import { basename, dirname, join, resolve, sep } from "node:path";
+import { dirname, join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 
@@ -429,11 +429,28 @@ async function waitFor(what, check, timeoutMs) {
 
 // ---------------------------------------------------------------- 子命令
 
-/** 专用检出 root 里面别的 git 检出（worktree 或 clone）所在的目录。 */
+/** 嵌套检出扫描最多下探的目录层数：.claude/worktrees/<名> 是 3 层，嵌套克隆里的 aisep/.claude/worktrees/<名> 是 4 层。 */
+const NESTED_SCAN_MAX_DEPTH = 4;
+/** 不进入的依赖目录。不按 .gitignore 跳过：aisep 的 .gitignore 含 .claude/worktrees/，那正是要找的地方。 */
+const NESTED_SCAN_SKIP = new Set(["node_modules", ".venv", "__pycache__"]);
+
+/**
+ * 专用检出 root 里面别的 git 检出（worktree 或 clone）所在的目录。
+ * 只下探 NESTED_SCAN_MAX_DEPTH 层、跳过 NESTED_SCAN_SKIP 与 .git 本身；不跟随符号链接（withFileTypes 的 Dirent 来自 lstat，
+ * 指向目录的链接不算目录），所以指向上级目录的链接既不会让扫描绕圈，也不会把专用检出自己报出来。
+ */
 export function findNestedCheckouts(root) {
-	return readdirSync(root, { recursive: true })
-		.filter((p) => basename(p) === ".git" && p !== ".git" && !p.includes(`${sep}.git${sep}`))
-		.map((p) => dirname(join(root, p)));
+	const found = [];
+	const walk = (dir, depth) => {
+		for (const entry of readdirSync(dir, { withFileTypes: true })) {
+			if (!entry.isDirectory() || entry.name === ".git" || NESTED_SCAN_SKIP.has(entry.name)) continue;
+			const child = join(dir, entry.name);
+			if (existsSync(join(child, ".git"))) found.push(child);
+			if (depth < NESTED_SCAN_MAX_DEPTH) walk(child, depth + 1);
+		}
+	};
+	walk(root, 1);
+	return found;
 }
 
 async function start(opts) {
