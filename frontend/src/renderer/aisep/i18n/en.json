@@ -86,5 +86,12 @@
 	"section.gates.approvedOnBranch": "Approved on {{branch}}, not merged yet",
 	"section.aiActivity.gateNeedsServer": "The gate page needs the model server (VITE_AISEP_MCP_URL).",
 	"section.gates.branchMarksUnknown": "Could not read the approvals on {{branches}}: elements already approved there may not be marked.",
-	"gate.approval.notApprovableFailed": "Could not check which elements can be approved, so nothing is prefilled: {{message}}"
+	"gate.approval.notApprovableFailed": "Could not check which elements can be approved, so nothing is prefilled: {{message}}",
+	"gate.progress.title": "Approval progress",
+	"gate.progress.refresh": "Refresh",
+	"gate.progress.stage.pending": "Awaiting approval",
+	"gate.progress.stage.approved": "Approved, not pushed",
+	"gate.progress.stage.pushed": "Pushed, not merged",
+	"gate.progress.stage.merged": "Merged",
+	"gate.progress.fetchNote": "Read from Git on the model server's repository, checked every 15 seconds. The server never fetches: “Pushed” and “Merged” follow origin as of the last git fetch there."
 }

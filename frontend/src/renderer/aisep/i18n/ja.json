@@ -86,5 +86,12 @@
 	"section.gates.approvedOnBranch": "{{branch}} で承認済み、未マージ",
 	"section.aiActivity.gateNeedsServer": "ゲートページにはモデルサーバー（VITE_AISEP_MCP_URL）が必要です。",
 	"section.gates.branchMarksUnknown": "{{branches}} の承認を読み取れません：そこで承認済みの要素に印が付いていない可能性があります。",
-	"gate.approval.notApprovableFailed": "承認できる要素を確認できないため、事前入力しません：{{message}}"
+	"gate.approval.notApprovableFailed": "承認できる要素を確認できないため、事前入力しません：{{message}}",
+	"gate.progress.title": "承認の進捗",
+	"gate.progress.refresh": "更新",
+	"gate.progress.stage.pending": "承認待ち",
+	"gate.progress.stage.approved": "承認済み・未プッシュ",
+	"gate.progress.stage.pushed": "プッシュ済み・未マージ",
+	"gate.progress.stage.merged": "マージ済み",
+	"gate.progress.fetchNote": "モデルサーバーが読むリポジトリの Git から導出し、15 秒ごとに確認します。サーバーは fetch しません。「プッシュ済み」「マージ済み」はそのリポジトリで最後に git fetch した時点の origin に基づきます。"
 }
