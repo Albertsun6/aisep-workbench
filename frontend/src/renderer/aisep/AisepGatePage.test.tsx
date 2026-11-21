@@ -390,7 +390,10 @@ describe("AisepGatePage", () => {
 			diff: () => Promise.reject(new AisepToolError("REF_NOT_FOUND", "找不到提交 feat/approve", false)),
 		});
 		renderGate(client);
-		expect(await screen.findByRole("alert")).toHaveTextContent("找不到提交 feat/approve");
+		const alert = await screen.findByRole("alert");
+		expect(alert).toHaveTextContent("找不到提交 feat/approve");
+		// Message (and hint) only, the same wording as the home page: no error code in front.
+		expect(alert).not.toHaveTextContent("REF_NOT_FOUND");
 	});
 });
 

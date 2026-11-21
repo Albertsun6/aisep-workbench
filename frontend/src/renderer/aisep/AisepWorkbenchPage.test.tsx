@@ -590,10 +590,11 @@ describe("AisepWorkbenchPage gate entries (model_branches, §5.11)", () => {
 		}
 	});
 
-	it("while the server stays down, only the list asks again: the rows do not multiply the calls", async () => {
+	it("while the server stays down, only the list asks again: the rows do not multiply the calls; once it is back each row asks once", async () => {
 		vi.useFakeTimers({ shouldAdvanceTime: true });
 		try {
 			let listDown = false;
+			let progressDown = true;
 			let listCalls = 0;
 			let rowCalls = 0;
 			const { client } = branchClient(async () => {
@@ -605,7 +606,8 @@ describe("AisepWorkbenchPage gate entries (model_branches, §5.11)", () => {
 			client.query = async (sparql, target) => {
 				if (sparql !== APPROVAL_RECORDS_QUERY) return query(sparql, target);
 				rowCalls++;
-				throw new AisepToolError("INTERNAL", "boom", false);
+				if (progressDown) throw new AisepToolError("INTERNAL", "boom", false);
+				return query(sparql, target);
 			};
 			renderPage(client);
 			const links = within(await list()).getAllByRole("link");
@@ -618,6 +620,15 @@ describe("AisepWorkbenchPage gate entries (model_branches, §5.11)", () => {
 			// Five more intervals: five list calls, and none from the three failed rows.
 			expect(listCalls - lists).toBe(5);
 			expect(rowCalls - rows).toBe(0);
+			// The server is back: the next list read makes each failed row read its progress again.
+			listDown = false;
+			progressDown = false;
+			await act(() => vi.advanceTimersByTimeAsync(GATE_BRANCHES_REFRESH_MS));
+			const back = within(await list()).getAllByRole("link");
+			expect(await within(back[0]).findByText(en["gate.progress.stage.approved"])).toBeInTheDocument();
+			expect(await within(back[1]).findByText(en["gate.progress.stage.pending"])).toBeInTheDocument();
+			expect(await within(back[2]).findByText(en["gate.progress.stage.pending"])).toBeInTheDocument();
+			expect(within(region()).queryByText(en["section.gates.branches.refreshFailed"])).toBeNull();
 		} finally {
 			vi.useRealTimers();
 		}

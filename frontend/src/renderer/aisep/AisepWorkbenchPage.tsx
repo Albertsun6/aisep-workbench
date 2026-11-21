@@ -322,13 +322,14 @@ function GateBranchRow({
 	});
 	// Nothing moves the key after a failure, so a failed computation tries again, but only after the list itself was read
 	// again: while the server is down the list's one call per interval fails and no row asks (not one call per row).
-	const { isError: progressFailed, refetch: refetchProgress } = progress;
+	// A read already running is left alone (refetch would cancel and resend it).
+	const { isError: progressFailed, isFetching: progressFetching, refetch: refetchProgress } = progress;
 	const seenListUpdate = useRef(listUpdatedAt);
 	useEffect(() => {
 		if (seenListUpdate.current === listUpdatedAt) return;
 		seenListUpdate.current = listUpdatedAt;
-		if (progressFailed) void refetchProgress();
-	}, [listUpdatedAt, progressFailed, refetchProgress]);
+		if (progressFailed && !progressFetching) void refetchProgress();
+	}, [listUpdatedAt, progressFailed, progressFetching, refetchProgress]);
 	const content = (
 		<>
 			<span className="min-w-0 truncate font-mono text-foreground">{info.branch}</span>
