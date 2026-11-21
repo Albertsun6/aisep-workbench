@@ -428,7 +428,15 @@ function guardClient(
 	history: Record<string, string>[],
 	approves: Record<string, [gate: string, elements: string[]]>,
 ) {
+	const zero = { added: 0, modified: 0, removed: 0 };
 	return gateClient({
+		// The coverage walk diffs each commit against its parent (base given); history commits only add records here.
+		diff: async (input: { base?: string }) =>
+			input.base === undefined
+				? diff
+				: ({
+						counts: { element: zero, relationship: zero, view: zero, governance: { ...zero, added: 1 }, schema: zero, other: zero },
+					} as unknown as DiffResult),
 		query: async (sparql: string, target: { ref: string }) => {
 			if (sparql === APPROVERS_QUERY) return gateApprovers as QueryResult;
 			if (sparql === NOT_APPROVABLE_QUERY) return gateNotApprovable as QueryResult;
