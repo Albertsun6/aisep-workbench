@@ -102,3 +102,22 @@ export async function approvalProgress(
 	const records = secondParent === null ? tipApprovals(tip, parent) : [];
 	return { stage: stageOf(records, remote, main), records, remoteBranch: remote !== null };
 }
+
+// STUB (test-first): replaced by the real walk in the next commit.
+export const APPROVAL_COVERAGE_QUERY = `PREFIX aisep: <https://aisep.example/ont/aisep#>
+SELECT ?record ?gate ?element WHERE {
+  ?record a aisep:ApprovalRecord ; aisep:decision aisep:DecisionApproved ; aisep:gate ?gate ; aisep:approves ?element .
+}`;
+export interface ApprovalCoverage {
+	records: Iri[];
+	approved: { record: Iri; gate: Iri; elements: Set<Iri> }[];
+}
+export async function approvalCoverage(_client: AisepModelClient, _commit: string, _options: CallOptions = {}): Promise<ApprovalCoverage> {
+	return { records: [], approved: [] };
+}
+export function isCovered(_coverage: ApprovalCoverage, _gate: string, _approves: readonly Iri[]): boolean {
+	return false;
+}
+export function coveringRecords(_coverage: ApprovalCoverage, _gate: string): Iri[] {
+	return [];
+}

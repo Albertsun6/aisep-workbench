@@ -16,7 +16,7 @@ import {
 	type GateResult,
 	type QueryResult,
 } from "./data/client";
-import { APPROVAL_RECORDS_QUERY } from "./data/approval-progress";
+import { APPROVAL_COVERAGE_QUERY, APPROVAL_RECORDS_QUERY } from "./data/approval-progress";
 import { fixtureClient } from "./data/fixture-client";
 import staleHead from "./data/fixtures/error-stale-head.json";
 import gateApproval from "./data/fixtures/gate-approval.json";
@@ -415,3 +415,172 @@ describe("approvalCandidates", () => {
 });
 
 vi.setConfig({ testTimeout: 15_000 });
+
+// Repeat approval guard (aisep models/workbench: acNoRepeatSameSelection, acOtherGateOrRejectAllowed,
+// acCoverageUnknownConfirm). The page pinned `head`; history[k] is the record set at `${head}~${k}` (what a reload sees
+// after earlier approvals made the head an approval commit), `approves` answers APPROVAL_COVERAGE_QUERY on `head`. The
+// branch-ref progress reads as "approved" (the tip is an approval commit), as it does on a real reload.
+const AISEP = "https://aisep.example/ont/aisep#";
+const ARCH_RECORD = `${M}approval-20261121000001-architecture-1eb5dbc`;
+const DESIGN_RECORD = `${M}approval-20261121000002-design-aaaaaaa`;
+const QUOTATION_LINE = `${M}quotationLine`;
+function guardClient(
+	history: Record<string, string>[] | (() => never),
+	approves: Record<string, [gate: string, elements: string[]]>,
+) {
+	return gateClient({
+		query: async (sparql: string, target: { ref: string }) => {
+			if (sparql === APPROVERS_QUERY) return gateApprovers as QueryResult;
+			if (sparql === NOT_APPROVABLE_QUERY) return gateNotApprovable as QueryResult;
+			if (sparql === APPROVAL_COVERAGE_QUERY) {
+				if (typeof history === "function") history();
+				return {
+					kind: "select",
+					variables: ["record", "gate", "element"],
+					truncated: false,
+					rows: Object.entries(approves).flatMap(([record, [gate, elements]]) =>
+						elements.map((element) => ({
+							record: { type: "iri" as const, value: record },
+							gate: { type: "iri" as const, value: `${AISEP}${gate}` },
+							element: { type: "iri" as const, value: element },
+						})),
+					),
+				};
+			}
+			if (sparql !== APPROVAL_RECORDS_QUERY) throw new Error(`unexpected query ${sparql}`);
+			if (!target.ref.startsWith(`${head}~`)) return progressRecords(target.ref, true);
+			if (typeof history === "function") history();
+			const m = target.ref.slice(head.length).match(/^~(\d+)(\^2)?$/);
+			const records = m && !m[2] ? history[Number(m[1])] : undefined;
+			if (!records) throw new AisepToolError("REF_NOT_FOUND", `找不到提交 ${target.ref}`, false);
+			const rows = Object.entries(records).map(([record, decision]) => ({
+				record: { type: "iri" as const, value: record },
+				decision: { type: "iri" as const, value: decision },
+			}));
+			return { kind: "select", variables: ["record", "decision"], rows, truncated: false } as QueryResult;
+		},
+	});
+}
+const APPROVED = DECISION_APPROVED;
+/** The head is the Architecture approval of quotationLine, on top of the content commit. */
+const approvedOnce = (): Record<string, string>[] => [{ [ARCH_RECORD]: APPROVED }, {}];
+
+async function readyApproval() {
+	const approval = await screen.findByRole("region", { name: en["gate.approval.title"] });
+	await within(approval).findByRole("combobox", { name: en["gate.approval.approver"] });
+	await screen.findByText(en["gate.check.pass"]);
+	return {
+		approval,
+		approve: within(approval).getByRole("button", { name: en["gate.approval.approve"] }),
+		reject: within(approval).getByRole("button", { name: en["gate.approval.reject"] }),
+	};
+}
+
+async function chooseGate(approval: HTMLElement, gate: string) {
+	await userEvent.click(within(approval).getByRole("combobox", { name: en["gate.approval.gate"] }));
+	await userEvent.click(await screen.findByRole("option", { name: gate }));
+}
+
+describe("repeat approval guard: same selection", () => {
+	it("keeps Approve off after a reload when the same gate and elements are already approved, even after confirming", async () => {
+		const { client, calls } = guardClient(approvedOnce(), { [ARCH_RECORD]: ["GateArchitecture", [QUOTATION_LINE]] });
+		renderGate(client);
+		const { approval, approve } = await readyApproval();
+		expect(await within(approval).findByText(en["gate.approval.alreadyCovered"].replace("{{records}}", ARCH_RECORD.slice(M.length)))).toBeInTheDocument();
+		await userEvent.click(within(approval).getByRole("checkbox", { name: en["gate.approval.confirmRepeat"] }));
+		expect(approve).toBeDisabled();
+		fireEvent.click(approve);
+		await new Promise((r) => setTimeout(r, 20));
+		expect(calls.approve).toHaveLength(0);
+	});
+
+	it("keeps Approve off for Architecture after Architecture then Design were approved (not only the tip's record)", async () => {
+		const { client, calls } = guardClient(
+			[{ [ARCH_RECORD]: APPROVED, [DESIGN_RECORD]: APPROVED }, { [ARCH_RECORD]: APPROVED }, {}],
+			{ [ARCH_RECORD]: ["GateArchitecture", [QUOTATION_LINE]], [DESIGN_RECORD]: ["GateDesign", [QUOTATION_LINE]] },
+		);
+		renderGate(client);
+		const { approval, approve } = await readyApproval();
+		expect(await within(approval).findByText(en["gate.approval.alreadyCovered"].replace("{{records}}", ARCH_RECORD.slice(M.length)))).toBeInTheDocument();
+		await userEvent.click(within(approval).getByRole("checkbox", { name: en["gate.approval.confirmRepeat"] }));
+		expect(approve).toBeDisabled();
+		expect(calls.approve).toHaveLength(0);
+	});
+});
+
+describe("repeat approval guard: other gate or reject", () => {
+	it("approves another gate after the confirmation", async () => {
+		const { client, calls } = guardClient(approvedOnce(), { [ARCH_RECORD]: ["GateArchitecture", [QUOTATION_LINE]] });
+		renderGate(client);
+		const { approval, approve } = await readyApproval();
+		await within(approval).findByText(en["gate.approval.alreadyCovered"].replace("{{records}}", ARCH_RECORD.slice(M.length)));
+		await chooseGate(approval, en["gate.gates.GateDesign"]);
+		expect(within(approval).queryByText(/^This branch already approved/)).toBeNull();
+		await userEvent.click(within(approval).getByRole("checkbox", { name: en["gate.approval.confirmRepeat"] }));
+		await waitFor(() => expect(approve).toBeEnabled());
+		await userEvent.click(approve);
+		await waitFor(() => expect(calls.approve).toHaveLength(1));
+		expect(calls.approve[0]).toMatchObject({ gate: "GateDesign", decision: "Approved", approves: [QUOTATION_LINE] });
+	});
+
+	it("rejects the same selection after the confirmation", async () => {
+		const { client, calls } = guardClient(approvedOnce(), { [ARCH_RECORD]: ["GateArchitecture", [QUOTATION_LINE]] });
+		renderGate(client);
+		const { approval, approve, reject } = await readyApproval();
+		await within(approval).findByText(en["gate.approval.alreadyCovered"].replace("{{records}}", ARCH_RECORD.slice(M.length)));
+		await userEvent.click(within(approval).getByRole("checkbox", { name: en["gate.approval.confirmRepeat"] }));
+		expect(approve).toBeDisabled();
+		await waitFor(() => expect(reject).toBeEnabled());
+		await userEvent.click(reject);
+		await waitFor(() => expect(calls.approve).toHaveLength(1));
+		expect(calls.approve[0]).toMatchObject({ gate: "GateArchitecture", decision: "Rejected" });
+	});
+
+	it("approves elements the earlier record did not approve, after the confirmation", async () => {
+		const { client, calls } = guardClient(approvedOnce(), { [ARCH_RECORD]: ["GateArchitecture", [`${M}somethingElse`]] });
+		renderGate(client);
+		const { approval, approve } = await readyApproval();
+		await userEvent.click(await within(approval).findByRole("checkbox", { name: en["gate.approval.confirmRepeat"] }));
+		await waitFor(() => expect(approve).toBeEnabled());
+		expect(within(approval).queryByText(/^This branch already approved/)).toBeNull();
+		await userEvent.click(approve);
+		await waitFor(() => expect(calls.approve).toHaveLength(1));
+	});
+
+	it("approves again once a content commit follows the earlier approval (that approval no longer counts)", async () => {
+		const { client, calls } = guardClient([{ [ARCH_RECORD]: APPROVED }, { [ARCH_RECORD]: APPROVED }, {}], {
+			[ARCH_RECORD]: ["GateArchitecture", [QUOTATION_LINE]],
+		});
+		renderGate(client);
+		const { approval, approve } = await readyApproval();
+		await userEvent.click(await within(approval).findByRole("checkbox", { name: en["gate.approval.confirmRepeat"] }));
+		await waitFor(() => expect(approve).toBeEnabled());
+		expect(within(approval).queryByText(/^This branch already approved/)).toBeNull();
+		await userEvent.click(approve);
+		await waitFor(() => expect(calls.approve).toHaveLength(1));
+	});
+});
+
+describe("repeat approval guard: coverage unknown", () => {
+	it("falls back to the confirmation when the approval records cannot be read", async () => {
+		const { client, calls } = gateClient({
+			query: async (sparql: string, target: { ref: string }) => {
+				if (sparql === APPROVERS_QUERY) return gateApprovers as QueryResult;
+				if (sparql === NOT_APPROVABLE_QUERY) return gateNotApprovable as QueryResult;
+				// The branch progress reads fine (pending); only the walk from the pinned head fails.
+				if (sparql === APPROVAL_RECORDS_QUERY && !target.ref.startsWith(`${head}~`)) return progressRecords(target.ref, false);
+				throw new Error("socket hang up");
+			},
+		});
+		renderGate(client);
+		const { approval, approve, reject } = await readyApproval();
+		expect(await within(approval).findByRole("note")).toHaveTextContent(en["gate.approval.progressUnknown"]);
+		expect(approve).toBeDisabled();
+		expect(reject).toBeDisabled();
+		await userEvent.click(within(approval).getByRole("checkbox", { name: en["gate.approval.confirmRepeat"] }));
+		expect(approve).toBeEnabled();
+		expect(reject).toBeEnabled();
+		await userEvent.click(approve);
+		await waitFor(() => expect(calls.approve).toHaveLength(1));
+	});
+});

@@ -80,6 +80,7 @@
 	"gate.approval.alreadyApproved": "本分支顶端已经是一个批准提交（{{stage}}）。再写一条记录（批准或驳回都算）会叠在它上面，超出合并豁免允许的范围，只能走重评。",
 	"gate.approval.progressUnknown": "读不到批准进度，无法确认本分支顶端是不是已经批准过。",
 	"gate.approval.confirmRepeat": "我确认要在这个分支上再写一条记录",
+	"gate.approval.alreadyCovered": "本分支已经批准过这一选择（{{records}}），批准按钮已停用：再批只会多写一条记录。仍可驳回、换关口或勾选别的元素。",
 	"gate.approval.gateFailed": "关口校验未通过，这个提交只能驳回。",
 	"gate.approval.recorded": "已记录 {{record}}，提交 {{commit}}。",
 	"gate.approval.duplicate": "已有相同记录（{{record}}，提交 {{commit}}），没有重复写入。",

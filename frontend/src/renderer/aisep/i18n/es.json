@@ -80,6 +80,7 @@
 	"gate.approval.alreadyApproved": "La punta de la rama ya es un commit de aprobación ({{stage}}). Escribir otro registro (aprobación o rechazo) lo pone encima, algo que la exención de fusión no permite y que requiere una nueva revisión.",
 	"gate.approval.progressUnknown": "No se pudo leer el progreso de la aprobación; no se sabe si la punta de la rama ya está aprobada.",
 	"gate.approval.confirmRepeat": "Confirmo escribir otro registro en esta rama",
+	"gate.approval.alreadyCovered": "Esta rama ya aprobó esta selección ({{records}}), así que Aprobar está desactivado: aprobarla de nuevo solo añadiría un segundo registro. Aún puedes rechazar, elegir otra puerta o marcar otros elementos.",
 	"gate.approval.gateFailed": "La comprobación de la puerta falló, así que este commit solo se puede rechazar.",
 	"gate.approval.recorded": "Se registró {{record}} en el commit {{commit}}.",
 	"gate.approval.duplicate": "Ya existe el mismo registro ({{record}}, commit {{commit}}); no se escribió nada nuevo.",
