@@ -8,6 +8,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { PageTopbar, PageTopbarTitle } from "../components/PageTopbar";
+import { AisepApprovalProgress, approvalProgressKey } from "./AisepApprovalProgress";
 import { modelClient } from "./AisepWorkbenchPage";
 import {
 	AisepToolError,
@@ -165,6 +166,7 @@ export function AisepGatePage({ branch, client = modelClient }: { branch: string
 							<p className="font-mono text-caption text-muted-foreground">
 								{t("gate.commits", { head: head.slice(0, 7), base: diff.data.base.commit.slice(0, 7) })}
 							</p>
+							<AisepApprovalProgress client={client} branch={branch} mainRef={diff.data.base.mainRef} />
 							<DiffSection diff={diff.data} />
 							<CheckSection client={client} commit={head} />
 							<ApprovalSection client={client} branch={branch} diff={diff.data} commit={head} />
@@ -335,6 +337,7 @@ function ApprovalSection({
 			Promise.all([
 				queryClient.invalidateQueries({ queryKey: ["aisep", "diff"] }),
 				queryClient.invalidateQueries({ queryKey: ["aisep", "approved-on-branch", branch] }),
+				queryClient.invalidateQueries({ queryKey: approvalProgressKey(branch) }),
 			]),
 	});
 

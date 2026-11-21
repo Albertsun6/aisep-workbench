@@ -86,5 +86,12 @@
 	"section.gates.approvedOnBranch": "Auf {{branch}} freigegeben, noch nicht gemergt",
 	"section.aiActivity.gateNeedsServer": "Die Gate-Seite braucht den Modellserver (VITE_AISEP_MCP_URL).",
 	"section.gates.branchMarksUnknown": "Freigaben auf {{branches}} konnten nicht gelesen werden: Dort bereits freigegebene Elemente sind womöglich nicht markiert.",
-	"gate.approval.notApprovableFailed": "Es ließ sich nicht prüfen, welche Elemente freigegeben werden können, daher wird nichts vorausgefüllt: {{message}}"
+	"gate.approval.notApprovableFailed": "Es ließ sich nicht prüfen, welche Elemente freigegeben werden können, daher wird nichts vorausgefüllt: {{message}}",
+	"gate.progress.title": "Freigabefortschritt",
+	"gate.progress.refresh": "Aktualisieren",
+	"gate.progress.stage.pending": "Wartet auf Freigabe",
+	"gate.progress.stage.approved": "Freigegeben, nicht gepusht",
+	"gate.progress.stage.pushed": "Gepusht, nicht gemergt",
+	"gate.progress.stage.merged": "Gemergt",
+	"gate.progress.fetchNote": "Aus Git im Repository des Modellservers abgeleitet, alle 15 Sekunden geprüft. Der Server führt nie fetch aus: „Gepusht“ und „Gemergt“ folgen origin zum Stand des letzten git fetch dort."
 }
