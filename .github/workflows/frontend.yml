@@ -181,8 +181,10 @@ jobs:
     timeout-minutes: 30
     strategy:
       fail-fast: false
+      # AISEP: 3 shards, not 2: at 2 the full suite made vitest the slowest
+      # job (vitest (1) 474 s); measurements are in aisep-workbench PR #10.
       matrix:
-        shard: [1, 2]
+        shard: [1, 2, 3]
     defaults:
       run:
         working-directory: frontend
@@ -226,10 +228,10 @@ jobs:
             test -f "$f" || { echo "::error::$f is in scripts/ci-vitest-always-run.txt but does not exist"; exit 1; }
           done
           if [ "$VITEST_FILES" = all ]; then
-            npx vitest run --shard=${{ matrix.shard }}/2
+            npx vitest run --shard=${{ matrix.shard }}/3
           else
             read -ra related <<< "$VITEST_FILES"
-            npx vitest related --run --passWithNoTests --shard=${{ matrix.shard }}/2 "${related[@]}" "${always[@]}"
+            npx vitest related --run --passWithNoTests --shard=${{ matrix.shard }}/3 "${related[@]}" "${always[@]}"
           fi
 
   docs:

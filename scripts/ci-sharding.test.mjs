@@ -137,12 +137,12 @@ if (args[0] === 'list') {
   }
 });
 
-test('vitest matrix and command agree on two complete shards', () => {
+test('vitest matrix and command agree on three complete shards', () => {
   const block = job(frontend, 'vitest');
-  assert.match(block, /shard: \[1, 2\]/);
+  assert.match(block, /shard: \[1, 2, 3\]/);
   const script = runStep(block, 'Run vitest shard');
-  assert.match(script, /^ *npx vitest run --shard=\$\{\{ matrix\.shard \}\}\/2$/m);
-  assert.match(script, /^ *npx vitest related --run --passWithNoTests --shard=\$\{\{ matrix\.shard \}\}\/2 /m);
+  assert.match(script, /^ *npx vitest run --shard=\$\{\{ matrix\.shard \}\}\/3$/m);
+  assert.match(script, /^ *npx vitest related --run --passWithNoTests --shard=\$\{\{ matrix\.shard \}\}\/3 /m);
   assert.match(block, /timeout-minutes: 30/);
   assert.match(job(go, 'backend-core'), /timeout-minutes: 20/);
   assert.match(job(go, 'storage-race'), /timeout-minutes: 30/);
