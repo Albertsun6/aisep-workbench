@@ -241,6 +241,15 @@ test('嵌套检出扫描：跳过 node_modules，被 .gitignore 忽略的 .claud
 	assert.deepEqual(findNestedCheckouts(serve), [worktree]);
 });
 
+for (const name of ['.venv', '__pycache__', '.git']) {
+	test(`嵌套检出扫描：跳过 ${name} 目录`, (t) => {
+		const { serve } = scanSetup(t);
+		gitInit(join(serve, name, 'inner'));
+		const outside = gitInit(join(serve, 'pkg'));
+		assert.deepEqual(findNestedCheckouts(serve), [outside]);
+	});
+}
+
 test('嵌套检出扫描：不跟随指向上级目录的符号链接', (t) => {
 	const { dir, serve } = scanSetup(t);
 	gitInit(join(dir, 'other'));

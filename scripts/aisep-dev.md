@@ -151,9 +151,9 @@ node scripts/aisep-dev.mjs refresh
 ## 已知风险
 
 - **批准模式下，批准工具对本机不带 Origin 的进程开放。** `workbench` 画像包含 `governance_record_approval`。服务只校验浏览器请求的 Origin，不带 Origin 的请求（curl、本机任意脚本或 agent）直接放行（aisep `server.py` 的 `OriginGate`）。批准模式的 allow-root 覆盖整个 `~/Desktop/AISEP/aisep`，所以批准模式运行期间，本机任何进程都能以任意 Stakeholder 的名义，给任一会话的分支写批准记录。缓解：默认是预览模式；批准模式只由 Albert 本人启动，批准完立即停止；其他会话不得启动批准模式，也不得调用批准工具。
-- 预览模式的 allow-root 是专用检出本身。服务运行期间有人在 `aisep-serve` 里面再建一个分支 worktree 或放一个独立 clone（服务端只要求仓库在 allow-root 下），上面的分支在预览模式下也能被批准；启动时的检查只覆盖启动那一刻。不要在专用检出里面放任何 git 检出。
+- 预览模式的 allow-root 是专用检出本身。服务运行期间有人在 `aisep-serve` 里面再建一个分支 worktree 或放一个独立 clone（服务端只要求仓库在 allow-root 下），上面的分支在预览模式下也能被批准；启动时的检查只覆盖启动那一刻。启动检查本身也有盲区：只下探 4 层（`.claude/worktrees/<名>` 是 3 层，嵌套克隆里的 `aisep/.claude/worktrees/<名>` 是 4 层），不进入 `node_modules`、`.venv`、`__pycache__` 和 `.git`，所以放在这些目录里或深于 4 层的检出查不出来，启动照常放行。由此推断（读代码得出，未实测）：预览模式下服务端仍可能批准藏在跳过目录里或深层的 worktree 上的分支，因为服务端只看仓库在不在 allow-root 下，不看这份扫描；真要堵住得改 aisep 服务端的 allow-root 判定。不要在专用检出里面放任何 git 检出。
 - `--approve` 只是一个开关，没有二次确认。脚本拦不住会话自己加 `--approve`（交互确认也能被管道喂过去），靠的是规则：只由 Albert 本人启动。
 - 预览模式下批准工具同样列在 `tools/list` 里，关口页的批准表单也照常显示，点了会被服务拒绝：分支 worktree 不在 allow-root 内，`gitio.locate_worktree` 报 `PATH_OUTSIDE_ROOT`（读代码得出，没有实际点过批准）。
-- 界面语言是英文。
+- 网页版界面默认简体中文，在设置里改过的语言记在浏览器的 `localStorage`（`aisep.locale`）里，换浏览器或清站点数据后回到简体中文。
 - 只验证了网页版。Electron 版没有验证；`--ignore-scripts` 跳过了原生模块构建，对网页版没有影响。
 - Claude 桌面应用的内置浏览器面板隐藏时，页面停在启动画面不往下走；在普通浏览器或无头 Chrome 里正常。原因未查。

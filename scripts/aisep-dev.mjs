@@ -436,7 +436,7 @@ const NESTED_SCAN_SKIP = new Set(["node_modules", ".venv", "__pycache__"]);
 
 /**
  * 专用检出 root 里面别的 git 检出（worktree 或 clone）所在的目录。
- * 只下探 NESTED_SCAN_MAX_DEPTH 层、跳过 NESTED_SCAN_SKIP 与 .git 本身；不跟随符号链接（withFileTypes 的 Dirent 来自 lstat，
+ * 只下探 NESTED_SCAN_MAX_DEPTH 层、跳过 NESTED_SCAN_SKIP 与 .git 本身；不跟随符号链接（withFileTypes 的 Dirent 描述目录项本身，类型取自 readdir 的 d_type、拿不到时 Node 用 lstat 补，
  * 指向目录的链接不算目录），所以指向上级目录的链接既不会让扫描绕圈，也不会把专用检出自己报出来。
  */
 export function findNestedCheckouts(root) {
