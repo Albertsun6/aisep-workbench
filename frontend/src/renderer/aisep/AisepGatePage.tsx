@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { PageTopbar, PageTopbarTitle } from "../components/PageTopbar";
 import { APPROVAL_STAGE_TEXT, AisepApprovalProgress, aisepErrorMessage, approvalProgressKey } from "./AisepApprovalProgress";
-import { DEFAULT_MAIN_REF, approvalProgress } from "./data/approval-progress";
+import { DEFAULT_MAIN_REF, approvalCoverage, approvalProgress, coveringRecords, isCovered } from "./data/approval-progress";
 import { modelClient } from "./AisepWorkbenchPage";
 import {
 	AisepToolError,
@@ -335,6 +335,15 @@ function ApprovalSection({
 		queryFn: ({ signal }) => approvalProgress(client, branch, mainRef, { signal }),
 		retry: shouldRetryAisep,
 	});
+	// What the pinned head already approved (repeat approval guard): a reload after an approval pins the approval commit,
+	// whose own diff still offers the same elements. Read on the pinned commit, not the branch: the head never moves here.
+	const coverage = useQuery({
+		queryKey: ["aisep", "gate", "coverage", commit],
+		queryFn: ({ signal }) => approvalCoverage(client, commit, { signal }),
+		retry: shouldRetryAisep,
+		staleTime: Number.POSITIVE_INFINITY,
+		refetchOnWindowFocus: false,
+	});
 	// Which warning the user confirmed: a confirmation of "progress unknown" does not carry over to "already approved".
 	const [confirmedFor, setConfirmedFor] = useState<"approved" | "unknown">();
 	useEffect(() => {
@@ -405,9 +414,15 @@ function ApprovalSection({
 		);
 	}
 	const gateFailed = gateCheck.data?.result === "FAIL";
-	// Already approved (tip adds Approved records), or unknown because the progress could not be read: ask first.
+	// Already approved (tip adds Approved records), or unknown because the progress or what the head already approved
+	// could not be read: ask first.
 	const alreadyStage = progress.data && progress.data.stage !== "pending" ? progress.data.stage : undefined;
-	const confirmReason = alreadyStage !== undefined ? "approved" : progress.isError && !progress.data ? "unknown" : undefined;
+	const unknown = (progress.isError && !progress.data) || coverage.isError;
+	const confirmReason = alreadyStage !== undefined ? "approved" : unknown ? "unknown" : undefined;
+	// The same gate and elements are already approved on this head: approving again only writes a second record (the
+	// server dedupes by head commit, and the head is now the approval commit). No confirmation lifts this; a rejection,
+	// another gate or other elements still go through the confirmation above.
+	const covered = !recorded && coverage.data !== undefined && isCovered(coverage.data, gate, approves);
 	const needsConfirm = confirmReason !== undefined;
 	const confirmedRepeat = confirmReason !== undefined && confirmedFor === confirmReason;
 	const ready =
@@ -416,6 +431,7 @@ function ApprovalSection({
 		!writing &&
 		!recorded &&
 		(progress.data !== undefined || progress.isError) &&
+		(coverage.data !== undefined || coverage.isError) &&
 		(!needsConfirm || confirmedRepeat);
 	return (
 		<GateSection titleKey="gate.approval.title">
@@ -453,6 +469,11 @@ function ApprovalSection({
 				))}
 			</fieldset>
 			{gateFailed ? <p className="text-xs text-destructive">{t("gate.approval.gateFailed")}</p> : null}
+			{covered && coverage.data ? (
+				<p role="note" className="text-xs text-warning">
+					{t("gate.approval.alreadyCovered", { records: coveringRecords(coverage.data, gate).map(localName).join(", ") })}
+				</p>
+			) : null}
 			{needsConfirm && !recorded ? (
 				<div role="note" className="flex flex-col gap-1 text-xs text-warning">
 					<p>
@@ -467,7 +488,7 @@ function ApprovalSection({
 				</div>
 			) : null}
 			<div className="flex gap-2">
-				<Button variant="accent" size="sm" disabled={!ready || gateFailed || !gateCheck.isSuccess}
+				<Button variant="accent" size="sm" disabled={!ready || gateFailed || !gateCheck.isSuccess || covered}
 					onClick={() => submit("Approved")}>
 					{t("gate.approval.approve")}
 				</Button>

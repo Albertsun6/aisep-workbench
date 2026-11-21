@@ -13,7 +13,15 @@
 //
 // The tip's Approved records are then looked up by IRI on the remote branch and on main. The server never runs
 // `git fetch`: the remote stages are only as fresh as the last fetch of the repository the server reads.
-import { AisepToolError, QUERY_LIMIT_MAX, asSelect, type AisepModelClient, type CallOptions, type Iri } from "./client";
+import {
+	AisepToolError,
+	QUERY_LIMIT_MAX,
+	asSelect,
+	type AisepModelClient,
+	type CallOptions,
+	type DiffResult,
+	type Iri,
+} from "./client";
 
 export type ApprovalStage = "pending" | "approved" | "pushed" | "merged";
 export const APPROVAL_STAGES = ["pending", "approved", "pushed", "merged"] as const satisfies readonly ApprovalStage[];
@@ -101,4 +109,85 @@ export async function approvalProgress(
 	if (main === null) throw new AisepToolError("REF_NOT_FOUND", `${mainRef} does not exist`, false);
 	const records = secondParent === null ? tipApprovals(tip, parent) : [];
 	return { stage: stageOf(records, remote, main), records, remoteBranch: remote !== null };
+}
+
+// Repeat approval guard (aisep models/workbench reqApprovalProgress, acNoRepeatSameSelection): which gate and elements
+// the pinned head already approved. A reload after an approval pins the approval commit itself, so the tip's single
+// record is not enough: after Architecture then Design, re-approving Architecture must still be caught. Like the merge
+// check's effective content (mergecheck.py `_effective_content`), walk first parents from the head over approval commits
+// down to the content commit; every record added on the way counts, and an approval below the content commit was for
+// older content and does not count. An approval commit here: one parent, exactly one record added, and model_diff
+// against the parent shows nothing but added governance. That is close to mergecheck's `_commit_shape` but not equal:
+// model_diff only sees models/, so a commit that took a record along with changes outside models/ only (§5.9 step 7,
+// taken) still passes for an approval commit here. That errs on the safe side: an approval is held back, never let
+// through twice.
+export const APPROVAL_COVERAGE_QUERY = `PREFIX aisep: <https://aisep.example/ont/aisep#>
+SELECT ?record ?gate ?element WHERE {
+  ?record a aisep:ApprovalRecord ; aisep:decision aisep:DecisionApproved ; aisep:gate ?gate ; aisep:approves ?element .
+}`;
+
+/** More approval commits than this in a row is not a page reload: refuse rather than read on. */
+export const COVERAGE_WALK_LIMIT = 20;
+
+const AISEP_NS = "https://aisep.example/ont/aisep#";
+
+export interface ApprovalCoverage {
+	/** Every record (any decision) the approval commits above the content commit added, newest first. */
+	records: Iri[];
+	/** The Approved ones among them, with what they approved. */
+	approved: { record: Iri; gate: Iri; elements: Set<Iri> }[];
+}
+
+export async function approvalCoverage(client: AisepModelClient, commit: string, options: CallOptions = {}): Promise<ApprovalCoverage> {
+	let tip = await recordsAt(client, `${commit}~0`, options);
+	if (tip === null) throw new AisepToolError("REF_NOT_FOUND", `${commit} does not exist`, false);
+	const records: Iri[] = [];
+	for (let k = 0; ; k++) {
+		const [parent, secondParent] = await Promise.all([
+			recordsAt(client, `${commit}~${k + 1}`, options),
+			recordsAt(client, `${commit}~${k}^2`, options),
+		]);
+		if (parent === null || secondParent !== null) break;
+		const added = [...tip.keys()].filter((iri) => !parent.has(iri));
+		if (added.length !== 1) break;
+		const diff = await client.diff({ head: `${commit}~${k}`, base: `${commit}~${k + 1}`, detail: "summary" }, options);
+		if (!onlyAddsGovernance(diff)) break;
+		if (k === COVERAGE_WALK_LIMIT) {
+			throw new AisepToolError("RESULT_TRUNCATED", `more than ${COVERAGE_WALK_LIMIT} approval commits in a row`, false);
+		}
+		records.push(added[0]);
+		tip = parent;
+	}
+	if (records.length === 0) return { records, approved: [] };
+	const select = asSelect(await client.query(APPROVAL_COVERAGE_QUERY, { ref: commit, limit: QUERY_LIMIT_MAX }, options));
+	if (select.truncated) {
+		throw new AisepToolError("RESULT_TRUNCATED", `the server truncated the result at ${select.rows.length} rows`, false);
+	}
+	const byRecord = new Map<Iri, { record: Iri; gate: Iri; elements: Set<Iri> }>();
+	for (const row of select.rows) {
+		const record = row.record.value;
+		if (!records.includes(record)) continue;
+		const entry = byRecord.get(record) ?? { record, gate: row.gate.value, elements: new Set<Iri>() };
+		entry.elements.add(row.element.value);
+		byRecord.set(record, entry);
+	}
+	return { records, approved: records.flatMap((record) => byRecord.get(record) ?? []) };
+}
+
+/** The model diff of one commit against its parent adds governance and changes nothing else. */
+function onlyAddsGovernance(diff: DiffResult): boolean {
+	return Object.entries(diff.counts).every(([kind, n]) =>
+		kind === "governance" ? n.added >= 1 && n.modified === 0 && n.removed === 0 : n.added + n.modified + n.removed === 0,
+	);
+}
+
+/** Every element of `approves` is in some Approved record of `gate` (a GateId such as "GateArchitecture"). */
+export function isCovered(coverage: ApprovalCoverage, gate: string, approves: readonly Iri[]): boolean {
+	const ofGate = coverage.approved.filter((entry) => entry.gate === `${AISEP_NS}${gate}`);
+	return approves.length > 0 && approves.every((iri) => ofGate.some((entry) => entry.elements.has(iri)));
+}
+
+/** The Approved records of `gate` in the coverage, newest first. */
+export function coveringRecords(coverage: ApprovalCoverage, gate: string): Iri[] {
+	return coverage.approved.filter((entry) => entry.gate === `${AISEP_NS}${gate}`).map((entry) => entry.record);
 }
