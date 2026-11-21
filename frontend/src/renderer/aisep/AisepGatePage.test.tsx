@@ -246,6 +246,44 @@ describe("AisepGatePage", () => {
 		expect(calls.approve).toHaveLength(1);
 	});
 
+	it.each([
+		[
+			"the branch tip is already an approval commit (M3: a second click on the new head wrote a second approval)",
+			(ref: string) => progressRecords(ref, true),
+			() => en["gate.approval.alreadyApproved"].replace("{{stage}}", en["gate.progress.stage.approved"]),
+		],
+		[
+			"the approval progress cannot be read",
+			() => Promise.reject(new Error("socket hang up")),
+			() => en["gate.approval.progressUnknown"],
+		],
+	])("holds both buttons until the user confirms when %s", async (_, records, note) => {
+		const { client, calls } = gateClient({
+			query: async (sparql: string, target: { ref: string }) => {
+				if (sparql === APPROVAL_RECORDS_QUERY) return records(target.ref);
+				if (sparql === APPROVERS_QUERY) return gateApprovers as QueryResult;
+				if (sparql === NOT_APPROVABLE_QUERY) return gateNotApprovable as QueryResult;
+				throw new Error(`unexpected query ${sparql}`);
+			},
+		});
+		renderGate(client);
+		const approval = await screen.findByRole("region", { name: en["gate.approval.title"] });
+		expect(await within(approval).findByRole("note")).toHaveTextContent(note());
+		// Everything else is ready (approver loaded, gate PASS): only the missing confirmation keeps the buttons off.
+		await within(approval).findByRole("combobox", { name: en["gate.approval.approver"] });
+		await screen.findByText(en["gate.check.pass"]);
+		const approve = within(approval).getByRole("button", { name: en["gate.approval.approve"] });
+		const reject = within(approval).getByRole("button", { name: en["gate.approval.reject"] });
+		expect(approve).toBeDisabled();
+		expect(reject).toBeDisabled();
+		fireEvent.click(approve);
+		await userEvent.click(within(approval).getByRole("checkbox", { name: en["gate.approval.confirmRepeat"] }));
+		expect(approve).toBeEnabled();
+		expect(calls.approve).toHaveLength(0);
+		await userEvent.click(approve);
+		await waitFor(() => expect(calls.approve).toHaveLength(1));
+	});
+
 	it("still shows the running write after leaving the page and coming back, and does not send another", async () => {
 		let finish: (result: ApprovalResult) => void = () => {};
 		const { client, calls } = gateClient({

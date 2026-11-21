@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { PageTopbar, PageTopbarTitle } from "../components/PageTopbar";
 import { AisepApprovalProgress, approvalProgressKey } from "./AisepApprovalProgress";
+import { DEFAULT_MAIN_REF, approvalProgress, type ApprovalStage } from "./data/approval-progress";
 import { modelClient } from "./AisepWorkbenchPage";
 import {
 	AisepToolError,
@@ -104,6 +105,13 @@ type Decision = "Approved" | "Rejected";
 export function approvalMutationKey(branch: string, commit: string) {
 	return ["aisep", "approval", branch, commit] as const;
 }
+
+const STAGE_TEXT: Record<ApprovalStage, AisepMessageKey> = {
+	pending: "gate.progress.stage.pending",
+	approved: "gate.progress.stage.approved",
+	pushed: "gate.progress.stage.pushed",
+	merged: "gate.progress.stage.merged",
+};
 
 const CHANGE_TEXT: Record<Change, AisepMessageKey> = {
 	added: "gate.change.added",
@@ -330,6 +338,16 @@ function ApprovalSection({
 	const [gate, setGate] = useState<GateId>("GateArchitecture");
 	const [approver, setApprover] = useState<Iri | undefined>();
 	const [unchecked, setUnchecked] = useState<ReadonlySet<Iri>>(new Set());
+	// The branch tip may already be an approval commit (an approval written earlier, from this page or elsewhere): then
+	// the head on screen is that commit, and approving it writes a second approval on top. Same query (and cache entry)
+	// as the progress bar above (AisepApprovalProgress), which polls it.
+	const mainRef = diff.base.mainRef ?? DEFAULT_MAIN_REF;
+	const progress = useQuery({
+		queryKey: [...approvalProgressKey(branch), mainRef],
+		queryFn: ({ signal }) => approvalProgress(client, branch, mainRef, { signal }),
+		retry: shouldRetryAisep,
+	});
+	const [confirmedRepeat, setConfirmedRepeat] = useState(false);
 	useEffect(() => {
 		if (approver === undefined && approvers.data?.length) setApprover(approvers.data[0].iri);
 	}, [approver, approvers.data]);
@@ -398,7 +416,16 @@ function ApprovalSection({
 		);
 	}
 	const gateFailed = gateCheck.data?.result === "FAIL";
-	const ready = approves.length > 0 && approver !== undefined && !writing && !recorded;
+	// Already approved (tip adds Approved records), or unknown because the progress could not be read: ask first.
+	const alreadyStage = progress.data && progress.data.stage !== "pending" ? progress.data.stage : undefined;
+	const needsConfirm = alreadyStage !== undefined || (progress.isError && !progress.data);
+	const ready =
+		approves.length > 0 &&
+		approver !== undefined &&
+		!writing &&
+		!recorded &&
+		(progress.data !== undefined || progress.isError) &&
+		(!needsConfirm || confirmedRepeat);
 	return (
 		<GateSection titleKey="gate.approval.title">
 			<div className="flex flex-wrap items-end gap-3 text-xs">
@@ -435,6 +462,19 @@ function ApprovalSection({
 				))}
 			</fieldset>
 			{gateFailed ? <p className="text-xs text-destructive">{t("gate.approval.gateFailed")}</p> : null}
+			{needsConfirm && !recorded ? (
+				<div role="note" className="flex flex-col gap-1 text-xs text-warning">
+					<p>
+						{alreadyStage
+							? t("gate.approval.alreadyApproved", { stage: t(STAGE_TEXT[alreadyStage]) })
+							: t("gate.approval.progressUnknown")}
+					</p>
+					<label className="flex items-center gap-2 text-foreground">
+						<Checkbox checked={confirmedRepeat} disabled={writing} onCheckedChange={(checked) => setConfirmedRepeat(checked === true)} />
+						{t("gate.approval.confirmRepeat")}
+					</label>
+				</div>
+			) : null}
 			<div className="flex gap-2">
 				<Button variant="accent" size="sm" disabled={!ready || gateFailed || !gateCheck.isSuccess}
 					onClick={() => submit("Approved")}>
