@@ -50,7 +50,7 @@ node scripts/aisep-dev.mjs refresh
    - 首页：`http://localhost:<web-port>/#/aisep`
    - 关口页：`http://localhost:<web-port>/#/aisep/gate/<分支>`。现在首页没有进入关口页的入口，要直接输地址，分支名里的 `/` 原样保留。
 
-两个服务各自成一个进程组。按 Ctrl-C，或对 `start` 进程的 PID 发 `SIGTERM`，脚本按进程组 PID 停掉两个服务，5 秒不退就 `SIGKILL`。任一服务意外退出，另一个也会被停掉。
+两个服务各自成一个进程组。按 Ctrl-C，或对 `start` 进程的 PID 发 `SIGTERM`，脚本向两个进程组发 `SIGTERM`；组里 5 秒后还有进程就 `SIGKILL` 整组。判断看整个进程组，不只看组长，所以 `dev-web.mjs` 先退出时它拉起的 Vite 也会被停掉。任一服务意外退出，另一个也会被停掉，并且不再打印就绪信息。
 
 来源必须精确匹配：页面来源是 `http://localhost:<web-port>`，所以 Vite 端口和 `--allow-origin` 由同一个参数决定。来源对不上时，服务对页面的请求一律回 403，前端只报「no response」。
 
@@ -67,7 +67,9 @@ node scripts/aisep-dev.mjs refresh
 
 ### refresh
 
-只移动专用检出，服务不用重启。首页不传 ref，读的是 `--repo` 的工作区，所以合并后要跑一次 `refresh`，首页才会把新模型显示为已批准。服务按文件内容缓存解析结果，不会读到旧数据（aisep `core.py`）。
+只移动专用检出的工作区。首页不传 ref，读的是 `--repo` 的工作区，所以合并后要跑一次 `refresh`，首页才会把新模型显示为已批准。服务按文件内容缓存解析结果，不会读到旧数据（aisep `core.py`），所以只换模型数据时不用重启服务。
+
+运行中的服务用的仍是启动时导入的 Python 代码。新的 main 改了 `aisep/*.py` 时，`refresh` 不会让服务换代码，要停掉后重新 `start`。
 
 ### preflight
 
@@ -75,18 +77,22 @@ node scripts/aisep-dev.mjs refresh
 
 | 项 | 怎么查 |
 |---|---|
+| 分支不是 `main` | 主分支上不能批准 |
 | 分支已在 allow-root 下的 worktree 检出 | `git worktree list --porcelain`，取第一条匹配，与服务的查找规则相同 |
-| 该 worktree 的 `models/` 干净 | `git status --porcelain --untracked-files=all -- models/`，含未跟踪文件 |
+| 该 worktree 的 `models/` 干净 | `git status` 只看 `models/` 下的 `.ttl`（含未跟踪），与服务端判脏的范围相同。带 assume-unchanged 或 skip-worktree 标记的文件这里看不到 |
 | 本地头等于远端头 | 本地 `refs/heads/<分支>` 对比 `git ls-remote origin`。不 fetch，不改本地引用 |
 | `tools/list` 含 `governance_record_approval` | 确认服务是 `workbench` 画像 |
+| 分支头还不在 `origin/main` 上 | `git merge-base --is-ancestor`，用本地记录的 `origin/main`。已合入或与 main 同头时，关口页的四个关口都会被拒 |
 | 分支头 `model_gate` 为 PASS | 和关口页一样：先 `model_diff` 取分支头，再在该提交上跑 gate |
-| 批准人下拉 | 用关口页的同一条件查 Stakeholder，按页面顺序列出，第 1 行是下拉默认值 |
+| 批准人下拉 | 用关口页逐字相同的查询列出 Stakeholder，行数和顺序与页面下拉一致，第 1 行是默认值。所属模型另查一次，只用来标注 |
 
 另外还输出两项信息：专用检出与远端 `main` 是否一致，以及 `model_diff` 的 head、base 和条目数。
 
-预检只调用 `model_diff`、`model_gate`、`model_query`。脚本里只有这三个工具名能发出 `tools/call`，没有调用批准工具的代码路径，也不写任何文件。
+预检只调用 `model_diff`、`model_gate`、`model_query`。脚本里只有这三个工具名能发出 `tools/call`，没有调用批准工具的代码路径。git 命令带 `GIT_OPTIONAL_LOCKS=0`，`git status` 不会回写别的会话的 index；带 `GIT_TERMINAL_PROMPT=0`，凭据失效时直接报错，不会卡在提示上。
 
-**选批准人**：下拉会列出所有模型里带中文标签的 Stakeholder，默认选中第一行，可能是 procurement 的「首席架构师」。批准新模型时要选新模型的「项目负责人」。预检会标出不属于 procurement 的「项目负责人」。
+预检没覆盖的服务端检查：批准时头提交之后不能有非批准提交（`STALE_HEAD`）、写锁冲突、批准过程中 worktree 被切换分支。全部通过不等于批准一定成功。
+
+**选批准人**：下拉会列出所有模型里带中文标签的 Stakeholder，默认选中第一行，可能是 procurement 的「首席架构师」。批准新模型时要选新模型的「项目负责人」。预检的列表会写出每个人所属的模型。
 
 ## 网页模式下没有数据的栏目
 

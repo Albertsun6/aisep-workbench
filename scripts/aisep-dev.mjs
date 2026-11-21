@@ -31,15 +31,16 @@ const READ_ONLY_TOOLS = new Set(["model_diff", "model_gate", "model_query"]);
 const GATE_TIMEOUT_MS = 600_000;
 const WORKBENCH_DEFAULT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
-// 与工作台关口页 APPROVERS_QUERY 同条件（AisepGatePage.tsx），多取 inModel 便于辨认是哪个模型的人。
+// 与工作台关口页 APPROVERS_QUERY（AisepGatePage.tsx）逐字相同，行数与顺序才和页面下拉一致。改页面时同步改这里。
 const APPROVERS_QUERY = `PREFIX aisep: <https://aisep.example/ont/aisep#>
 PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
-SELECT ?approver ?prefLabel ?model WHERE {
+SELECT ?approver ?prefLabel WHERE {
   ?approver a/rdfs:subClassOf* arch:Stakeholder ; skos:prefLabel ?prefLabel .
-  OPTIONAL { ?approver arch:inModel ?model }
   FILTER NOT EXISTS { ?approver a/rdfs:subClassOf* aisep:AIAgent }
   FILTER(lang(?prefLabel) = "zh")
 }`;
+// 单独查每个 Stakeholder 属于哪个模型，只用来标注，不影响上面的顺序。
+const STAKEHOLDER_MODELS_QUERY = `SELECT ?approver ?model WHERE { ?approver a/rdfs:subClassOf* arch:Stakeholder ; arch:inModel ?model }`;
 
 function fail(message) {
 	console.error(`错误：${message}`);
@@ -71,8 +72,11 @@ function port(value, fallback, name) {
 	return n;
 }
 
+// GIT_OPTIONAL_LOCKS=0：git status 不回写 index（预检会读别的会话的 worktree）；GIT_TERMINAL_PROMPT=0：凭据失效时报错而不是挂住。
+const GIT_ENV = { ...process.env, GIT_OPTIONAL_LOCKS: "0", GIT_TERMINAL_PROMPT: "0" };
+
 function git(cwd, ...args) {
-	return execFileSync("git", ["-C", cwd, ...args], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
+	return execFileSync("git", ["-C", cwd, ...args], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], env: GIT_ENV }).trim();
 }
 
 function tryGit(cwd, ...args) {
@@ -235,27 +239,35 @@ function launch(label, command, args, options, drop) {
 	return child;
 }
 
+// 以进程组是否还有进程为准，不看组长：dev-web.mjs 先退出时，它拉起的 vite 仍在同一组里。
+function groupAlive(pgid) {
+	try {
+		process.kill(-pgid, 0);
+		return true;
+	} catch (e) {
+		return e.code !== "ESRCH";
+	}
+}
+
 let stopping = false;
 async function stopAll(code) {
 	if (stopping) return;
 	stopping = true;
-	for (const { label, child } of children) {
-		if (child.exitCode !== null || child.signalCode !== null) continue;
-		console.log(`[stop] 停止 ${label}（进程组 ${child.pid}）`);
+	// 先发信号再打日志：终端已关闭时写 stdout 可能出错，不能让它挡在清理前面。
+	for (const { child } of children) {
 		try {
 			process.kill(-child.pid, "SIGTERM");
 		} catch {}
 	}
+	for (const { label, child } of children) console.log(`[stop] 已向 ${label} 进程组 ${child.pid} 发 SIGTERM`);
 	const deadline = Date.now() + 5000;
 	for (const { label, child } of children) {
-		while (child.exitCode === null && child.signalCode === null && Date.now() < deadline) {
-			await new Promise((r) => setTimeout(r, 100));
-		}
-		if (child.exitCode === null && child.signalCode === null) {
-			console.log(`[stop] ${label} 5 秒未退出，SIGKILL 进程组 ${child.pid}`);
+		while (groupAlive(child.pid) && Date.now() < deadline) await new Promise((r) => setTimeout(r, 100));
+		if (groupAlive(child.pid)) {
 			try {
 				process.kill(-child.pid, "SIGKILL");
 			} catch {}
+			console.log(`[stop] ${label} 5 秒未退出，已 SIGKILL 进程组 ${child.pid}`);
 		}
 	}
 	process.exit(code);
@@ -343,10 +355,13 @@ async function start(opts) {
 			stopAll(1);
 		});
 	}
+	for (const stream of [process.stdout, process.stderr]) stream.on("error", () => {});
 	for (const sig of ["SIGINT", "SIGTERM", "SIGHUP"]) process.on(sig, () => stopAll(0));
 
 	await waitFor("MCP 服务", async () => (await mcp(mcpPort, "tools/list", {}, undefined, 5000))?.tools?.length > 0, 60_000);
+	if (stopping) return;
 	await waitFor("网页版", async () => (await fetch(`http://localhost:${webPort}/`, { signal: AbortSignal.timeout(5000) })).ok, 120_000);
+	if (stopping) return;
 
 	const base = `http://localhost:${webPort}`;
 	console.log("");
@@ -380,9 +395,12 @@ async function preflight(branch, opts) {
 	const inRoot = wt && allowRoots().some((r) => under(wt, r));
 	report(Boolean(wt && inRoot), "分支已在 allow-root 下的 worktree 检出", wt ? `${wt}${inRoot ? "" : "（不在 allow-root 内）"}` : "没有检出该分支的 worktree");
 
-	// 2. models/ 干净（批准时 DIRTY_WORKTREE 的条件）
+	// 0. 不能是主分支（approval.py _check_branch）
+	report(branch !== "main", "分支不是 main", branch === "main" ? "main 上不能批准" : "");
+
+	// 2. models/ 下的 .ttl 干净（批准时 DIRTY_WORKTREE 只比 .ttl；assume-unchanged/skip-worktree 标记的文件这里看不到）
 	if (wt) {
-		const dirty = git(wt, "status", "--porcelain", "--untracked-files=all", "--", "models/");
+		const dirty = git(wt, "status", "--porcelain", "--untracked-files=all", "--", ":(glob)models/**/*.ttl");
 		report(!dirty, "该 worktree 的 models/ 干净", dirty ? dirty.split("\n").slice(0, 5).join("；") : "");
 	} else report(false, "该 worktree 的 models/ 干净", "没有 worktree，无法检查");
 
@@ -420,6 +438,15 @@ async function preflight(branch, opts) {
 		const items = diff.items ?? [];
 		info("model_diff", `head ${head?.slice(0, 7)} · base ${diff.base?.commit?.slice(0, 7)} · 条目 ${items.length}`);
 		if (local && head !== local) report(false, "服务看到的分支头等于本地分支头", `${head?.slice(0, 7)} ≠ ${local.slice(0, 7)}`);
+		// 分支头已在 main 上（已合并或与 main 同头）时只能批 GateRelease，关口页的四个关口都会被拒（approval.py）
+		if (head) {
+			let inMain = false;
+			try {
+				execFileSync("git", ["-C", AISEP_REPO, "merge-base", "--is-ancestor", head, "refs/remotes/origin/main"], { env: GIT_ENV, stdio: "ignore" });
+				inMain = true;
+			} catch {}
+			report(!inMain, "分支头还不在 origin/main 上", inMain ? "已在本地记录的 origin/main 里，关口页的关口批准会被拒" : "");
+		}
 	} catch (e) {
 		report(false, "model_diff", e.message);
 	}
@@ -441,13 +468,19 @@ async function preflight(branch, opts) {
 		try {
 			const q = await callTool(mcpPort, "model_query", { sparql: APPROVERS_QUERY, ref: head });
 			const rows = q.rows ?? [];
-			console.log(`\n批准人下拉（${rows.length} 人，顺序同页面，第 1 行是默认选中）：`);
+			const models = new Map();
+			try {
+				const m = await callTool(mcpPort, "model_query", { sparql: STAKEHOLDER_MODELS_QUERY, ref: head });
+				for (const r of m.rows ?? []) {
+					const iri = r.approver?.value;
+					models.set(iri, [...(models.get(iri) ?? []), r.model?.value]);
+				}
+			} catch {}
+			console.log(`\n批准人下拉（${rows.length} 行，与页面同一条查询，第 1 行是默认选中）：`);
 			rows.forEach((r, i) => {
 				const iri = r.approver?.value ?? "?";
 				const label = r.prefLabel?.value ?? "?";
-				const model = r.model?.value ?? "（无 inModel）";
-				const mark = label.includes("项目负责人") && !iri.includes("/procurement/") ? "  ← 新模型的项目负责人？" : "";
-				console.log(`  ${i + 1}. ${label}  ${iri}  模型 ${model}${mark}`);
+				console.log(`  ${i + 1}. ${label}  ${iri}  模型 ${(models.get(iri) ?? ["（无 inModel）"]).join(", ")}`);
 			});
 			console.log("提醒：选新模型的「项目负责人」，不要选 procurement 的人；默认第 1 行不一定是他。");
 		} catch (e) {
@@ -456,6 +489,7 @@ async function preflight(branch, opts) {
 	}
 
 	console.log(`\n${failed === 0 ? "全部通过。" : `${failed} 项不通过。`}预检没有调用批准工具，也没有写入任何东西。`);
+	console.log("预检没覆盖的服务端检查：批准时头提交之后不能有非批准提交（STALE_HEAD）、写锁冲突、批准过程中 worktree 被切换分支。");
 	process.exit(failed === 0 ? 0 : 1);
 }
 
