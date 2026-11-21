@@ -67,9 +67,9 @@ export function AisepApprovalProgress({
 			</div>
 			{progress.isLoading ? (
 				<p role="status" className="text-xs text-muted-foreground">{t("section.loading")}</p>
-			) : progress.isError ? (
-				<p role="alert" className="text-xs text-destructive">{t("gate.error", { message: errorMessage(progress.error) })}</p>
-			) : (
+			) : null}
+			{/* A failed poll keeps the last stage on screen (a brief disconnect must not blank it) and says it failed. */}
+			{progress.data ? (
 				<ol className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
 					{APPROVAL_STAGES.map((stage, index) => {
 						const done = index < current;
@@ -99,7 +99,10 @@ export function AisepApprovalProgress({
 						);
 					})}
 				</ol>
-			)}
+			) : null}
+			{progress.isError ? (
+				<p role="alert" className="text-xs text-destructive">{t("gate.error", { message: errorMessage(progress.error) })}</p>
+			) : null}
 			<p className="text-caption text-muted-foreground">{t("gate.progress.fetchNote")}</p>
 		</section>
 	);

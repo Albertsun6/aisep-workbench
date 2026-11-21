@@ -58,6 +58,19 @@ describe("approval progress", () => {
 		expect(await approvalProgress(client, BRANCH, refs.main)).toEqual({ stage: "approved", records: [OURS], remoteBranch: true });
 	});
 
+	it("needs every record the tip added: one of two pushed is still approved, one of two merged is still pushed", async () => {
+		const SECOND = `${OURS}-second`;
+		const both = { ...after, [SECOND]: APPROVED };
+		const partlyPushed = serverWith({ [refs.local]: both, [refs.parent]: before, [refs.remote]: after, [refs.main]: before });
+		expect(await approvalProgress(partlyPushed.client, BRANCH, refs.main)).toEqual({
+			stage: "approved",
+			records: [OURS, SECOND],
+			remoteBranch: true,
+		});
+		const partlyMerged = serverWith({ [refs.local]: both, [refs.parent]: before, [refs.remote]: both, [refs.main]: after });
+		expect((await approvalProgress(partlyMerged.client, BRANCH, refs.main)).stage).toBe("pushed");
+	});
+
 	it("is pushed when origin/<branch> has the record and main does not", async () => {
 		const { client } = serverWith({ [refs.local]: after, [refs.parent]: before, [refs.remote]: after, [refs.main]: before });
 		expect((await approvalProgress(client, BRANCH, refs.main)).stage).toBe("pushed");
