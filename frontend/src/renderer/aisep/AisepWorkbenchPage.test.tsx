@@ -3,6 +3,7 @@ import { act, cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { appI18n } from "../i18n";
+import { approvalProgressKey } from "./AisepApprovalProgress";
 import {
 	AGENT_SESSIONS_REFRESH_MS,
 	AisepWorkbenchPage,
@@ -48,8 +49,11 @@ const sampleRows: AgentSessionRow[] = [
 	{ sessionRef: "e", agent: "Codex", task: "回答问题", branch: "feat/q", bucket: "needsYou", rawStatus: "needs_input" },
 ];
 
-function renderPage(client: AisepModelClient = fixtureClient, sessions: AgentSessionSource = fakeSessions([])) {
-	const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+function renderPage(
+	client: AisepModelClient = fixtureClient,
+	sessions: AgentSessionSource = fakeSessions([]),
+	queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } }),
+) {
 	return render(
 		<QueryClientProvider client={queryClient}>
 			<AisepWorkbenchPage client={client} sessions={sessions} />
@@ -597,7 +601,7 @@ describe("AisepWorkbenchPage gate entries (model_branches, §5.11)", () => {
 			let progressDown = true;
 			let listCalls = 0;
 			let rowCalls = 0;
-			const { client } = branchClient(async () => {
+			const { client, refs } = branchClient(async () => {
 				listCalls++;
 				if (listDown) throw new AisepToolError("INTERNAL", "boom", false);
 				return { branches: BRANCHES, main: MAIN };
@@ -629,6 +633,56 @@ describe("AisepWorkbenchPage gate entries (model_branches, §5.11)", () => {
 			expect(await within(back[1]).findByText(en["gate.progress.stage.pending"])).toBeInTheDocument();
 			expect(await within(back[2]).findByText(en["gate.progress.stage.pending"])).toBeInTheDocument();
 			expect(within(region()).queryByText(en["section.gates.branches.refreshFailed"])).toBeNull();
+			// Asks once: after the server came back each row's tip was read exactly once (failed reads never reach refs),
+			// and a later list read does not make a row that has its stage ask again.
+			await act(() => vi.advanceTimersByTimeAsync(GATE_BRANCHES_REFRESH_MS));
+			for (const branch of ["feat/approved", "feat/model", ODD]) expect(tipQueries(refs, branch)).toBe(1);
+		} finally {
+			vi.useRealTimers();
+		}
+	});
+
+	it("leaves a row's progress read alone while it is still running when the list refreshes again (no cancel and resend)", async () => {
+		vi.useFakeTimers({ shouldAdvanceTime: true });
+		try {
+			let mode: "down" | "slow" | "up" = "up";
+			let listCalls = 0;
+			const held: { ref: string; release: () => void }[] = [];
+			const { client } = branchClient(async () => {
+				listCalls++;
+				return { branches: BRANCHES, main: MAIN };
+			});
+			const query = client.query.bind(client);
+			client.query = async (sparql, target) => {
+				if (sparql !== APPROVAL_RECORDS_QUERY || mode === "up") return query(sparql, target);
+				if (mode === "down") throw new AisepToolError("INTERNAL", "boom", false);
+				// Slow: the read stays open until the test lets it go, then gets the server's answer.
+				return new Promise((resolve, reject) =>
+					held.push({ ref: target?.ref ?? "", release: () => void query(sparql, target).then(resolve, reject) }));
+			};
+			const heldTips = (branch: string) => held.filter((h) => h.ref === `refs/heads/${branch}`).length;
+			const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+			renderPage(client, undefined, queryClient);
+			const links = within(await list()).getAllByRole("link");
+			expect(await within(links[0]).findByText(en["gate.progress.stage.approved"])).toBeInTheDocument();
+			// The row has a stage, then a reread fails (as after the gate page invalidates it while the server is down).
+			// Only a query that already has data is cancelled and resent by refetch(), so this is the case the guard is for.
+			mode = "down";
+			await act(() => queryClient.invalidateQueries({ queryKey: approvalProgressKey("feat/approved") }));
+			// The next list read makes the failed row read again; that read outlasts one interval.
+			mode = "slow";
+			let lists = listCalls;
+			await act(() => vi.advanceTimersByTimeAsync(GATE_BRANCHES_REFRESH_MS));
+			await vi.waitFor(() => expect(listCalls).toBe(lists + 1));
+			await vi.waitFor(() => expect(heldTips("feat/approved")).toBe(1));
+			// Another list read while the row is still failed and reading: nothing is cancelled and sent again.
+			lists = listCalls;
+			await act(() => vi.advanceTimersByTimeAsync(GATE_BRANCHES_REFRESH_MS));
+			await vi.waitFor(() => expect(listCalls).toBe(lists + 1));
+			expect(heldTips("feat/approved")).toBe(1);
+			mode = "up";
+			for (const h of held.splice(0)) h.release();
+			expect(await within(links[0]).findByText(en["gate.progress.stage.approved"])).toBeInTheDocument();
 		} finally {
 			vi.useRealTimers();
 		}
