@@ -417,10 +417,12 @@ jobs:
     timeout-minutes: 20
     # Two runners, half the spec files each: the suite is bound by the single
     # Vite dev server, so more workers on one runner don't help.
+    # AISEP: 3 runners, not 2: at 2 this job was every PR's critical path
+    # (test step 182-305 s); measurements are in the aisep-workbench T4 PR.
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2]
+        shard: [1, 2, 3]
     container:
       # Keep this aligned with Playwright in frontend/package-lock.json.
       image: mcr.microsoft.com/playwright:v1.60.0-noble
@@ -444,7 +446,7 @@ jobs:
         working-directory: packages/product-ui
 
       - name: Run renderer smoke suite
-        run: CI=true npm run test:e2e:renderer -- --shard=${{ matrix.shard }}/2
+        run: CI=true npm run test:e2e:renderer -- --shard=${{ matrix.shard }}/3
 
       # Screenshots and attachments from failed specs, so a flaky pixel check
       # can be inspected instead of only re-run.

@@ -147,3 +147,17 @@ test('vitest matrix and command agree on three complete shards', () => {
   assert.match(job(go, 'backend-core'), /timeout-minutes: 20/);
   assert.match(job(go, 'storage-race'), /timeout-minutes: 30/);
 });
+
+// AISEP: renderer-smoke shards (aisep-workbench T4). Playwright assigns spec
+// files to shards itself, so new specs need no list; the matrix and the
+// command's shard total just have to agree.
+test('renderer-smoke matrix and command agree on three complete shards', () => {
+  const block = job(frontend, 'renderer-smoke');
+  const matrix = block.match(/^        shard: \[([\d, ]+)\]$/m);
+  assert.ok(matrix, 'missing renderer-smoke shard matrix');
+  const shards = matrix[1].split(',').map(Number);
+  assert.deepEqual(shards, [1, 2, 3]);
+  const script = runStep(block, 'Run renderer smoke suite');
+  assert.match(script, new RegExp(`^CI=true npm run test:e2e:renderer -- --shard=\\$\\{\\{ matrix\\.shard \\}\\}/${shards.length}$`));
+  assert.match(block, /fail-fast: false/);
+});
