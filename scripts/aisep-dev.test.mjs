@@ -2,12 +2,12 @@
 // node --test scripts/aisep-dev.test.mjs
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdtempSync, rmSync, writeFileSync, mkdirSync } from 'node:fs';
+import { existsSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync, mkdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import test from 'node:test';
 
-import { autoFetchOnce, effectiveContent, parseServerCommand } from './aisep-dev.mjs';
+import { autoFetchOnce, effectiveContent, findNestedCheckouts, parseServerCommand } from './aisep-dev.mjs';
 
 const ENV = {
 	...process.env,
@@ -206,4 +206,52 @@ test('有效内容提交：跳过顶端的批准提交，停在第一个普通�
 	git(env.upstream, 'commit', '--quiet', '--allow-empty', '-m', `x\n\nAISEP-Evidence: ${content}`);
 	const empty = git(env.upstream, 'rev-parse', 'HEAD');
 	assert.equal(effectiveContent(env.upstream, empty), empty);
+});
+
+// 预览模式启动检查（findNestedCheckouts）。标题逐字对应 aisep 模型 workbench 里 4 个 aisep:TestCase 的 skos:definition，
+// 改标题要同时改模型（模型元素已批准，改了要重新批准）。
+/** 临时目录里的 serve（git 仓库，相当于专用检出）。 */
+function scanSetup(t) {
+	const dir = realpathSync(mkdtempSync(join(tmpdir(), 'aisep-dev-scan-')));
+	t.after(() => rmSync(dir, { recursive: true, force: true }));
+	const serve = join(dir, 'serve');
+	execFileSync('git', ['init', '--quiet', serve], { env: ENV });
+	return { dir, serve };
+}
+
+function gitInit(path) {
+	execFileSync('git', ['init', '--quiet', path], { env: ENV });
+	return path;
+}
+
+test('嵌套检出扫描：第 4 层的检出照报，第 5 层不下探', (t) => {
+	const { serve } = scanSetup(t);
+	const level4 = gitInit(join(serve, 'a/b/c/d'));
+	gitInit(join(serve, 'a/b/c/d2/e'));
+	assert.deepEqual(findNestedCheckouts(serve), [level4]);
+});
+
+test('嵌套检出扫描：跳过 node_modules，被 .gitignore 忽略的 .claude/worktrees 照扫', (t) => {
+	const { serve } = scanSetup(t);
+	commit(serve, '.gitignore', '.claude/worktrees/\nnode_modules/\n');
+	gitInit(join(serve, 'node_modules/pkg'));
+	const worktree = join(serve, '.claude/worktrees/x');
+	git(serve, 'worktree', 'add', '--quiet', '--detach', worktree);
+	assert.equal(git(serve, 'check-ignore', '.claude/worktrees/x'), '.claude/worktrees/x');
+	assert.deepEqual(findNestedCheckouts(serve), [worktree]);
+});
+
+test('嵌套检出扫描：不跟随指向上级目录的符号链接', (t) => {
+	const { dir, serve } = scanSetup(t);
+	gitInit(join(dir, 'other'));
+	symlinkSync(dir, join(serve, 'up'), 'dir');
+	assert.deepEqual(findNestedCheckouts(serve), []);
+});
+
+test('嵌套检出扫描：不把专用检出自身报成嵌套检出', (t) => {
+	const { dir, serve } = scanSetup(t);
+	symlinkSync(dir, join(serve, 'up'), 'dir');
+	const found = findNestedCheckouts(serve);
+	assert.ok(!found.some((p) => realpathSync(p) === realpathSync(serve)), `把专用检出自身报成了嵌套检出：${found.join('、')}`);
+	assert.deepEqual(found, []);
 });

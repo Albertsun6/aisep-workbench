@@ -14,7 +14,7 @@ import { execFile, execFileSync, spawn } from "node:child_process";
 import { existsSync, readdirSync, realpathSync } from "node:fs";
 import { connect } from "node:net";
 import { homedir } from "node:os";
-import { basename, dirname, join, resolve, sep } from "node:path";
+import { dirname, join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 
@@ -429,6 +429,30 @@ async function waitFor(what, check, timeoutMs) {
 
 // ---------------------------------------------------------------- 子命令
 
+/** 嵌套检出扫描最多下探的目录层数：.claude/worktrees/<名> 是 3 层，嵌套克隆里的 aisep/.claude/worktrees/<名> 是 4 层。 */
+const NESTED_SCAN_MAX_DEPTH = 4;
+/** 不进入的依赖目录。不按 .gitignore 跳过：aisep 的 .gitignore 含 .claude/worktrees/，那正是要找的地方。 */
+const NESTED_SCAN_SKIP = new Set(["node_modules", ".venv", "__pycache__"]);
+
+/**
+ * 专用检出 root 里面别的 git 检出（worktree 或 clone）所在的目录。
+ * 只下探 NESTED_SCAN_MAX_DEPTH 层、跳过 NESTED_SCAN_SKIP 与 .git 本身；不跟随符号链接（withFileTypes 的 Dirent 来自 lstat，
+ * 指向目录的链接不算目录），所以指向上级目录的链接既不会让扫描绕圈，也不会把专用检出自己报出来。
+ */
+export function findNestedCheckouts(root) {
+	const found = [];
+	const walk = (dir, depth) => {
+		for (const entry of readdirSync(dir, { withFileTypes: true })) {
+			if (!entry.isDirectory() || entry.name === ".git" || NESTED_SCAN_SKIP.has(entry.name)) continue;
+			const child = join(dir, entry.name);
+			if (existsSync(join(child, ".git"))) found.push(child);
+			if (depth < NESTED_SCAN_MAX_DEPTH) walk(child, depth + 1);
+		}
+	};
+	walk(root, 1);
+	return found;
+}
+
 async function start(opts) {
 	const mcpPort = port(opts["mcp-port"], DEFAULT_MCP_PORT, "--mcp-port");
 	const webPort = port(opts["web-port"], DEFAULT_WEB_PORT, "--web-port");
@@ -457,9 +481,7 @@ async function start(opts) {
 	// 预览模式的 allow-root 是专用检出：建在它里面的任何 git 检出（aisep 登记的 worktree，或独立的 clone）也在
 	// allow-root 内，上面的分支就能被批准。只在启动时查一次；服务运行期间再建的查不到（见 scripts/aisep-dev.md「已知风险」）。
 	if (!approve) {
-		const inside = readdirSync(SERVE_DIR, { recursive: true })
-			.filter((p) => basename(p) === ".git" && p !== ".git" && !p.includes(`${sep}.git${sep}`))
-			.map((p) => dirname(join(SERVE_DIR, p)));
+		const inside = findNestedCheckouts(SERVE_DIR);
 		if (inside.length) fail(`专用检出 ${SERVE_DIR} 里面有别的 git 检出（worktree 或 clone），预览模式下上面的分支能被批准：${inside.join("、")}`);
 	}
 	// 服务从专用检出导入 aisep（工作目录在 sys.path 首位），确认没有导入到别处的代码。
