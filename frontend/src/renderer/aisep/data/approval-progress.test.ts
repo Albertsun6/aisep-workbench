@@ -224,6 +224,18 @@ describe("approval coverage", () => {
 		expect(isCovered(coverage, "GateDesign", [`${W}a`])).toBe(true);
 	});
 
+	it("covers by the union of one gate's records: a then b approved separately covers {a, b}", async () => {
+		const A2 = `${W}approval-4-architecture`;
+		const { client } = historyServer(
+			[{ ...before, [A1]: APPROVED, [A2]: APPROVED }, { ...before, [A1]: APPROVED }, before],
+			{ [A1]: [ARCH, [`${W}a`]], [A2]: [ARCH, [`${W}b`]] },
+		);
+		const coverage = await approvalCoverage(client, HEAD);
+		expect(isCovered(coverage, "GateArchitecture", [`${W}a`, `${W}b`])).toBe(true);
+		expect(isCovered(coverage, "GateArchitecture", [`${W}a`, `${W}c`])).toBe(false);
+		expect(coveringRecords(coverage, "GateArchitecture")).toEqual([A2, A1]);
+	});
+
 	it("does not cover another gate, an element outside the approved set, or nothing at all", async () => {
 		const { client } = historyServer([{ ...before, [A1]: APPROVED }, before], { [A1]: [ARCH, [`${W}a`]] });
 		const coverage = await approvalCoverage(client, HEAD);
