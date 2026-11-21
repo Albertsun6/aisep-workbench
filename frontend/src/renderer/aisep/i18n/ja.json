@@ -71,6 +71,7 @@
 	"gate.approval.model": "モデル",
 	"gate.approval.gate": "ゲート",
 	"gate.approval.approver": "承認者",
+	"gate.approval.approverPlaceholder": "承認者を選択",
 	"gate.approval.approves": "承認する要素",
 	"gate.approval.none": "承認できる追加・変更要素はありません。",
 	"gate.approval.noApprovers": "モデルに承認できるステークホルダーがいません。",

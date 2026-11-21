@@ -123,17 +123,18 @@ describe.skipIf(!AISEP_ROOT)("AisepGatePage against a real AISEP MCP Server", ()
 	it("records an approval from the page, and the record is then found on the branch", async () => {
 		renderGate();
 		const approve = await screen.findByRole("button", { name: en["gate.approval.approve"] }, { timeout: 60_000 });
+		const approval = screen.getByRole("region", { name: en["gate.approval.title"] });
+		// No approver is chosen for the user: pick the model's chief architect.
+		await userEvent.click(await within(approval).findByRole("combobox", { name: en["gate.approval.approver"] }, { timeout: 60_000 }));
+		await userEvent.click(await screen.findByRole("option", { name: "首席架构师" }));
 		await waitFor(() => expect(approve).toBeEnabled(), { timeout: 30_000 });
 		await userEvent.click(approve);
 		// record_approval runs the full gate again on headCommit (§5.9 step 3).
-		const approval = screen.getByRole("region", { name: en["gate.approval.title"] });
 		expect(await within(approval).findByRole("status", {}, { timeout: 500_000 })).toHaveTextContent(/approval-/);
 
 		expect(approvals).toEqual([
 			expect.objectContaining({
-				// The first approver the server lists; both Stakeholders on the branch may approve.
-				model: "procurement", gate: "GateArchitecture", decision: "Approved",
-				approvedBy: expect.stringMatching(new RegExp(`^${M}(chiefArchitect|reviewer)$`)),
+				model: "procurement", gate: "GateArchitecture", decision: "Approved", approvedBy: `${M}chiefArchitect`,
 				approves: [`${M}quotationLine`], branch: BRANCH, headCommit: head,
 			}),
 		]);

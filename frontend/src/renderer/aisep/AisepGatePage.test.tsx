@@ -110,9 +110,10 @@ describe("AisepGatePage", () => {
 		);
 	});
 
-	it("approves exactly the commit that was shown, with the prefilled elements and the first approver", async () => {
+	it("approves exactly the commit that was shown, with the prefilled elements and the approver the user chose", async () => {
 		const { client, calls } = gateClient();
 		renderGate(client);
+		await chooseApprover(await screen.findByRole("region", { name: en["gate.approval.title"] }), "评审人");
 		const approve = await screen.findByRole("button", { name: en["gate.approval.approve"] });
 		await waitFor(() => expect(approve).toBeEnabled());
 		await userEvent.click(approve);
@@ -184,6 +185,7 @@ describe("AisepGatePage", () => {
 
 	it("cannot approve once every element is unchecked", async () => {
 		renderGate(gateClient().client);
+		await chooseApprover(await screen.findByRole("region", { name: en["gate.approval.title"] }), "评审人");
 		const approve = await screen.findByRole("button", { name: en["gate.approval.approve"] });
 		await waitFor(() => expect(approve).toBeEnabled());
 		await userEvent.click(screen.getByRole("checkbox", { name: "报价行" }));
@@ -199,6 +201,7 @@ describe("AisepGatePage", () => {
 		expect(within(check).getByText(/direct triple/)).toBeInTheDocument();
 		expect(screen.getByText(en["gate.approval.gateFailed"])).toBeInTheDocument();
 		expect(screen.getByRole("button", { name: en["gate.approval.approve"] })).toBeDisabled();
+		await chooseApprover(screen.getByRole("region", { name: en["gate.approval.title"] }), "评审人");
 		const reject = screen.getByRole("button", { name: en["gate.approval.reject"] });
 		await waitFor(() => expect(reject).toBeEnabled());
 		await userEvent.click(reject);
@@ -214,6 +217,7 @@ describe("AisepGatePage", () => {
 			),
 		});
 		renderGate(client);
+		await chooseApprover(await screen.findByRole("region", { name: en["gate.approval.title"] }), "评审人");
 		const approve = await screen.findByRole("button", { name: en["gate.approval.approve"] });
 		await waitFor(() => expect(approve).toBeEnabled());
 		await userEvent.click(approve);
@@ -230,6 +234,7 @@ describe("AisepGatePage", () => {
 			recordApproval: (input: ApprovalInput) => (calls.approve.push(input), new Promise<ApprovalResult>((done) => (finish = done))),
 		});
 		renderGate(client);
+		await chooseApprover(await screen.findByRole("region", { name: en["gate.approval.title"] }), "评审人");
 		const approve = await screen.findByRole("button", { name: en["gate.approval.approve"] });
 		const reject = screen.getByRole("button", { name: en["gate.approval.reject"] });
 		await waitFor(() => expect(approve).toBeEnabled());
@@ -277,7 +282,7 @@ describe("AisepGatePage", () => {
 		const approval = await screen.findByRole("region", { name: en["gate.approval.title"] });
 		expect(await within(approval).findByRole("note")).toHaveTextContent(note());
 		// Everything else is ready (approver loaded, gate PASS): only the missing confirmation keeps the buttons off.
-		await within(approval).findByRole("combobox", { name: en["gate.approval.approver"] });
+		await chooseApprover(approval, "评审人");
 		await screen.findByText(en["gate.check.pass"]);
 		const approve = within(approval).getByRole("button", { name: en["gate.approval.approve"] });
 		const reject = within(approval).getByRole("button", { name: en["gate.approval.reject"] });
@@ -305,7 +310,7 @@ describe("AisepGatePage", () => {
 		renderGate(client);
 		const approval = await screen.findByRole("region", { name: en["gate.approval.title"] });
 		// Everything else is ready (approver loaded, gate PASS): only the unread progress keeps the buttons off.
-		await within(approval).findByRole("combobox", { name: en["gate.approval.approver"] });
+		await chooseApprover(approval, "评审人");
 		await screen.findByText(en["gate.check.pass"]);
 		const approve = within(approval).getByRole("button", { name: en["gate.approval.approve"] });
 		const reject = within(approval).getByRole("button", { name: en["gate.approval.reject"] });
@@ -336,7 +341,7 @@ describe("AisepGatePage", () => {
 		renderGate(client);
 		const approval = await screen.findByRole("region", { name: en["gate.approval.title"] });
 		expect(await within(approval).findByRole("note")).toHaveTextContent(en["gate.approval.progressUnknown"]);
-		await within(approval).findByRole("combobox", { name: en["gate.approval.approver"] });
+		await chooseApprover(approval, "评审人");
 		await screen.findByText(en["gate.check.pass"]);
 		const approve = within(approval).getByRole("button", { name: en["gate.approval.approve"] });
 		await userEvent.click(within(approval).getByRole("checkbox", { name: en["gate.approval.confirmRepeat"] }));
@@ -366,6 +371,7 @@ describe("AisepGatePage", () => {
 			</QueryClientProvider>
 		);
 		const first = render(page);
+		await chooseApprover(await screen.findByRole("region", { name: en["gate.approval.title"] }), "评审人");
 		const approve = await screen.findByRole("button", { name: en["gate.approval.approve"] });
 		await waitFor(() => expect(approve).toBeEnabled());
 		await userEvent.click(approve);
@@ -376,7 +382,7 @@ describe("AisepGatePage", () => {
 		expect(await within(approval).findByText(en["gate.approval.writing"])).toBeInTheDocument();
 		const again = within(approval).getByRole("button", { name: en["gate.approval.approve"] });
 		// The approvers and the gate have loaded: only the running write keeps the button off.
-		await within(approval).findByRole("combobox", { name: en["gate.approval.approver"] });
+		await chooseApprover(approval, "评审人");
 		expect(again).toBeDisabled();
 		expect(within(approval).getByRole("button", { name: en["gate.approval.reject"] })).toBeDisabled();
 		await act(async () => finish(gateApproval as ApprovalResult));
@@ -473,7 +479,7 @@ const approvedOnce = (): Record<string, string>[] => [{ [ARCH_RECORD]: APPROVED 
 
 async function readyApproval() {
 	const approval = await screen.findByRole("region", { name: en["gate.approval.title"] });
-	await within(approval).findByRole("combobox", { name: en["gate.approval.approver"] });
+	await chooseApprover(approval, "评审人");
 	await screen.findByText(en["gate.check.pass"]);
 	return {
 		approval,
@@ -590,3 +596,67 @@ describe("repeat approval guard: coverage unknown", () => {
 		await waitFor(() => expect(calls.approve).toHaveLength(1));
 	});
 });
+
+// Approver choices (aisep models/workbench: the #68 approval was signed by procurement:chiefArchitect, a Stakeholder of
+// another model): only the approved model's own Stakeholders are offered, and none is chosen for the user.
+const WB_LEAD = {
+	approver: { type: "iri" as const, value: "https://aisep.example/model/workbench/projectLead" },
+	prefLabel: { type: "literal" as const, value: "项目负责人", lang: "zh" },
+	model: { type: "iri" as const, value: "https://aisep.example/model/workbench/" },
+};
+function approversClient(rows: unknown[]) {
+	const answer = { ...(gateApprovers as QueryResult & { kind: "select" }), rows } as QueryResult;
+	return gateClient({
+		query: async (sparql: string, target: { ref: string }) => {
+			if (sparql === APPROVAL_RECORDS_QUERY) return progressRecords(target.ref, false);
+			if (sparql === APPROVERS_QUERY) return answer;
+			if (sparql === NOT_APPROVABLE_QUERY) return gateNotApprovable as QueryResult;
+			throw new Error(`unexpected query ${sparql}`);
+		},
+	});
+}
+const procurementApprovers = (gateApprovers as QueryResult & { kind: "select" }).rows;
+
+describe("approver choices", () => {
+	it("offers only the Stakeholders of the model being approved", async () => {
+		renderGate(approversClient([...procurementApprovers, WB_LEAD]).client);
+		const approval = await screen.findByRole("region", { name: en["gate.approval.title"] });
+		await userEvent.click(await within(approval).findByRole("combobox", { name: en["gate.approval.approver"] }));
+		const options = (await screen.findAllByRole("option")).map((o) => o.textContent);
+		expect(options).toEqual(["评审人", "首席架构师"]);
+	});
+
+	it("says so instead of showing an empty list when the model has no Stakeholder", async () => {
+		renderGate(approversClient([WB_LEAD]).client);
+		const approval = await screen.findByRole("region", { name: en["gate.approval.title"] });
+		expect(await within(approval).findByText(en["gate.approval.noApprovers"])).toBeInTheDocument();
+		expect(within(approval).queryByRole("combobox", { name: en["gate.approval.approver"] })).toBeNull();
+		expect(within(approval).getByRole("button", { name: en["gate.approval.approve"] })).toBeDisabled();
+	});
+
+	it("chooses no approver for the user: nothing can be sent until one is picked", async () => {
+		const { client, calls } = approversClient([...procurementApprovers, WB_LEAD]);
+		renderGate(client);
+		const approval = await screen.findByRole("region", { name: en["gate.approval.title"] });
+		const picker = await within(approval).findByRole("combobox", { name: en["gate.approval.approver"] });
+		await screen.findByText(en["gate.check.pass"]);
+		expect(picker).toHaveTextContent(en["gate.approval.approverPlaceholder"]);
+		const approve = within(approval).getByRole("button", { name: en["gate.approval.approve"] });
+		const reject = within(approval).getByRole("button", { name: en["gate.approval.reject"] });
+		expect(approve).toBeDisabled();
+		expect(reject).toBeDisabled();
+		fireEvent.click(approve);
+		await new Promise((r) => setTimeout(r, 20));
+		expect(calls.approve).toHaveLength(0);
+		await chooseApprover(approval, "首席架构师");
+		await waitFor(() => expect(approve).toBeEnabled());
+		await userEvent.click(approve);
+		await waitFor(() => expect(calls.approve).toHaveLength(1));
+		expect(calls.approve[0].approvedBy).toBe("https://aisep.example/model/procurement/chiefArchitect");
+	});
+});
+
+async function chooseApprover(approval: HTMLElement, name: string) {
+	await userEvent.click(await within(approval).findByRole("combobox", { name: en["gate.approval.approver"] }));
+	await userEvent.click(await screen.findByRole("option", { name }));
+}

@@ -71,6 +71,7 @@
 	"gate.approval.model": "Модель",
 	"gate.approval.gate": "Шлюз",
 	"gate.approval.approver": "Утверждающий",
+	"gate.approval.approverPlaceholder": "Выберите утверждающего",
 	"gate.approval.approves": "Элементы для утверждения",
 	"gate.approval.none": "Нет добавленных или изменённых элементов для утверждения.",
 	"gate.approval.noApprovers": "В модели нет заинтересованного лица, которое может утверждать.",

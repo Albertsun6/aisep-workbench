@@ -71,6 +71,7 @@
 	"gate.approval.model": "Model",
 	"gate.approval.gate": "Gate",
 	"gate.approval.approver": "Approver",
+	"gate.approval.approverPlaceholder": "Choose an approver",
 	"gate.approval.approves": "Elements to approve",
 	"gate.approval.none": "No added or modified elements to approve.",
 	"gate.approval.noApprovers": "No stakeholder in the model can approve.",
