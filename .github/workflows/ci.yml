@@ -2,7 +2,8 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    # AISEP: aisep-main is this mirror's trunk (UPSTREAM.md); run CI after merges into it too.
+    branches: [main, aisep-main]
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review, converted_to_draft]
 
