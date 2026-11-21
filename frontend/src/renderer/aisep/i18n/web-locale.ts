@@ -15,7 +15,7 @@ export interface WebLocaleEnv {
 	storage: LocaleStorage | undefined;
 }
 
-function defaultEnv(): WebLocaleEnv {
+export function defaultEnv(): WebLocaleEnv {
 	let storage: LocaleStorage | undefined;
 	try {
 		storage = window.localStorage;
@@ -43,14 +43,21 @@ function writeLocale(storage: LocaleStorage | undefined, locale: AppLocale): voi
 	}
 }
 
+// 上一次 initWebLocale 的订阅：再次调用（测试里反复调、HMR 重载本模块）时先退掉，
+// 免得写回 localStorage 的订阅越叠越多。
+let unsubscribe: (() => void) | undefined;
+import.meta.hot?.dispose(() => unsubscribe?.());
+
 export async function initWebLocale(env: WebLocaleEnv = defaultEnv()): Promise<void> {
 	if (env.hasDesktopBridge) return;
-	// 先让上游自己的启动读取（读到的是不落盘的 en）跑完，再套用记住的语言；
-	// 反过来的话上游的 load 会在之后把语言盖回 en。load 自带去重，main.tsx
-	// 随后的那次调用直接复用。
+	// 起作用的是顺序：上游 load()（读到的是不落盘的 en）要在 setLocale 之前发起。
+	// 发起时它记下 localeRevision，之后 setLocale 把版本号加一，它读完就不再套用；
+	// 反过来先 setLocale、后发起 load，load 就会把语言盖回 en。这里 await 只是让
+	// 顺序一目了然，不是必需的。load 自带去重，main.tsx 随后的那次调用直接复用。
 	await useLocaleStore.getState().load();
 	const wanted = readLocale(env.storage);
-	useLocaleStore.subscribe((state, prev) => {
+	unsubscribe?.();
+	unsubscribe = useLocaleStore.subscribe((state, prev) => {
 		if (state.locale !== prev.locale) writeLocale(env.storage, state.locale);
 	});
 	if (useLocaleStore.getState().locale !== wanted) await useLocaleStore.getState().setLocale(wanted);

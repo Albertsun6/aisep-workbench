@@ -117,10 +117,15 @@ export async function approvalProgress(
 // check's effective content (mergecheck.py `_effective_content`), walk first parents from the head over approval commits
 // down to the content commit; every record added on the way counts, and an approval below the content commit was for
 // older content and does not count. An approval commit here: one parent, exactly one record added, and model_diff
-// against the parent shows nothing but added governance. That is close to mergecheck's `_commit_shape` but not equal:
-// model_diff only sees models/, so a commit that took a record along with changes outside models/ only (§5.9 step 7,
-// taken) still passes for an approval commit here. That errs on the safe side: an approval is held back, never let
-// through twice.
+// against the parent shows nothing but one or two added governance subjects (the record, plus the AgentActivity
+// record_approval adds when it creates one: model_diff counts both as governance). That is as close to mergecheck's
+// `_commit_shape` as a summary model_diff gets, but not equal; a commit that took a record along (§5.9 step 7, taken)
+// still passes for an approval commit here when its other changes are any of:
+// - files outside models/ only (model_diff never sees them);
+// - files in models/ that change no triple (formatting, comments: model_diff compares triples);
+// - one more added governance subject that is not an AgentActivity (the summary counts kinds, not types).
+// Nor are the trailer, the single new file or blank nodes checked. All of these err on the safe side: an approval is
+// held back, never let through twice.
 export const APPROVAL_COVERAGE_QUERY = `PREFIX aisep: <https://aisep.example/ont/aisep#>
 SELECT ?record ?gate ?element WHERE {
   ?record a aisep:ApprovalRecord ; aisep:decision aisep:DecisionApproved ; aisep:gate ?gate ; aisep:approves ?element .
@@ -174,10 +179,12 @@ export async function approvalCoverage(client: AisepModelClient, commit: string,
 	return { records, approved: records.flatMap((record) => byRecord.get(record) ?? []) };
 }
 
-/** The model diff of one commit against its parent adds governance and changes nothing else. */
+/** The model diff of one commit against its parent adds one record and at most one activity, and nothing else. */
 function onlyAddsGovernance(diff: DiffResult): boolean {
 	return Object.entries(diff.counts).every(([kind, n]) =>
-		kind === "governance" ? n.added >= 1 && n.modified === 0 && n.removed === 0 : n.added + n.modified + n.removed === 0,
+		kind === "governance"
+			? n.added >= 1 && n.added <= 2 && n.modified === 0 && n.removed === 0
+			: n.added + n.modified + n.removed === 0,
 	);
 }
 
@@ -187,7 +194,9 @@ export function isCovered(coverage: ApprovalCoverage, gate: string, approves: re
 	return approves.length > 0 && approves.every((iri) => ofGate.some((entry) => entry.elements.has(iri)));
 }
 
-/** The Approved records of `gate` in the coverage, newest first. */
-export function coveringRecords(coverage: ApprovalCoverage, gate: string): Iri[] {
-	return coverage.approved.filter((entry) => entry.gate === `${AISEP_NS}${gate}`).map((entry) => entry.record);
+/** The Approved records of `gate` in the coverage that approved some of `approves`, newest first. */
+export function coveringRecords(coverage: ApprovalCoverage, gate: string, approves: readonly Iri[]): Iri[] {
+	return coverage.approved
+		.filter((entry) => entry.gate === `${AISEP_NS}${gate}` && approves.some((iri) => entry.elements.has(iri)))
+		.map((entry) => entry.record);
 }

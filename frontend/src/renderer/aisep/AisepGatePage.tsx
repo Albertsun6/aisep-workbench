@@ -454,7 +454,7 @@ function ApprovalSection({
 				<LabeledSelect label={t("gate.approval.gate")} value={gate} onValueChange={(value) => setGate(value as GateId)}
 					options={BRANCH_GATES.map((id) => ({ value: id, label: t(GATE_TEXT[id]) }))} />
 				{modelApprovers.length ? (
-					<LabeledSelect label={t("gate.approval.approver")} value={approver} onValueChange={setApprover}
+					<LabeledSelect label={t("gate.approval.approver")} value={approver ?? ""} onValueChange={setApprover}
 						placeholder={t("gate.approval.approverPlaceholder")}
 						options={modelApprovers.map((a) => ({ value: a.iri, label: a.prefLabel }))} />
 				) : approvers.isSuccess ? (
@@ -483,7 +483,7 @@ function ApprovalSection({
 			{gateFailed ? <p className="text-xs text-destructive">{t("gate.approval.gateFailed")}</p> : null}
 			{covered && coverage.data ? (
 				<p role="note" className="text-xs text-warning">
-					{t("gate.approval.alreadyCovered", { records: coveringRecords(coverage.data, gate).map(localName).join(", ") })}
+					{t("gate.approval.alreadyCovered", { records: coveringRecords(coverage.data, gate, approves).map(localName).join(", ") })}
 				</p>
 			) : null}
 			{needsConfirm && !recorded ? (
@@ -491,7 +491,9 @@ function ApprovalSection({
 					<p>
 						{alreadyStage
 							? t("gate.approval.alreadyApproved", { stage: t(APPROVAL_STAGE_TEXT[alreadyStage]) })
-							: t("gate.approval.progressUnknown")}
+							: progress.isError && !progress.data
+								? t("gate.approval.progressUnknown")
+								: t("gate.approval.coverageUnknown")}
 					</p>
 					<label className="flex items-center gap-2 text-foreground">
 						<Checkbox checked={confirmedRepeat} disabled={writing} onCheckedChange={(checked) => setConfirmedFor(checked === true ? confirmReason : undefined)} />

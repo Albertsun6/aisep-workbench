@@ -518,6 +518,19 @@ describe("repeat approval guard: same selection", () => {
 		expect(approve).toBeDisabled();
 		expect(calls.approve).toHaveLength(0);
 	});
+
+	it("names only the records that cover the current selection, not every Approved record of the gate", async () => {
+		const OTHER_RECORD = `${M}approval-20261121000003-architecture-bbbbbbb`;
+		const { client } = guardClient(
+			[{ [ARCH_RECORD]: APPROVED, [OTHER_RECORD]: APPROVED }, { [ARCH_RECORD]: APPROVED }, {}],
+			{ [ARCH_RECORD]: ["GateArchitecture", [QUOTATION_LINE]], [OTHER_RECORD]: ["GateArchitecture", [`${M}somethingElse`]] },
+		);
+		renderGate(client);
+		const { approval, approve } = await readyApproval();
+		expect(await within(approval).findByText(en["gate.approval.alreadyCovered"].replace("{{records}}", ARCH_RECORD.slice(M.length)))).toBeInTheDocument();
+		expect(within(approval).queryByText(new RegExp(OTHER_RECORD.slice(M.length)))).toBeNull();
+		expect(approve).toBeDisabled();
+	});
 });
 
 describe("repeat approval guard: other gate or reject", () => {
@@ -586,12 +599,43 @@ describe("repeat approval guard: coverage unknown", () => {
 		});
 		renderGate(client);
 		const { approval, approve, reject } = await readyApproval();
-		expect(await within(approval).findByRole("note")).toHaveTextContent(en["gate.approval.progressUnknown"]);
+		// The progress itself was read: the note names what is actually unknown, not the progress.
+		expect(await within(approval).findByRole("note")).toHaveTextContent(en["gate.approval.coverageUnknown"]);
+		expect(within(approval).queryByText(en["gate.approval.progressUnknown"])).toBeNull();
 		expect(approve).toBeDisabled();
 		expect(reject).toBeDisabled();
 		await userEvent.click(within(approval).getByRole("checkbox", { name: en["gate.approval.confirmRepeat"] }));
 		expect(approve).toBeEnabled();
 		expect(reject).toBeEnabled();
+		await userEvent.click(approve);
+		await waitFor(() => expect(calls.approve).toHaveLength(1));
+	});
+
+	it("falls back to the confirmation when the model diff of a walked commit fails", async () => {
+		const { client, calls } = guardClient(approvedOnce(), { [ARCH_RECORD]: ["GateArchitecture", [QUOTATION_LINE]] });
+		const pageDiff = client.diff;
+		const guardQuery = client.query;
+		// The branch progress reads fine and is pending, so only the coverage is unknown.
+		client.query = async (sparql, target, options) =>
+			sparql === APPROVAL_RECORDS_QUERY && target?.ref !== undefined && !target.ref.startsWith(`${head}~`)
+				? progressRecords(target.ref, false)
+				: guardQuery(sparql, target, options);
+		const walked: unknown[] = [];
+		client.diff = async (input, options) => {
+			if (input.base === undefined) return pageDiff(input, options);
+			walked.push(input);
+			throw new AisepToolError("INTERNAL", "model_diff failed", false);
+		};
+		renderGate(client);
+		const { approval, approve, reject } = await readyApproval();
+		expect(await within(approval).findByRole("note")).toHaveTextContent(en["gate.approval.coverageUnknown"]);
+		expect(walked).not.toHaveLength(0);
+		// Unknown is not covered: no "already approved this selection" lock, only the confirmation.
+		expect(within(approval).queryByText(/^This branch already approved/)).toBeNull();
+		expect(approve).toBeDisabled();
+		expect(reject).toBeDisabled();
+		await userEvent.click(within(approval).getByRole("checkbox", { name: en["gate.approval.confirmRepeat"] }));
+		expect(approve).toBeEnabled();
 		await userEvent.click(approve);
 		await waitFor(() => expect(calls.approve).toHaveLength(1));
 	});
@@ -653,6 +697,32 @@ describe("approver choices", () => {
 		await userEvent.click(approve);
 		await waitFor(() => expect(calls.approve).toHaveLength(1));
 		expect(calls.approve[0].approvedBy).toBe("https://aisep.example/model/procurement/chiefArchitect");
+	});
+
+	it("shows the placeholder again, not a blank picker, after switching to another model", async () => {
+		// The branch changes an element of each model: the model picker appears.
+		const WB_ITEM = {
+			...diff.items![0],
+			iri: "https://aisep.example/model/workbench/gatePage",
+			label: undefined,
+			files: { base: [], head: ["models/workbench/elements.ttl"] },
+		};
+		const twoModels = { ...diff, items: [...(diff.items ?? []), WB_ITEM] } as DiffResult;
+		const { client } = approversClient([...procurementApprovers, WB_LEAD]);
+		client.diff = async () => twoModels;
+		renderGate(client);
+		const approval = await screen.findByRole("region", { name: en["gate.approval.title"] });
+		await chooseApprover(approval, "首席架构师");
+		const picker = within(approval).getByRole("combobox", { name: en["gate.approval.approver"] });
+		expect(picker).toHaveTextContent("首席架构师");
+		await userEvent.click(within(approval).getByRole("combobox", { name: en["gate.approval.model"] }));
+		await userEvent.click(await screen.findByRole("option", { name: "workbench" }));
+		await waitFor(() =>
+			expect(within(approval).getByRole("combobox", { name: en["gate.approval.approver"] })).toHaveTextContent(
+				en["gate.approval.approverPlaceholder"],
+			),
+		);
+		expect(within(approval).getByRole("button", { name: en["gate.approval.approve"] })).toBeDisabled();
 	});
 });
 
