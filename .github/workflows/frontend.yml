@@ -448,11 +448,6 @@ jobs:
       - name: Run renderer smoke suite
         run: CI=true npm run test:e2e:renderer -- --shard=${{ matrix.shard }}/3
 
-      # 证伪用临时步骤（T4）：第 2 片必败，检验 ci-ok 随之失败；下一提交去掉。
-      - name: Falsify shard 2
-        if: matrix.shard == 2
-        run: exit 1
-
       # Screenshots and attachments from failed specs, so a flaky pixel check
       # can be inspected instead of only re-run.
       - name: Upload renderer smoke results
