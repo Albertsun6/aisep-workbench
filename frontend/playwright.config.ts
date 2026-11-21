@@ -12,8 +12,10 @@ export default defineConfig({
 	// AISEP: CI runners are presumed slower than dev machines; first-render
 	// assertions on a busy runner can exceed the 5 s default without anything
 	// being wrong. That premise rests only on local load data so far (see wb PR
-	// #6), not on runner measurements. Cost: a regression that slows first
-	// render by 5–15 s no longer fails renderer-smoke in CI.
+	// #6), not on runner measurements. Cost: this is the default for every
+	// expect assertion without an explicit timeout, in every spec this config
+	// runs in CI (not just first render), so any such wait that regresses into
+	// the 5–15 s range no longer fails in CI.
 	expect: { timeout: process.env.CI ? 15_000 : 5_000 },
 	reporter: process.env.CI ? [["list"], ["github"]] : "list",
 	use: {
