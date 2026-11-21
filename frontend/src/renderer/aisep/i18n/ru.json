@@ -86,5 +86,12 @@
 	"section.gates.approvedOnBranch": "Утверждено в {{branch}}, ещё не слито",
 	"section.aiActivity.gateNeedsServer": "Странице шлюза нужен сервер моделей (VITE_AISEP_MCP_URL).",
 	"section.gates.branchMarksUnknown": "Не удалось прочитать утверждения в {{branches}}: уже утверждённые там элементы могут быть не отмечены.",
-	"gate.approval.notApprovableFailed": "Не удалось проверить, какие элементы можно утвердить, поэтому ничего не заполнено: {{message}}"
+	"gate.approval.notApprovableFailed": "Не удалось проверить, какие элементы можно утвердить, поэтому ничего не заполнено: {{message}}",
+	"gate.progress.title": "Ход утверждения",
+	"gate.progress.refresh": "Обновить",
+	"gate.progress.stage.pending": "Ожидает утверждения",
+	"gate.progress.stage.approved": "Утверждено, не отправлено",
+	"gate.progress.stage.pushed": "Отправлено, не слито",
+	"gate.progress.stage.merged": "Слито",
+	"gate.progress.fetchNote": "Выводится из Git в репозитории, который читает сервер моделей, проверка каждые 15 секунд. Сервер никогда не делает fetch: «Отправлено» и «Слито» отражают origin на момент последнего git fetch в этом репозитории."
 }

@@ -86,5 +86,12 @@
 	"section.gates.approvedOnBranch": "Aprovado em {{branch}}, ainda não mesclado",
 	"section.aiActivity.gateNeedsServer": "A página de portão precisa do servidor de modelos (VITE_AISEP_MCP_URL).",
 	"section.gates.branchMarksUnknown": "Não foi possível ler as aprovações em {{branches}}: elementos já aprovados lá podem não estar marcados.",
-	"gate.approval.notApprovableFailed": "Não foi possível verificar quais elementos podem ser aprovados, então nada é preenchido: {{message}}"
+	"gate.approval.notApprovableFailed": "Não foi possível verificar quais elementos podem ser aprovados, então nada é preenchido: {{message}}",
+	"gate.progress.title": "Progresso da aprovação",
+	"gate.progress.refresh": "Atualizar",
+	"gate.progress.stage.pending": "Aguardando aprovação",
+	"gate.progress.stage.approved": "Aprovado, não enviado",
+	"gate.progress.stage.pushed": "Enviado, não mesclado",
+	"gate.progress.stage.merged": "Mesclado",
+	"gate.progress.fetchNote": "Derivado do Git no repositório lido pelo servidor de modelos, verificado a cada 15 segundos. O servidor nunca faz fetch: “Enviado” e “Mesclado” seguem o origin do último git fetch nesse repositório."
 }
