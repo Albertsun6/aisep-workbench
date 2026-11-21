@@ -110,9 +110,10 @@ describe("AisepGatePage", () => {
 		);
 	});
 
-	it("approves exactly the commit that was shown, with the prefilled elements and the first approver", async () => {
+	it("approves exactly the commit that was shown, with the prefilled elements and the approver the user chose", async () => {
 		const { client, calls } = gateClient();
 		renderGate(client);
+		await chooseApprover(await screen.findByRole("region", { name: en["gate.approval.title"] }), "评审人");
 		const approve = await screen.findByRole("button", { name: en["gate.approval.approve"] });
 		await waitFor(() => expect(approve).toBeEnabled());
 		await userEvent.click(approve);
@@ -184,6 +185,7 @@ describe("AisepGatePage", () => {
 
 	it("cannot approve once every element is unchecked", async () => {
 		renderGate(gateClient().client);
+		await chooseApprover(await screen.findByRole("region", { name: en["gate.approval.title"] }), "评审人");
 		const approve = await screen.findByRole("button", { name: en["gate.approval.approve"] });
 		await waitFor(() => expect(approve).toBeEnabled());
 		await userEvent.click(screen.getByRole("checkbox", { name: "报价行" }));
@@ -199,6 +201,7 @@ describe("AisepGatePage", () => {
 		expect(within(check).getByText(/direct triple/)).toBeInTheDocument();
 		expect(screen.getByText(en["gate.approval.gateFailed"])).toBeInTheDocument();
 		expect(screen.getByRole("button", { name: en["gate.approval.approve"] })).toBeDisabled();
+		await chooseApprover(screen.getByRole("region", { name: en["gate.approval.title"] }), "评审人");
 		const reject = screen.getByRole("button", { name: en["gate.approval.reject"] });
 		await waitFor(() => expect(reject).toBeEnabled());
 		await userEvent.click(reject);
@@ -214,6 +217,7 @@ describe("AisepGatePage", () => {
 			),
 		});
 		renderGate(client);
+		await chooseApprover(await screen.findByRole("region", { name: en["gate.approval.title"] }), "评审人");
 		const approve = await screen.findByRole("button", { name: en["gate.approval.approve"] });
 		await waitFor(() => expect(approve).toBeEnabled());
 		await userEvent.click(approve);
@@ -230,6 +234,7 @@ describe("AisepGatePage", () => {
 			recordApproval: (input: ApprovalInput) => (calls.approve.push(input), new Promise<ApprovalResult>((done) => (finish = done))),
 		});
 		renderGate(client);
+		await chooseApprover(await screen.findByRole("region", { name: en["gate.approval.title"] }), "评审人");
 		const approve = await screen.findByRole("button", { name: en["gate.approval.approve"] });
 		const reject = screen.getByRole("button", { name: en["gate.approval.reject"] });
 		await waitFor(() => expect(approve).toBeEnabled());
@@ -277,7 +282,7 @@ describe("AisepGatePage", () => {
 		const approval = await screen.findByRole("region", { name: en["gate.approval.title"] });
 		expect(await within(approval).findByRole("note")).toHaveTextContent(note());
 		// Everything else is ready (approver loaded, gate PASS): only the missing confirmation keeps the buttons off.
-		await within(approval).findByRole("combobox", { name: en["gate.approval.approver"] });
+		await chooseApprover(approval, "评审人");
 		await screen.findByText(en["gate.check.pass"]);
 		const approve = within(approval).getByRole("button", { name: en["gate.approval.approve"] });
 		const reject = within(approval).getByRole("button", { name: en["gate.approval.reject"] });
@@ -305,7 +310,7 @@ describe("AisepGatePage", () => {
 		renderGate(client);
 		const approval = await screen.findByRole("region", { name: en["gate.approval.title"] });
 		// Everything else is ready (approver loaded, gate PASS): only the unread progress keeps the buttons off.
-		await within(approval).findByRole("combobox", { name: en["gate.approval.approver"] });
+		await chooseApprover(approval, "评审人");
 		await screen.findByText(en["gate.check.pass"]);
 		const approve = within(approval).getByRole("button", { name: en["gate.approval.approve"] });
 		const reject = within(approval).getByRole("button", { name: en["gate.approval.reject"] });
@@ -336,7 +341,7 @@ describe("AisepGatePage", () => {
 		renderGate(client);
 		const approval = await screen.findByRole("region", { name: en["gate.approval.title"] });
 		expect(await within(approval).findByRole("note")).toHaveTextContent(en["gate.approval.progressUnknown"]);
-		await within(approval).findByRole("combobox", { name: en["gate.approval.approver"] });
+		await chooseApprover(approval, "评审人");
 		await screen.findByText(en["gate.check.pass"]);
 		const approve = within(approval).getByRole("button", { name: en["gate.approval.approve"] });
 		await userEvent.click(within(approval).getByRole("checkbox", { name: en["gate.approval.confirmRepeat"] }));
@@ -366,6 +371,7 @@ describe("AisepGatePage", () => {
 			</QueryClientProvider>
 		);
 		const first = render(page);
+		await chooseApprover(await screen.findByRole("region", { name: en["gate.approval.title"] }), "评审人");
 		const approve = await screen.findByRole("button", { name: en["gate.approval.approve"] });
 		await waitFor(() => expect(approve).toBeEnabled());
 		await userEvent.click(approve);
@@ -376,7 +382,7 @@ describe("AisepGatePage", () => {
 		expect(await within(approval).findByText(en["gate.approval.writing"])).toBeInTheDocument();
 		const again = within(approval).getByRole("button", { name: en["gate.approval.approve"] });
 		// The approvers and the gate have loaded: only the running write keeps the button off.
-		await within(approval).findByRole("combobox", { name: en["gate.approval.approver"] });
+		await chooseApprover(approval, "评审人");
 		expect(again).toBeDisabled();
 		expect(within(approval).getByRole("button", { name: en["gate.approval.reject"] })).toBeDisabled();
 		await act(async () => finish(gateApproval as ApprovalResult));
@@ -473,7 +479,7 @@ const approvedOnce = (): Record<string, string>[] => [{ [ARCH_RECORD]: APPROVED 
 
 async function readyApproval() {
 	const approval = await screen.findByRole("region", { name: en["gate.approval.title"] });
-	await within(approval).findByRole("combobox", { name: en["gate.approval.approver"] });
+	await chooseApprover(approval, "评审人");
 	await screen.findByText(en["gate.check.pass"]);
 	return {
 		approval,

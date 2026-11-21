@@ -1,7 +1,7 @@
 // Gate page (aisep docs/mcp-interface.md §8 step 5, §2 "关口页"): the branch's committed model changes against the
 // main branch, the gate check on that same commit, and the one write the workbench does: record an approval.
 import { useMutation, useMutationState, useQuery, useQueryClient, type MutationState } from "@tanstack/react-query";
-import { useEffect, useId, useRef, useState } from "react";
+import { useId, useRef, useState } from "react";
 import { Workflow } from "@/components/app-icons";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -30,11 +30,15 @@ import {
 import { shouldRetryAisep } from "./data/mcp-client";
 import { useAisepT, type AisepMessageKey } from "./i18n";
 
-/** §5.9 approvedBy: an existing arch:Stakeholder that is not an aisep:AIAgent (AI cannot approve). */
+/**
+ * §5.9 approvedBy: an existing arch:Stakeholder that is not an aisep:AIAgent (AI cannot approve). The page offers only
+ * the Stakeholders of the model being approved (?model): the server accepts any model's, and the first approval of
+ * aisep models/workbench #68 ended up signed by a procurement Stakeholder that way.
+ */
 export const APPROVERS_QUERY = `PREFIX aisep: <https://aisep.example/ont/aisep#>
 PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
-SELECT ?approver ?prefLabel WHERE {
-  ?approver a/rdfs:subClassOf* arch:Stakeholder ; skos:prefLabel ?prefLabel .
+SELECT ?approver ?prefLabel ?model WHERE {
+  ?approver a/rdfs:subClassOf* arch:Stakeholder ; skos:prefLabel ?prefLabel ; arch:inModel ?model .
   FILTER NOT EXISTS { ?approver a/rdfs:subClassOf* aisep:AIAgent }
   FILTER(lang(?prefLabel) = "zh")
 }`;
@@ -54,10 +58,17 @@ SELECT DISTINCT ?element WHERE {
 export interface Approver {
 	iri: Iri;
 	prefLabel: string;
+	/** The arch:Model IRI the Stakeholder belongs to. */
+	model: Iri;
 }
 
 export function approversFromRows(result: QueryResult): Approver[] {
-	return asSelect(result).rows.map((row) => ({ iri: row.approver.value, prefLabel: row.prefLabel.value }));
+	return asSelect(result).rows.map((row) => ({ iri: row.approver.value, prefLabel: row.prefLabel.value, model: row.model.value }));
+}
+
+/** The model IRI for a model slug (aisep spec §3: `https://aisep.example/model/<slug>/`). */
+function modelIri(slug: string): Iri {
+	return `https://aisep.example/model/${slug}/`;
 }
 
 /**
@@ -324,7 +335,7 @@ function ApprovalSection({
 	const [chosenModel, setModel] = useState<string>();
 	const model = chosenModel !== undefined && models.includes(chosenModel) ? chosenModel : models[0];
 	const [gate, setGate] = useState<GateId>("GateArchitecture");
-	const [approver, setApprover] = useState<Iri | undefined>();
+	const [chosenApprover, setApprover] = useState<Iri | undefined>();
 	const [unchecked, setUnchecked] = useState<ReadonlySet<Iri>>(new Set());
 	// The branch tip may already be an approval commit (an approval written earlier, from this page or elsewhere): then
 	// the head on screen is that commit, and approving it writes a second approval on top. Same query (and cache entry)
@@ -346,11 +357,11 @@ function ApprovalSection({
 	});
 	// Which warning the user confirmed: a confirmation of "progress unknown" does not carry over to "already approved".
 	const [confirmedFor, setConfirmedFor] = useState<"approved" | "unknown">();
-	useEffect(() => {
-		if (approver === undefined && approvers.data?.length) setApprover(approvers.data[0].iri);
-	}, [approver, approvers.data]);
 
 	const items = model ? (candidates.get(model) ?? []) : [];
+	// Only this model's Stakeholders, and none chosen for the user: a choice left over from another model does not count.
+	const modelApprovers = model ? (approvers.data ?? []).filter((a) => a.model === modelIri(model)) : [];
+	const approver = modelApprovers.some((a) => a.iri === chosenApprover) ? chosenApprover : undefined;
 	const approves = items.map((item) => item.iri).filter((iri) => !unchecked.has(iri));
 	const mutationKey = approvalMutationKey(branch, commit);
 	// Set in the click handler itself: a second click before React re-renders the disabled button must not write again.
@@ -442,9 +453,10 @@ function ApprovalSection({
 				) : null}
 				<LabeledSelect label={t("gate.approval.gate")} value={gate} onValueChange={(value) => setGate(value as GateId)}
 					options={BRANCH_GATES.map((id) => ({ value: id, label: t(GATE_TEXT[id]) }))} />
-				{approvers.data?.length ? (
+				{modelApprovers.length ? (
 					<LabeledSelect label={t("gate.approval.approver")} value={approver} onValueChange={setApprover}
-						options={approvers.data.map((a) => ({ value: a.iri, label: a.prefLabel }))} />
+						placeholder={t("gate.approval.approverPlaceholder")}
+						options={modelApprovers.map((a) => ({ value: a.iri, label: a.prefLabel }))} />
 				) : approvers.isSuccess ? (
 					<p className="text-destructive">{t("gate.approval.noApprovers")}</p>
 				) : null}
@@ -521,11 +533,13 @@ function LabeledSelect({
 	value,
 	onValueChange,
 	options,
+	placeholder,
 }: {
 	label: string;
 	value: string | undefined;
 	onValueChange: (value: string) => void;
 	options: { value: string; label: string }[];
+	placeholder?: string;
 }) {
 	const id = useId();
 	return (
@@ -533,7 +547,7 @@ function LabeledSelect({
 			<span id={id} className="text-muted-foreground">{label}</span>
 			<Select value={value} onValueChange={onValueChange}>
 				<SelectTrigger size="sm" aria-labelledby={id} className="min-w-40">
-					<SelectValue />
+					<SelectValue placeholder={placeholder} />
 				</SelectTrigger>
 				<SelectContent>
 					{options.map((option) => (
