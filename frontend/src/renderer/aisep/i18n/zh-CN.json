@@ -71,6 +71,7 @@
 	"gate.approval.model": "模型",
 	"gate.approval.gate": "关口",
 	"gate.approval.approver": "批准人",
+	"gate.approval.approverPlaceholder": "选择批准人",
 	"gate.approval.approves": "要批准的元素",
 	"gate.approval.none": "没有可批准的新增或修改元素。",
 	"gate.approval.noApprovers": "模型里没有可以批准的干系人。",

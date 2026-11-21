@@ -71,6 +71,7 @@
 	"gate.approval.model": "Modèle",
 	"gate.approval.gate": "Porte",
 	"gate.approval.approver": "Approbateur",
+	"gate.approval.approverPlaceholder": "Choisir l’approbateur",
 	"gate.approval.approves": "Éléments à approuver",
 	"gate.approval.none": "Aucun élément ajouté ou modifié à approuver.",
 	"gate.approval.noApprovers": "Aucune partie prenante du modèle ne peut approuver.",

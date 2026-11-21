@@ -7,7 +7,8 @@
 	"kind": "select",
 	"variables": [
 		"approver",
-		"prefLabel"
+		"prefLabel",
+		"model"
 	],
 	"rows": [
 		{
@@ -19,6 +20,10 @@
 				"type": "literal",
 				"value": "评审人",
 				"lang": "zh"
+			},
+			"model": {
+				"type": "iri",
+				"value": "https://aisep.example/model/procurement/"
 			}
 		},
 		{
@@ -30,6 +35,10 @@
 				"type": "literal",
 				"value": "首席架构师",
 				"lang": "zh"
+			},
+			"model": {
+				"type": "iri",
+				"value": "https://aisep.example/model/procurement/"
 			}
 		}
 	],

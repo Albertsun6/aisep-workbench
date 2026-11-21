@@ -71,6 +71,7 @@
 	"gate.approval.model": "Modell",
 	"gate.approval.gate": "Gate",
 	"gate.approval.approver": "Freigebende Person",
+	"gate.approval.approverPlaceholder": "Freigebende Person wählen",
 	"gate.approval.approves": "Freizugebende Elemente",
 	"gate.approval.none": "Keine hinzugefügten oder geänderten Elemente zum Freigeben.",
 	"gate.approval.noApprovers": "Kein Stakeholder im Modell darf freigeben.",

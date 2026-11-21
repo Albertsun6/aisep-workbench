@@ -590,3 +590,67 @@ describe("repeat approval guard: coverage unknown", () => {
 		await waitFor(() => expect(calls.approve).toHaveLength(1));
 	});
 });
+
+// Approver choices (aisep models/workbench: the #68 approval was signed by procurement:chiefArchitect, a Stakeholder of
+// another model): only the approved model's own Stakeholders are offered, and none is chosen for the user.
+const WB_LEAD = {
+	approver: { type: "iri" as const, value: "https://aisep.example/model/workbench/projectLead" },
+	prefLabel: { type: "literal" as const, value: "项目负责人", lang: "zh" },
+	model: { type: "iri" as const, value: "https://aisep.example/model/workbench/" },
+};
+function approversClient(rows: unknown[]) {
+	const answer = { ...(gateApprovers as QueryResult & { kind: "select" }), rows } as QueryResult;
+	return gateClient({
+		query: async (sparql: string, target: { ref: string }) => {
+			if (sparql === APPROVAL_RECORDS_QUERY) return progressRecords(target.ref, false);
+			if (sparql === APPROVERS_QUERY) return answer;
+			if (sparql === NOT_APPROVABLE_QUERY) return gateNotApprovable as QueryResult;
+			throw new Error(`unexpected query ${sparql}`);
+		},
+	});
+}
+const procurementApprovers = (gateApprovers as QueryResult & { kind: "select" }).rows;
+
+describe("approver choices", () => {
+	it("offers only the Stakeholders of the model being approved", async () => {
+		renderGate(approversClient([...procurementApprovers, WB_LEAD]).client);
+		const approval = await screen.findByRole("region", { name: en["gate.approval.title"] });
+		await userEvent.click(await within(approval).findByRole("combobox", { name: en["gate.approval.approver"] }));
+		const options = (await screen.findAllByRole("option")).map((o) => o.textContent);
+		expect(options).toEqual(["评审人", "首席架构师"]);
+	});
+
+	it("says so instead of showing an empty list when the model has no Stakeholder", async () => {
+		renderGate(approversClient([WB_LEAD]).client);
+		const approval = await screen.findByRole("region", { name: en["gate.approval.title"] });
+		expect(await within(approval).findByText(en["gate.approval.noApprovers"])).toBeInTheDocument();
+		expect(within(approval).queryByRole("combobox", { name: en["gate.approval.approver"] })).toBeNull();
+		expect(within(approval).getByRole("button", { name: en["gate.approval.approve"] })).toBeDisabled();
+	});
+
+	it("chooses no approver for the user: nothing can be sent until one is picked", async () => {
+		const { client, calls } = approversClient([...procurementApprovers, WB_LEAD]);
+		renderGate(client);
+		const approval = await screen.findByRole("region", { name: en["gate.approval.title"] });
+		const picker = await within(approval).findByRole("combobox", { name: en["gate.approval.approver"] });
+		await screen.findByText(en["gate.check.pass"]);
+		expect(picker).toHaveTextContent(en["gate.approval.approverPlaceholder"]);
+		const approve = within(approval).getByRole("button", { name: en["gate.approval.approve"] });
+		const reject = within(approval).getByRole("button", { name: en["gate.approval.reject"] });
+		expect(approve).toBeDisabled();
+		expect(reject).toBeDisabled();
+		fireEvent.click(approve);
+		await new Promise((r) => setTimeout(r, 20));
+		expect(calls.approve).toHaveLength(0);
+		await chooseApprover(approval, "首席架构师");
+		await waitFor(() => expect(approve).toBeEnabled());
+		await userEvent.click(approve);
+		await waitFor(() => expect(calls.approve).toHaveLength(1));
+		expect(calls.approve[0].approvedBy).toBe("https://aisep.example/model/procurement/chiefArchitect");
+	});
+});
+
+async function chooseApprover(approval: HTMLElement, name: string) {
+	await userEvent.click(await within(approval).findByRole("combobox", { name: en["gate.approval.approver"] }));
+	await userEvent.click(await screen.findByRole("option", { name }));
+}
