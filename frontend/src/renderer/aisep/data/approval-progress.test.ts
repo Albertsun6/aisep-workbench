@@ -308,9 +308,12 @@ describe("approval coverage", () => {
 			history.push(before);
 			return historyServer(history, approves).client;
 		};
-		const coverage = await approvalCoverage(chain(COVERAGE_WALK_LIMIT), HEAD);
-		expect(coverage.records).toHaveLength(COVERAGE_WALK_LIMIT);
-		await expect(approvalCoverage(chain(COVERAGE_WALK_LIMIT + 1), HEAD)).rejects.toMatchObject({ code: "RESULT_TRUNCATED" });
+		// The limit itself is pinned (20), not only its relation to the walk: exactly 20 approval commits on top of the
+		// content commit are read, the 21st is refused.
+		expect(COVERAGE_WALK_LIMIT).toBe(20);
+		const coverage = await approvalCoverage(chain(20), HEAD);
+		expect(coverage.records).toHaveLength(20);
+		await expect(approvalCoverage(chain(21), HEAD)).rejects.toMatchObject({ code: "RESULT_TRUNCATED" });
 	});
 
 	it("walks over a Rejected record but lets only Approved ones cover", async () => {
