@@ -72,12 +72,14 @@ describe("McpModelClient", () => {
 		await client.diff({ head: { worktree: "feat/x" }, detail: "summary" });
 		await client.recordApproval({ model: "procurement", gate: "GateArchitecture", decision: "Approved",
 			approvedBy: "x", approves: ["y"], branch: "feat/x", headCommit: "0".repeat(40) });
+		await client.branches();
 		expect(f.seen.map((s) => [s.headers["Mcp-Name"], s.body.params.arguments])).toEqual([
 			["model_query", { sparql: "ASK {}", limit: 5 }],
 			["model_findings", { model: "procurement" }],
 			["model_diff", { head: { worktree: "feat/x" }, detail: "summary" }],
 			["governance_record_approval", { model: "procurement", gate: "GateArchitecture", decision: "Approved",
 				approvedBy: "x", approves: ["y"], branch: "feat/x", headCommit: "0".repeat(40) }],
+			["model_branches", {}],
 		]);
 	});
 

@@ -5,6 +5,8 @@ import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { PageTopbar, PageTopbarTitle } from "../components/PageTopbar";
+import { approvalProgressKey } from "./AisepApprovalProgress";
+import { approvalProgress, type ApprovalStage } from "./data/approval-progress";
 import { aoSessionSource, type AgentSessionBucket, type AgentSessionRow, type AgentSessionSource } from "./data/ao-sessions";
 import { branchChanges, changedElementsView } from "./data/changed-elements";
 import {
@@ -17,6 +19,7 @@ import {
 	iriColumn,
 	type AisepModelClient,
 	type ApprovalState,
+	type BranchInfo,
 	type Iri,
 	type ModelElement,
 } from "./data/client";
@@ -147,6 +150,7 @@ export function AisepWorkbenchPage({
 						isLoading={pending.isLoading}
 						isError={pending.isError}
 					>
+						<GateBranches client={client} gateLinks={!(client instanceof FixtureClient)} />
 						{unknownBranches.length ? (
 							<p role="alert" className="text-caption text-warning">
 								{t("section.gates.branchMarksUnknown", { branches: unknownBranches.join(", ") })}
@@ -241,6 +245,123 @@ function ElementSection({
 				<p className="text-xs text-muted-foreground">{t("section.empty")}</p>
 			)}
 		</Section>
+	);
+}
+
+/** The branch list follows pushes and merges done outside the workbench; the server reads refs only, never fetches. */
+export const GATE_BRANCHES_REFRESH_MS = 15_000;
+
+const STAGE_TEXT: Record<ApprovalStage, AisepMessageKey> = {
+	pending: "gate.progress.stage.pending",
+	approved: "gate.progress.stage.approved",
+	pushed: "gate.progress.stage.pushed",
+	merged: "gate.progress.stage.merged",
+};
+
+function errorText(error: unknown): string {
+	if (error instanceof AisepToolError) return error.hint ? `${error.code}: ${error.message}（${error.hint}）` : `${error.code}: ${error.message}`;
+	return error instanceof Error ? error.message : String(error);
+}
+
+/** "待批准关口" entry points (model_branches, §5.11): local branches with model changes not yet on main, each row a link. */
+function GateBranches({ client, gateLinks }: { client: AisepModelClient; gateLinks: boolean }) {
+	const t = useAisepT();
+	const headingId = useId();
+	const branches = useQuery({
+		queryKey: ["aisep", "branches"],
+		queryFn: async ({ signal }) => {
+			const { branches: all, main } = await client.branches({}, { signal });
+			return { main, rows: all.filter((b) => b.hasModelChanges && !b.mergedIntoMain) };
+		},
+		refetchInterval: GATE_BRANCHES_REFRESH_MS,
+		retry: shouldRetryAisep,
+	});
+	const data = branches.data;
+	const errorTitle = branches.isError ? errorText(branches.error) : undefined;
+	return (
+		<div className="flex flex-col gap-1">
+			<h3 id={headingId} className="text-xs font-medium text-muted-foreground">{t("section.gates.branches.title")}</h3>
+			{branches.isLoading ? (
+				<p role="status" className="text-xs text-muted-foreground">{t("section.loading")}</p>
+			) : null}
+			{/* A failed poll keeps the last list on screen and says the refresh failed (as the gate page's progress does). */}
+			{data ? (
+				data.rows.length ? (
+					<ul aria-labelledby={headingId} className="divide-y divide-border">
+						{data.rows.map((info) => (
+							<li key={info.branch}>
+								<GateBranchRow client={client} info={info} main={data.main} gateLinks={gateLinks} />
+							</li>
+						))}
+					</ul>
+				) : (
+					<p className="text-xs text-muted-foreground">{t("section.gates.branches.empty")}</p>
+				)
+			) : null}
+			{branches.isError ? (
+				<p role="alert" title={errorTitle} className="text-xs text-destructive">
+					{t(data ? "section.gates.branches.refreshFailed" : "section.gates.branches.error")}
+				</p>
+			) : null}
+			<p className="text-caption text-muted-foreground">{t("section.gates.branches.note")}</p>
+		</div>
+	);
+}
+
+function GateBranchRow({
+	client,
+	info,
+	main,
+	gateLinks,
+}: {
+	client: AisepModelClient;
+	info: BranchInfo;
+	main: { ref: string; commit: string };
+	gateLinks: boolean;
+}) {
+	const t = useAisepT();
+	// Every input of the stage is in the key (the refs' commits), so it is recomputed exactly when one moves; the gate
+	// page's invalidation of approvalProgressKey(branch) after an approval reaches this entry too.
+	const progress = useQuery({
+		queryKey: [...approvalProgressKey(info.branch), main.ref, info.head, info.remoteHead, main.commit],
+		queryFn: ({ signal }) => approvalProgress(client, info.branch, main.ref, { signal }),
+		enabled: gateLinks,
+		staleTime: Number.POSITIVE_INFINITY,
+		// Nothing moves the key after a failure, so a failed computation tries again on the list's poll interval.
+		refetchInterval: (query) => (query.state.status === "error" ? GATE_BRANCHES_REFRESH_MS : false),
+		retry: shouldRetryAisep,
+	});
+	const content = (
+		<>
+			<span className="min-w-0 truncate font-mono text-foreground">{info.branch}</span>
+			<span className="font-mono text-muted-foreground">{info.head.slice(0, 7)}</span>
+			{info.unpushed ? <Badge variant="warning">{t("section.gates.branches.unpushed")}</Badge> : null}
+			<span className="ml-auto shrink-0 text-muted-foreground">
+				{!gateLinks ? null : progress.data ? (
+					t(STAGE_TEXT[progress.data.stage])
+				) : progress.isError ? (
+					<span title={errorText(progress.error)}>
+						{t("section.gates.branches.progressUnknown")}
+					</span>
+				) : (
+					"…"
+				)}
+			</span>
+		</>
+	);
+	const rowClass = "flex items-center gap-3 py-2 text-xs";
+	return gateLinks ? (
+		<a
+			href={gateHref(info.branch)}
+			title={t("section.aiActivity.openGate", { branch: info.branch })}
+			className={`${rowClass} rounded-sm px-1 hover:bg-interactive-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60`}
+		>
+			{content}
+		</a>
+	) : (
+		<div title={t("section.aiActivity.gateNeedsServer")} className={`${rowClass} px-1`}>
+			{content}
+		</div>
 	);
 }
 

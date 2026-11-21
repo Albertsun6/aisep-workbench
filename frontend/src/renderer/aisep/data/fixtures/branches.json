@@ -1,0 +1,48 @@
+{
+	"branches": [
+		{
+			"branch": "feat/broken",
+			"head": "8d60b2508efad6663d129d4e7fd408ce8fab4078",
+			"remoteHead": null,
+			"unpushed": true,
+			"mergedIntoMain": true,
+			"hasModelChanges": false
+		},
+		{
+			"branch": "feat/clean",
+			"head": "f76f6b95da4f6724e900d6085a7186cabcadabc4",
+			"remoteHead": null,
+			"unpushed": true,
+			"mergedIntoMain": false,
+			"hasModelChanges": true
+		},
+		{
+			"branch": "feat/edit",
+			"head": "a78a094e2f99c67e764b84666d1d456475672969",
+			"remoteHead": null,
+			"unpushed": true,
+			"mergedIntoMain": false,
+			"hasModelChanges": true
+		},
+		{
+			"branch": "feat/gone",
+			"head": "f76f6b95da4f6724e900d6085a7186cabcadabc4",
+			"remoteHead": null,
+			"unpushed": true,
+			"mergedIntoMain": false,
+			"hasModelChanges": true
+		},
+		{
+			"branch": "main",
+			"head": "8d60b2508efad6663d129d4e7fd408ce8fab4078",
+			"remoteHead": null,
+			"unpushed": true,
+			"mergedIntoMain": true,
+			"hasModelChanges": false
+		}
+	],
+	"main": {
+		"ref": "refs/heads/main",
+		"commit": "8d60b2508efad6663d129d4e7fd408ce8fab4078"
+	}
+}
