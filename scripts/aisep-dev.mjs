@@ -11,10 +11,10 @@
 // 服务的代码与 --repo 用一个专用的游离检出（默认 ~/Desktop/AISEP/aisep-serve，跟随 origin/main），
 // 从不读写 aisep 主检出的工作区。预检只调用只读工具，脚本里没有任何调用批准工具的代码路径。
 import { execFile, execFileSync, spawn } from "node:child_process";
-import { existsSync, realpathSync } from "node:fs";
+import { existsSync, readdirSync, realpathSync } from "node:fs";
 import { connect } from "node:net";
 import { homedir } from "node:os";
-import { dirname, join, resolve, sep } from "node:path";
+import { basename, dirname, join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 
@@ -140,14 +140,26 @@ function allowRoots(approve) {
 	return approve ? [AISEP_REPO, SERVE_DIR] : [SERVE_DIR];
 }
 
+/** aisep/server.py 的全部命令行选项。 */
+const SERVER_FLAGS = new Set(["--transport", "--profile", "--allow-root", "--repo", "--main-branch", "--host", "--port", "--allow-origin"]);
+
 /**
- * ps 打出的整条命令行 → 服务的 --allow-root 与 --profile；不是 aisep.server 时 undefined。
- * ps 把参数用空格拼成一行，分不出参数边界：一个选项的值取到下一个「 --」之前，所以路径里可以有空格（不能含「 --」）。
+ * ps 打出的整条命令行 → 服务的 --allow-root 与 --profile；不是 aisep.server、或者分不清参数边界时 undefined（读不到）。
+ * ps 把参数用空格拼成一行：路径里的空格照收，但路径里出现「 -」开头的片段时，它和下一个选项分不开——
+ * 截短的路径会是更宽的 allow-root，预检可能误判通过，所以这种情况不猜，判为读不到。
  */
 export function parseServerCommand(line) {
-	if (!/(^|\s)-m aisep\.server(\s|$)/.test(line) && !/(^|\s)aisep\.server(\s|$)/.test(line)) return undefined;
-	const values = (flag) => [...line.matchAll(new RegExp(`(?:^|\\s)${flag}[ =](.+?)(?=\\s--|$)`, "g"))].map((m) => m[1].trim());
-	return { roots: values("--allow-root"), profile: values("--profile")[0] ?? "agent" };
+	const m = line.match(/(?:^|\s)aisep\.server(?=\s|$)/);
+	if (!m) return undefined;
+	const roots = [];
+	let profile = "agent";
+	for (const part of line.slice(m.index + m[0].length).trim().split(/\s+(?=-)/).filter(Boolean)) {
+		const [, flag, value] = part.match(/^(\S+?)(?:[ =](.*))?$/) ?? [];
+		if (!SERVER_FLAGS.has(flag) || !value?.trim()) return undefined;
+		if (flag === "--allow-root") roots.push(value.trim());
+		if (flag === "--profile") profile = value.trim();
+	}
+	return { roots, profile };
 }
 
 /** 正在 port 上监听的那个服务实际的 --allow-root 与 --profile（读进程命令行，只读）。 */
@@ -442,11 +454,13 @@ async function start(opts) {
 	}
 
 	const head = refreshServeCheckout();
-	// 预览模式的 allow-root 是专用检出：建在它里面的分支 worktree 也在 allow-root 内，批准工具就不再被拒。
-	// 只在启动时查一次；服务运行期间再建的查不到（见 scripts/aisep-dev.md「已知风险」）。
+	// 预览模式的 allow-root 是专用检出：建在它里面的任何 git 检出（aisep 登记的 worktree，或独立的 clone）也在
+	// allow-root 内，上面的分支就能被批准。只在启动时查一次；服务运行期间再建的查不到（见 scripts/aisep-dev.md「已知风险」）。
 	if (!approve) {
-		const inside = worktrees(AISEP_REPO).filter((w) => w.branch && under(w.worktree, SERVE_DIR));
-		if (inside.length) fail(`专用检出 ${SERVE_DIR} 里面有分支 worktree，预览模式下它们能被批准：${inside.map((w) => w.worktree).join("、")}`);
+		const inside = readdirSync(SERVE_DIR, { recursive: true })
+			.filter((p) => basename(p) === ".git" && p !== ".git" && !p.includes(`${sep}.git${sep}`))
+			.map((p) => dirname(join(SERVE_DIR, p)));
+		if (inside.length) fail(`专用检出 ${SERVE_DIR} 里面有别的 git 检出（worktree 或 clone），预览模式下上面的分支能被批准：${inside.join("、")}`);
 	}
 	// 服务从专用检出导入 aisep（工作目录在 sys.path 首位），确认没有导入到别处的代码。
 	const imported = execFileSync(PYTHON, ["-c", "import aisep, os; print(os.path.realpath(aisep.__file__))"], {

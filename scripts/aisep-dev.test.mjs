@@ -178,6 +178,13 @@ test('服务命令行：路径里有空格也取全；不是 aisep.server 时不
 	assert.deepEqual(parseServerCommand('python -m aisep.server --allow-root /x'), { roots: ['/x'], profile: 'agent' });
 	assert.equal(parseServerCommand('python -m http.server --allow-root /x'), undefined);
 	assert.equal(parseServerCommand('python -m aisep.serverless --allow-root /x'), undefined);
+	assert.deepEqual(parseServerCommand('python -m aisep.server --allow-root=/x --profile=workbench'), { roots: ['/x'], profile: 'workbench' });
+});
+
+test('服务命令行：路径里有「 -」开头的片段时分不清边界，判为读不到，不截成更宽的 allow-root', () => {
+	assert.equal(parseServerCommand('python -m aisep.server --profile workbench --allow-root /Users/a --b c/aisep'), undefined);
+	assert.equal(parseServerCommand('python -m aisep.server --profile workbench --allow-root /Users/a -x y/aisep'), undefined);
+	assert.equal(parseServerCommand('python -m aisep.server --profile workbench --allow-root'), undefined);
 });
 
 test('有效内容提交：跳过顶端的批准提交，停在第一个普通提交', (t) => {

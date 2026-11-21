@@ -27,7 +27,7 @@ node scripts/aisep-dev.mjs refresh
 | 谁启动 | 任何会话都可以 | **只由 Albert 本人启动**，其他会话不得启动 |
 | allow-root | 只有专用检出 `~/Desktop/AISEP/aisep-serve` | 再加整个 `~/Desktop/AISEP/aisep` |
 | 能看的 | 首页、关口页（模型差异、gate、批准人下拉） | 同左 |
-| 能批准吗 | 不能。起作用的是 allow-root 只含专用检出：各分支的 worktree 都不在里面，批准工具报 `PATH_OUTSIDE_ROOT`（专用检出是游离 HEAD 只是附带的，它自己没有分支可批）。启动时如果发现专用检出里面建了分支 worktree，直接拒绝启动 | 能，批准写进分支所在的 worktree |
+| 能批准吗 | 不能，前提是专用检出里面没有别的 git 检出。起作用的是 allow-root 只含专用检出：各会话的分支 worktree 都在它外面，批准工具报 `PATH_OUTSIDE_ROOT`（专用检出是游离 HEAD 只是附带的，它自己没有分支可批）。启动时如果发现专用检出里面有别的 git 检出（worktree 或独立 clone），直接拒绝启动 | 能，批准写进分支所在的 worktree |
 | 用多久 | 随意 | 只开批准那一步，批准完立即停止 |
 
 两种模式都用 `workbench` 画像。没有用 `agent` 画像做预览，是因为它带写工具（`model_add_element`、`model_remove` 等），会对本机不带 Origin 的进程开放写入。`workbench` 画像只有只读工具和批准工具，预览模式下批准工具又被 allow-root 挡住。
@@ -126,7 +126,7 @@ node scripts/aisep-dev.mjs refresh
 | 项 | 怎么查 |
 |---|---|
 | 分支不是 `main` | 主分支上不能批准 |
-| 分支已在服务 allow-root 下的 worktree 检出 | `git worktree list --porcelain` 取第一条匹配，与服务的查找规则相同。allow-root 从端口上那个服务进程的启动参数里读（`lsof` 只取 IPv4 上的监听者，`ps` 读整条命令行，选项的值取到下一个 ` --` 为止，路径里有空格也行），不用脚本自己的推算；端口上有多个 IPv4 监听进程时判为读不到 |
+| 分支已在服务 allow-root 下的 worktree 检出 | `git worktree list --porcelain` 取第一条匹配，与服务的查找规则相同。allow-root 从端口上那个服务进程的启动参数里读（`lsof` 只取 IPv4 上的监听者，`ps` 读整条命令行，路径里有空格也行；路径里出现以 `-` 开头的片段时分不清参数边界，判为读不到，不截成更宽的 allow-root），不用脚本自己的推算；端口上有多个 IPv4 监听进程时也判为读不到 |
 | 该 worktree 的 `models/` 干净 | `git status` 只看 `models/` 下的 `.ttl`（含未跟踪），与服务端判脏的范围相同。带 assume-unchanged 或 skip-worktree 标记的文件这里看不到 |
 | 本地头等于远端头 | 本地 `refs/heads/<分支>` 对比 `git ls-remote origin`。不 fetch，不改本地引用 |
 | `tools/list` 含 `governance_record_approval` | 确认服务是 `workbench` 画像 |
@@ -151,7 +151,7 @@ node scripts/aisep-dev.mjs refresh
 ## 已知风险
 
 - **批准模式下，批准工具对本机不带 Origin 的进程开放。** `workbench` 画像包含 `governance_record_approval`。服务只校验浏览器请求的 Origin，不带 Origin 的请求（curl、本机任意脚本或 agent）直接放行（aisep `server.py` 的 `OriginGate`）。批准模式的 allow-root 覆盖整个 `~/Desktop/AISEP/aisep`，所以批准模式运行期间，本机任何进程都能以任意 Stakeholder 的名义，给任一会话的分支写批准记录。缓解：默认是预览模式；批准模式只由 Albert 本人启动，批准完立即停止；其他会话不得启动批准模式，也不得调用批准工具。
-- 预览模式的 allow-root 是专用检出本身。服务运行期间有人在 `aisep-serve` 里面再建一个分支 worktree，那个分支在预览模式下也能被批准；启动时的检查只覆盖启动那一刻。不要在专用检出里面建 worktree。
+- 预览模式的 allow-root 是专用检出本身。服务运行期间有人在 `aisep-serve` 里面再建一个分支 worktree 或放一个独立 clone（服务端只要求仓库在 allow-root 下），上面的分支在预览模式下也能被批准；启动时的检查只覆盖启动那一刻。不要在专用检出里面放任何 git 检出。
 - `--approve` 只是一个开关，没有二次确认。脚本拦不住会话自己加 `--approve`（交互确认也能被管道喂过去），靠的是规则：只由 Albert 本人启动。
 - 预览模式下批准工具同样列在 `tools/list` 里，关口页的批准表单也照常显示，点了会被服务拒绝：分支 worktree 不在 allow-root 内，`gitio.locate_worktree` 报 `PATH_OUTSIDE_ROOT`（读代码得出，没有实际点过批准）。
 - 界面语言是英文。
