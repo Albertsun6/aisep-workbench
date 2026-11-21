@@ -20,6 +20,13 @@ export default defineConfig({
 	reporter: process.env.CI ? [["list"], ["github"]] : "list",
 	use: {
 		baseURL: `http://127.0.0.1:${port}`,
+		// AISEP: the web build defaults to zh-CN and remembers the choice in
+		// localStorage (src/renderer/aisep/i18n/web-locale.ts). Specs that do not
+		// inject window.ao assert upstream English copy, so pin English here.
+		storageState: {
+			cookies: [],
+			origins: [{ origin: `http://127.0.0.1:${port}`, localStorage: [{ name: "aisep.locale", value: "en" }] }],
+		},
 	},
 	webServer: {
 		// dev:web serves the renderer alone (VITE_NO_ELECTRON=1) — no Electron child to
