@@ -15,13 +15,27 @@
 
 ```bash
 node scripts/aisep-dev.mjs start --branch <分支> --workbench <工作台检出>
+node scripts/aisep-dev.mjs start --approve --branch <分支> --workbench <工作台检出>
 node scripts/aisep-dev.mjs preflight <分支>
 node scripts/aisep-dev.mjs refresh
 ```
 
+### 两种模式
+
+| | 预览模式（默认） | 批准模式（`--approve`） |
+|---|---|---|
+| 谁启动 | 任何会话都可以 | **只由 Albert 本人启动**，其他会话不得启动 |
+| allow-root | 只有专用检出 `~/Desktop/AISEP/aisep-serve` | 再加整个 `~/Desktop/AISEP/aisep` |
+| 能看的 | 首页、关口页（模型差异、gate、批准人下拉） | 同左 |
+| 能批准吗 | 不能。专用检出是游离 HEAD，没有可批准的分支 worktree，批准工具一定被拒 | 能，批准写进分支所在的 worktree |
+| 用多久 | 随意 | 只开批准那一步，批准完立即停止 |
+
+两种模式都用 `workbench` 画像。没有用 `agent` 画像做预览，是因为它带写工具（`model_add_element`、`model_remove` 等），会对本机不带 Origin 的进程开放写入。`workbench` 画像只有只读工具和批准工具，预览模式下批准工具又被 allow-root 挡住。
+
 | 参数 | 默认 | 说明 |
 |---|---|---|
-| `--branch` | 无 | 只用来打印关口页地址 |
+| `--approve` | 关 | 批准模式，见上节 |
+| `--branch` | 无 | 只用来打印关口页地址（批准模式下也打印预检命令） |
 | `--workbench` | 脚本所在的检出 | 网页版从哪个工作台检出启动。批准那一步要指向含 L2 进度展示改动的检出 |
 | `--mcp-port` | `18790` | MCP 服务端口。`preflight` 也用它找服务 |
 | `--web-port` | `15190` | Vite 端口，带 `--strictPort`：端口被占就直接失败，不会自动换端口 |
@@ -29,7 +43,14 @@ node scripts/aisep-dev.mjs refresh
 
 默认端口避开了 3001（AO 守护进程）、5173（`electron-forge` 等开发服务）和 18765、15173（规划会话在用）。
 
-环境变量 `AISEP_REPO`、`AISEP_SERVE_DIR`、`AISEP_PYTHON` 可以改仓库、专用检出和解释器的位置。
+环境变量（都有默认值）：
+
+| 变量 | 默认 | 说明 |
+|---|---|---|
+| `AISEP_ROOT` | `~/Desktop/AISEP` | 下面三项的默认值都从它推出 |
+| `AISEP_REPO` | `$AISEP_ROOT/aisep` | aisep 仓库，也是批准模式多加的那个 allow-root |
+| `AISEP_SERVE_DIR` | `$AISEP_ROOT/aisep-serve` | 专用检出 |
+| `AISEP_PYTHON` | `$AISEP_REPO/.venv/bin/python` | 解释器 |
 
 ### start
 
@@ -41,7 +62,8 @@ node scripts/aisep-dev.mjs refresh
    ```text
    python -m aisep.server --transport http --profile workbench --port <mcp-port>
      --repo ~/Desktop/AISEP/aisep-serve
-     --allow-root ~/Desktop/AISEP/aisep --allow-root ~/Desktop/AISEP/aisep-serve
+     --allow-root ~/Desktop/AISEP/aisep-serve
+     [--allow-root ~/Desktop/AISEP/aisep]   # 只在 --approve 时
      --allow-origin http://localhost:<web-port> --allow-origin http://127.0.0.1:<web-port>
    ```
 
@@ -63,22 +85,22 @@ node scripts/aisep-dev.mjs refresh
 - 检出里有任何未提交改动、检出了分支、或者目录不是 aisep 仓库的 worktree，都拒绝移动。
 - 不读写主检出 `~/Desktop/AISEP/aisep` 的工作区。`git fetch` 只更新共享的远端跟踪引用。
 
-`--repo` 也必须在 allow-root 之内（aisep `gitio.locate_repo`），所以 allow-root 有两项：`~/Desktop/AISEP/aisep` 覆盖各会话放在 `aisep/.claude/worktrees` 和 `aisep/aisep/.claude/worktrees` 下的分支 worktree；`~/Desktop/AISEP/aisep-serve` 覆盖专用检出本身。
+`--repo` 也必须在 allow-root 之内（aisep `gitio.locate_repo`），所以专用检出本身总是 allow-root。批准模式另加的 `~/Desktop/AISEP/aisep` 覆盖各会话放在 `aisep/.claude/worktrees` 和 `aisep/aisep/.claude/worktrees` 下的分支 worktree。
 
 ### refresh
 
 只移动专用检出的工作区。首页不传 ref，读的是 `--repo` 的工作区，所以合并后要跑一次 `refresh`，首页才会把新模型显示为已批准。服务按文件内容缓存解析结果，不会读到旧数据（aisep `core.py`），所以只换模型数据时不用重启服务。
 
-运行中的服务用的仍是启动时导入的 Python 代码。新的 main 改了 `aisep/*.py` 时，`refresh` 不会让服务换代码，要停掉后重新 `start`。
+运行中的服务用的仍是启动时导入的 Python 代码。`refresh` 后不用重启，只在新的 main 没改 `aisep/**` 时成立，例如冻结窗口内。main 改了 `aisep/**`，就要停掉服务后重新 `start`。
 
 ### preflight
 
-逐项输出「通过 / 不通过」，全部通过时退出码为 0。需要服务已经在 `--mcp-port` 上运行。
+逐项输出「通过 / 不通过」，全部通过时退出码为 0。需要服务已经在 `--mcp-port` 上运行，而且是批准模式：预览模式下第一项必然不通过。
 
 | 项 | 怎么查 |
 |---|---|
 | 分支不是 `main` | 主分支上不能批准 |
-| 分支已在 allow-root 下的 worktree 检出 | `git worktree list --porcelain`，取第一条匹配，与服务的查找规则相同 |
+| 分支已在服务 allow-root 下的 worktree 检出 | `git worktree list --porcelain` 取第一条匹配，与服务的查找规则相同。allow-root 从端口上那个服务进程的启动参数里读（`lsof` + `ps`），不用脚本自己的推算 |
 | 该 worktree 的 `models/` 干净 | `git status` 只看 `models/` 下的 `.ttl`（含未跟踪），与服务端判脏的范围相同。带 assume-unchanged 或 skip-worktree 标记的文件这里看不到 |
 | 本地头等于远端头 | 本地 `refs/heads/<分支>` 对比 `git ls-remote origin`。不 fetch，不改本地引用 |
 | `tools/list` 含 `governance_record_approval` | 确认服务是 `workbench` 画像 |
@@ -102,8 +124,8 @@ node scripts/aisep-dev.mjs refresh
 
 ## 已知风险
 
-- **批准工具对本机不带 Origin 的进程开放。** `workbench` 画像包含 `governance_record_approval`。服务只校验浏览器请求的 Origin，不带 Origin 的请求（curl、本机任意脚本或 agent）直接放行（aisep `server.py` 的 `OriginGate`）。所以服务运行期间，本机任何进程都能以任意 Stakeholder 的名义写批准记录。服务只为批准那一步起，用完就停；在服务运行期间，别的会话不得调用批准工具。
-- allow-root 覆盖整个 `~/Desktop/AISEP/aisep`，其中所有会话的 worktree 都可以被批准。
+- **批准模式下，批准工具对本机不带 Origin 的进程开放。** `workbench` 画像包含 `governance_record_approval`。服务只校验浏览器请求的 Origin，不带 Origin 的请求（curl、本机任意脚本或 agent）直接放行（aisep `server.py` 的 `OriginGate`）。批准模式的 allow-root 覆盖整个 `~/Desktop/AISEP/aisep`，所以批准模式运行期间，本机任何进程都能以任意 Stakeholder 的名义，给任一会话的分支写批准记录。缓解：默认是预览模式；批准模式只由 Albert 本人启动，批准完立即停止；其他会话不得启动批准模式，也不得调用批准工具。
+- 预览模式下批准工具同样列在 `tools/list` 里，关口页的批准表单也照常显示，点了会被服务拒绝：分支 worktree 不在 allow-root 内，`gitio.locate_worktree` 报 `PATH_OUTSIDE_ROOT`（读代码得出，没有实际点过批准）。
 - 界面语言是英文。
 - 只验证了网页版。Electron 版没有验证；`--ignore-scripts` 跳过了原生模块构建，对网页版没有影响。
 - Claude 桌面应用的内置浏览器面板隐藏时，页面停在启动画面不往下走；在普通浏览器或无头 Chrome 里正常。原因未查。

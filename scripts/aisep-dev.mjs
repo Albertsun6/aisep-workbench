@@ -1,8 +1,10 @@
 #!/usr/bin/env node
 // AISEP 一键启动：aisep 的 MCP HTTP 服务（workbench 画像）+ 工作台网页版（dev:web），外加批准前只读预检。
 // 用法见 scripts/aisep-dev.md。只用 Node 内置模块，不碰上游依赖。
+// 默认是预览模式：allow-root 只含专用检出（游离 HEAD），批准工具在这里一定被拒。
+// --approve 才把 allow-root 扩到整个 aisep 目录，只由 Albert 本人在批准那一步启动。
 //
-//   node scripts/aisep-dev.mjs start [--branch <分支>] [--workbench <工作台检出>] [--mcp-port N] [--web-port N]
+//   node scripts/aisep-dev.mjs start [--approve] [--branch <分支>] [--workbench <工作台检出>] [--mcp-port N] [--web-port N]
 //   node scripts/aisep-dev.mjs refresh
 //   node scripts/aisep-dev.mjs preflight <分支> [--mcp-port N]
 //
@@ -47,6 +49,8 @@ function fail(message) {
 	process.exit(1);
 }
 
+const FLAGS = new Set(["approve"]);
+
 function parseArgs(argv) {
 	const positional = [];
 	const opts = {};
@@ -54,6 +58,10 @@ function parseArgs(argv) {
 		const a = argv[i];
 		if (a.startsWith("--")) {
 			const key = a.slice(2);
+			if (FLAGS.has(key)) {
+				opts[key] = true;
+				continue;
+			}
 			const value = argv[i + 1];
 			if (value === undefined || value.startsWith("--")) fail(`${a} 缺少取值`);
 			opts[key] = value;
@@ -118,9 +126,28 @@ function under(path, root) {
 	return p === r || p.startsWith(r + sep);
 }
 
-function allowRoots() {
-	// 服务的 --repo 本身也必须在 allow-root 之下（aisep gitio.locate_repo），所以专用检出单独列一项。
-	return [AISEP_REPO, SERVE_DIR];
+function allowRoots(approve) {
+	// 服务的 --repo 本身也必须在 allow-root 之下（aisep gitio.locate_repo），所以专用检出总在其中。
+	// 预览模式只有它：专用检出是游离 HEAD，批准工具找不到可批准的分支 worktree。
+	// 批准模式再加整个 aisep 目录，覆盖各会话放在 aisep/.claude/worktrees 与 aisep/aisep/.claude/worktrees 下的分支。
+	return approve ? [AISEP_REPO, SERVE_DIR] : [SERVE_DIR];
+}
+
+/** 正在 port 上监听的那个服务实际的 --allow-root 与 --profile（读进程命令行，只读）。 */
+function serverArgs(p) {
+	try {
+		const pid = execFileSync("lsof", ["-nP", "-t", `-iTCP:${p}`, "-sTCP:LISTEN"], { encoding: "utf8" }).trim().split("\n")[0];
+		const cmd = execFileSync("ps", ["-ww", "-o", "command=", "-p", pid], { encoding: "utf8" }).trim().split(/\s+/);
+		const roots = [];
+		let profile = "agent";
+		cmd.forEach((a, i) => {
+			if (a === "--allow-root") roots.push(cmd[i + 1]);
+			if (a === "--profile") profile = cmd[i + 1];
+		});
+		return cmd.includes("aisep.server") ? { pid, roots, profile } : undefined;
+	} catch {
+		return undefined;
+	}
 }
 
 // ---------------------------------------------------------------- 专用检出
@@ -128,7 +155,11 @@ function allowRoots() {
 function refreshServeCheckout() {
 	if (!existsSync(join(AISEP_REPO, ".git"))) fail(`找不到 aisep 仓库：${AISEP_REPO}`);
 	console.log(`[refresh] git fetch origin（${AISEP_REPO}，只更新远端跟踪引用，不动主检出工作区）`);
-	git(AISEP_REPO, "fetch", "origin");
+	try {
+		git(AISEP_REPO, "fetch", "origin");
+	} catch (e) {
+		fail(`git fetch origin 失败（网络或凭据？），专用检出没有移动：\n${String(e.stderr ?? e.message).trim()}`);
+	}
 	const target = git(AISEP_REPO, "rev-parse", "refs/remotes/origin/main^{commit}");
 	const registered = worktrees(AISEP_REPO).find((w) => real(w.worktree) === real(SERVE_DIR));
 	if (!existsSync(SERVE_DIR)) {
@@ -295,6 +326,8 @@ async function start(opts) {
 	const webPort = port(opts["web-port"], DEFAULT_WEB_PORT, "--web-port");
 	const workbench = resolve(opts.workbench ?? WORKBENCH_DEFAULT);
 	const aoApi = opts["ao-api"] ?? DEFAULT_AO_API_TARGET;
+	const approve = opts.approve === true;
+	const roots = allowRoots(approve);
 	const frontend = join(workbench, "frontend");
 	if (!existsSync(join(frontend, "scripts/dev-web.mjs"))) fail(`${workbench} 不是工作台检出（缺 frontend/scripts/dev-web.mjs）`);
 	if (!existsSync(join(frontend, "node_modules/vite/bin/vite.js"))) {
@@ -330,7 +363,7 @@ async function start(opts) {
 		String(mcpPort),
 		"--repo",
 		SERVE_DIR,
-		...allowRoots().flatMap((r) => ["--allow-root", r]),
+		...roots.flatMap((r) => ["--allow-root", r]),
 		...origins.flatMap((o) => ["--allow-origin", o]),
 	];
 	const mcpChild = launch("mcp", PYTHON, mcpArgs, { cwd: SERVE_DIR, env: process.env });
@@ -368,12 +401,13 @@ async function start(opts) {
 	console.log("================ AISEP 工作台已就绪 ================");
 	console.log(`服务检出   ${SERVE_DIR} @ ${head.slice(0, 7)}（origin/main）`);
 	console.log(`工作台检出 ${workbench} @ ${tryGit(workbench, "rev-parse", "--short", "HEAD") ?? "?"}（${tryGit(workbench, "branch", "--show-current") || "游离"}）`);
-	console.log(`MCP        http://127.0.0.1:${mcpPort}/mcp  画像 workbench  allow-root ${allowRoots().join(" , ")}`);
+	console.log(`模式       ${approve ? "批准模式（--approve）：allow-root 覆盖所有会话的 worktree，只由 Albert 本人启动，批准完立即停止" : "预览模式：批准工具在这里一定被拒（批准要用 --approve 重新启动）"}`);
+	console.log(`MCP        http://127.0.0.1:${mcpPort}/mcp  画像 workbench  allow-root ${roots.join(" , ")}`);
 	console.log(`AO 代理    ${aoApi}（「AI 进行中」一栏需要 AO 守护进程，默认不接）`);
 	console.log(`首页       ${base}/#/aisep`);
 	if (opts.branch) console.log(`关口页     ${base}/#/aisep/gate/${opts.branch}`);
 	else console.log(`关口页     ${base}/#/aisep/gate/<分支名>（start 加 --branch 直接打印）`);
-	if (opts.branch) console.log(`预检       node ${join(WORKBENCH_DEFAULT, "scripts/aisep-dev.mjs")} preflight ${opts.branch} --mcp-port ${mcpPort}`);
+	if (opts.branch && approve) console.log(`预检       node ${join(WORKBENCH_DEFAULT, "scripts/aisep-dev.mjs")} preflight ${opts.branch} --mcp-port ${mcpPort}`);
 	console.log("Ctrl-C（或对本进程 PID 发 SIGTERM）停止两项服务");
 	console.log("====================================================");
 }
@@ -392,8 +426,15 @@ async function preflight(branch, opts) {
 	// 1. 已在 allow-root 下的 worktree 检出（服务按 git 登记的第一条匹配，aisep gitio.locate_worktree）
 	const hit = worktrees(AISEP_REPO).find((w) => w.branch === `refs/heads/${branch}`);
 	const wt = hit && !hit.prunable && existsSync(hit.worktree) ? hit.worktree : undefined;
-	const inRoot = wt && allowRoots().some((r) => under(wt, r));
-	report(Boolean(wt && inRoot), "分支已在 allow-root 下的 worktree 检出", wt ? `${wt}${inRoot ? "" : "（不在 allow-root 内）"}` : "没有检出该分支的 worktree");
+	// allow-root 取端口上那个服务进程实际的启动参数，不是本脚本自己算的
+	const srv = serverArgs(mcpPort);
+	if (srv) info("端口上的服务", `PID ${srv.pid}，画像 ${srv.profile}，allow-root ${srv.roots.join(" , ") || "（无）"}`);
+	const inRoot = wt && srv && srv.roots.some((r) => under(wt, r));
+	report(
+		Boolean(wt && inRoot),
+		"分支已在服务 allow-root 下的 worktree 检出",
+		!wt ? "没有检出该分支的 worktree" : !srv ? `${wt}（读不到 ${mcpPort} 端口上服务的 allow-root）` : `${wt}${inRoot ? "" : "（不在服务的 allow-root 内：服务是预览模式？批准要用 start --approve）"}`,
+	);
 
 	// 0. 不能是主分支（approval.py _check_branch）
 	report(branch !== "main", "分支不是 main", branch === "main" ? "main 上不能批准" : "");
