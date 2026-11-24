@@ -10,7 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { PageTopbar, PageTopbarTitle } from "../components/PageTopbar";
 import { APPROVAL_STAGE_TEXT, AisepApprovalProgress, aisepErrorMessage, approvalProgressKey } from "./AisepApprovalProgress";
 import { DEFAULT_MAIN_REF, approvalCoverage, approvalProgress, coveringRecords, isCovered } from "./data/approval-progress";
-import { modelClient } from "./AisepWorkbenchPage";
+import { modelClient, releaseCommitPrefix } from "./AisepWorkbenchPage";
 import {
 	AisepToolError,
 	QUERY_LIMIT_MAX,
@@ -80,6 +80,11 @@ export const GATE_TIMEOUT_MS = 600_000;
 /** A branch head is never on main, so GateRelease (mainline commits only, §5.9 step 1) is not offered here. */
 export const BRANCH_GATES = ["GateRequirements", "GateArchitecture", "GateDesign", "GateMerge"] as const satisfies readonly GateId[];
 
+/** The slug of a model IRI (aisep spec §3), or undefined. */
+function slugOfModel(iri: Iri): string | undefined {
+	return iri.match(/^https:\/\/aisep\.example\/model\/([^/]+)\/$/)?.[1];
+}
+
 /** "models/<slug>/…" -> slug. */
 function modelSlug(file: string | undefined): string | undefined {
 	return file?.match(/^models\/([^/]+)\//)?.[1];
@@ -135,11 +140,12 @@ const KIND_TEXT: Record<DiffKind, AisepMessageKey> = {
 	schema: "gate.kind.schema",
 	other: "gate.kind.other",
 };
-const GATE_TEXT: Record<(typeof BRANCH_GATES)[number], AisepMessageKey> = {
+const GATE_TEXT: Record<(typeof BRANCH_GATES)[number] | "GateRelease", AisepMessageKey> = {
 	GateRequirements: "gate.gates.GateRequirements",
 	GateArchitecture: "gate.gates.GateArchitecture",
 	GateDesign: "gate.gates.GateDesign",
 	GateMerge: "gate.gates.GateMerge",
+	GateRelease: "gate.gates.GateRelease",
 };
 
 function localName(iri: Iri): string {
@@ -312,8 +318,10 @@ function ApprovalSection({
 }) {
 	const t = useAisepT();
 	const queryClient = useQueryClient();
+	const release = releaseCommitPrefix(branch) !== undefined;
 	const notApprovable = useQuery({
 		queryKey: ["aisep", "gate", "not-approvable", commit],
+		enabled: !release,
 		// The set only grows (every approval record and AI activity is in it): ask for the largest page (§5.6).
 		queryFn: async ({ signal }) =>
 			new Set(iriColumn(await client.query(NOT_APPROVABLE_QUERY, { ref: commit, limit: QUERY_LIMIT_MAX }, { signal }), "element")),
@@ -323,7 +331,6 @@ function ApprovalSection({
 	});
 	// Without the exclusion set there is no safe prefill (a Stakeholder would slip in): the form waits for it.
 	const candidates = approvalCandidates(diff, notApprovable.data ?? new Set());
-	const models = [...candidates.keys()];
 	const gateCheck = useGateCheck(client, commit);
 	const approvers = useQuery({
 		queryKey: ["aisep", "gate", "approvers", commit],
@@ -332,9 +339,26 @@ function ApprovalSection({
 		staleTime: Number.POSITIVE_INFINITY,
 		refetchOnWindowFocus: false,
 	});
+	// A release approves a whole model (aisep models/workbench :reqApproveRelease): any model with a human approver.
+	const releasePrefix = releaseCommitPrefix(branch);
+	const models = release
+		? [...new Set((approvers.data ?? []).flatMap((a) => slugOfModel(a.model) ?? []))].sort()
+		: [...candidates.keys()];
+	// Only origin/main's tip may be released: a branch cut from an older R can be neither approved nor rejected, and
+	// neither can one while the tip is unknown.
+	const mainHead = useQuery({
+		queryKey: ["aisep", "branches", "main"],
+		queryFn: async ({ signal }) => (await client.branches({}, { signal })).main.commit,
+		enabled: release,
+		retry: shouldRetryAisep,
+	});
+	// The pinned head itself must be origin/main's tip (the branch name only says this is a release branch): a branch
+	// whose head is an approval commit already has a decision, and one cut elsewhere is not R.
+	const releaseBlocked = release && mainHead.data !== commit;
 	const [chosenModel, setModel] = useState<string>();
 	const model = chosenModel !== undefined && models.includes(chosenModel) ? chosenModel : models[0];
-	const [gate, setGate] = useState<GateId>("GateArchitecture");
+	const [chosenGate, setGate] = useState<GateId>("GateArchitecture");
+	const gate: GateId = release ? "GateRelease" : chosenGate;
 	const [chosenApprover, setApprover] = useState<Iri | undefined>();
 	const [unchecked, setUnchecked] = useState<ReadonlySet<Iri>>(new Set());
 	// The branch tip may already be an approval commit (an approval written earlier, from this page or elsewhere): then
@@ -368,17 +392,30 @@ function ApprovalSection({
 			: modelApprovers.some((a) => a.iri === chosenApprover)
 				? chosenApprover
 				: undefined;
-	const approves = items.map((item) => item.iri).filter((iri) => !unchecked.has(iri));
+	const approves = release
+		? model
+			? [modelIri(model)]
+			: []
+		: items.map((item) => item.iri).filter((iri) => !unchecked.has(iri));
 	const mutationKey = approvalMutationKey(branch, commit);
 	// Set in the click handler itself: a second click before React re-renders the disabled button must not write again.
 	const submitting = useRef(false);
 	const record = useMutation({
 		mutationKey,
-		mutationFn: (decision: Decision) =>
-			client.recordApproval(
+		mutationFn: async (decision: Decision) => {
+			if (release) {
+				// main may have moved while the page was open: read it again right before writing.
+				const tip = (await client.branches({})).main.commit;
+				if (tip !== commit) {
+					void queryClient.invalidateQueries({ queryKey: ["aisep", "branches", "main"] });
+					throw new Error(t("gate.approval.releaseStale", { commit: commit.slice(0, 7), main: tip.slice(0, 7) }));
+				}
+			}
+			return client.recordApproval(
 				approvalInput(branch, diff, { model: model as string, gate, decision, approvedBy: approver as Iri, approves }),
 				{ timeoutMs: GATE_TIMEOUT_MS },
-			),
+			);
+		},
 		// Main-branch rows stay Proposed until merge (§2); only the branch's own reads change: its changed-elements
 		// count and its "approved on the branch, not merged" marks in the pending gates.
 		// Only a failure frees the buttons again; a recorded decision is final for this head.
@@ -423,6 +460,22 @@ function ApprovalSection({
 			</GateSection>
 		);
 	}
+	if (release && approvers.isError) {
+		return (
+			<GateSection titleKey="gate.approval.title">
+				<p role="alert" className="text-xs text-destructive">
+					{t("gate.approval.releaseApproversFailed", { message: aisepErrorMessage(approvers.error) })}
+				</p>
+			</GateSection>
+		);
+	}
+	if (release && approvers.isLoading) {
+		return (
+			<GateSection titleKey="gate.approval.title">
+				<p role="status" className="text-xs text-muted-foreground">{t("section.loading")}</p>
+			</GateSection>
+		);
+	}
 	if (models.length === 0) {
 		return (
 			<GateSection titleKey="gate.approval.title">
@@ -449,7 +502,8 @@ function ApprovalSection({
 		!recorded &&
 		(progress.data !== undefined || progress.isError) &&
 		(coverage.data !== undefined || coverage.isError) &&
-		(!needsConfirm || confirmedRepeat);
+		(!needsConfirm || confirmedRepeat) &&
+		!releaseBlocked;
 	return (
 		<GateSection titleKey="gate.approval.title">
 			<div className="flex flex-wrap items-end gap-3 text-xs">
@@ -458,7 +512,7 @@ function ApprovalSection({
 						options={models.map((slug) => ({ value: slug, label: slug }))} />
 				) : null}
 				<LabeledSelect label={t("gate.approval.gate")} value={gate} onValueChange={(value) => setGate(value as GateId)}
-					options={BRANCH_GATES.map((id) => ({ value: id, label: t(GATE_TEXT[id]) }))} />
+					options={(release ? (["GateRelease"] as const) : BRANCH_GATES).map((id) => ({ value: id, label: t(GATE_TEXT[id]) }))} />
 				{modelApprovers.length ? (
 					<LabeledSelect label={t("gate.approval.approver")} value={approver ?? ""} onValueChange={setApprover}
 						placeholder={t("gate.approval.approverPlaceholder")}
@@ -467,6 +521,9 @@ function ApprovalSection({
 					<p className="text-destructive">{t("gate.approval.noApprovers")}</p>
 				) : null}
 			</div>
+			{release ? (
+				<p className="text-xs">{t("gate.approval.releaseApproves", { model: model ?? "" })}</p>
+			) : (
 			<fieldset className="flex flex-col gap-1 text-xs">
 				<legend className="mb-1 text-muted-foreground">{t("gate.approval.approves")}</legend>
 				{items.map((item) => (
@@ -486,6 +543,18 @@ function ApprovalSection({
 					</label>
 				))}
 			</fieldset>
+			)}
+			{release && mainHead.data !== undefined && releaseBlocked ? (
+				<p role="alert" className="text-xs text-destructive">
+					{commit.startsWith(releasePrefix ?? "")
+						? t("gate.approval.releaseStale", { commit: commit.slice(0, 7), main: mainHead.data.slice(0, 7) })
+						: t("gate.approval.releaseHeadNotR", { head: commit.slice(0, 7), main: mainHead.data.slice(0, 7) })}
+				</p>
+			) : release && mainHead.isError ? (
+				<p role="alert" className="text-xs text-destructive">{t("gate.approval.releaseMainUnknown")}</p>
+			) : release && mainHead.isLoading ? (
+				<p role="status" className="text-xs text-muted-foreground">{t("section.loading")}</p>
+			) : null}
 			{gateFailed ? <p className="text-xs text-destructive">{t("gate.approval.gateFailed")}</p> : null}
 			{covered && coverage.data ? (
 				<p role="note" className="text-xs text-warning">

@@ -856,3 +856,183 @@ async function chooseApprover(approval: HTMLElement, name: string) {
 	await userEvent.click(await within(approval).findByRole("combobox", { name: en["gate.approval.approver"] }));
 	await userEvent.click(await screen.findByRole("option", { name }));
 }
+
+// Release approval branches (aisep models/workbench :reqApproveRelease): cut by the session from origin/main's tip R.
+describe("AisepGatePage on a release approval branch", () => {
+	const RELEASE = `approval/release-${head.slice(0, 7)}-20261125120000`;
+	const OTHER = "0123456789abcdef0123456789abcdef01234567";
+
+	function renderRelease(overrides: Partial<AisepModelClient> = {}, mainCommit: string = head) {
+		const { client, calls } = gateClient({
+			branches: async () => ({ branches: [], main: { ref: "refs/remotes/origin/main", commit: mainCommit } }),
+			...overrides,
+		});
+		const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+		render(
+			<QueryClientProvider client={queryClient}>
+				<AisepGatePage branch={RELEASE} client={client} />
+			</QueryClientProvider>,
+		);
+		return calls;
+	}
+
+	it("offers the release gate only and approves the whole model on R (acReleaseOnlyReleaseGate, acReleaseApproveRecorded)", async () => {
+		const calls = renderRelease();
+		const approval = await screen.findByRole("region", { name: en["gate.approval.title"] });
+		expect(await within(approval).findByText(en["gate.approval.releaseApproves"].replace("{{model}}", "procurement"))).toBeInTheDocument();
+		expect(within(approval).queryByRole("checkbox")).toBeNull();
+		await userEvent.click(within(approval).getByRole("combobox", { name: en["gate.approval.gate"] }));
+		expect((await screen.findAllByRole("option")).map((o) => o.textContent)).toEqual([en["gate.gates.GateRelease"]]);
+		await userEvent.keyboard("{Escape}");
+		await chooseApprover(approval, "评审人");
+		const approve = within(approval).getByRole("button", { name: en["gate.approval.approve"] });
+		await waitFor(() => expect(approve).toBeEnabled());
+		await userEvent.click(approve);
+		await waitFor(() => expect(calls.approve).toHaveLength(1));
+		expect(calls.approve[0]).toEqual({
+			model: "procurement",
+			gate: "GateRelease",
+			decision: "Approved",
+			approvedBy: (gateApprovers as QueryResult & { rows: { approver: { value: string }; prefLabel: { value: string } }[] }).rows.find(
+				(row) => row.prefLabel.value === "评审人",
+			)?.approver.value,
+			approves: [M],
+			branch: RELEASE,
+			headCommit: head,
+			expectedBaseCommit: diff.base.commit,
+		});
+		expect(calls.approve[0]).not.toHaveProperty("activity");
+	});
+
+	it("can neither approve nor reject once origin/main moved past R (acReleaseStaleBlocks)", async () => {
+		renderRelease({}, OTHER);
+		const approval = await screen.findByRole("region", { name: en["gate.approval.title"] });
+		expect(
+			await within(approval).findByText(
+				en["gate.approval.releaseStale"].replace("{{commit}}", head.slice(0, 7)).replace("{{main}}", OTHER.slice(0, 7)),
+			),
+		).toBeInTheDocument();
+		await chooseApprover(approval, "评审人");
+		expect(within(approval).getByRole("button", { name: en["gate.approval.approve"] })).toBeDisabled();
+		expect(within(approval).getByRole("button", { name: en["gate.approval.reject"] })).toBeDisabled();
+	});
+
+	it("can neither approve nor reject while origin/main's tip cannot be read", async () => {
+		renderRelease({
+			branches: async () => {
+				throw new AisepToolError("REF_NOT_FOUND", "no main", false);
+			},
+		});
+		const approval = await screen.findByRole("region", { name: en["gate.approval.title"] });
+		expect(await within(approval).findByText(en["gate.approval.releaseMainUnknown"])).toBeInTheDocument();
+		await chooseApprover(approval, "评审人");
+		expect(within(approval).getByRole("button", { name: en["gate.approval.approve"] })).toBeDisabled();
+		expect(within(approval).getByRole("button", { name: en["gate.approval.reject"] })).toBeDisabled();
+	});
+
+	it("can neither approve nor reject when the pinned head is not origin/main's tip, whatever the branch name says", async () => {
+		// The name carries main's prefix but the head is another commit: a decided branch (its head is the approval
+		// commit) or one cut elsewhere. The name only marks a release branch; the head itself is compared.
+		const { client, calls } = gateClient({
+			branches: async () => ({ branches: [], main: { ref: "refs/remotes/origin/main", commit: OTHER } }),
+		});
+		const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+		render(
+			<QueryClientProvider client={queryClient}>
+				<AisepGatePage branch={`approval/release-${OTHER.slice(0, 7)}-20261125120000`} client={client} />
+			</QueryClientProvider>,
+		);
+		const approval = await screen.findByRole("region", { name: en["gate.approval.title"] });
+		expect(
+			await within(approval).findByText(
+				en["gate.approval.releaseHeadNotR"].replace("{{head}}", head.slice(0, 7)).replace("{{main}}", OTHER.slice(0, 7)),
+			),
+		).toBeInTheDocument();
+		await chooseApprover(approval, "评审人");
+		expect(within(approval).getByRole("button", { name: en["gate.approval.approve"] })).toBeDisabled();
+		expect(within(approval).getByRole("button", { name: en["gate.approval.reject"] })).toBeDisabled();
+		expect(calls.approve).toHaveLength(0);
+	});
+
+	it("reads origin/main again right before writing and writes nothing if it moved meanwhile", async () => {
+		let tip = head;
+		const calls = renderRelease({
+			branches: async () => ({ branches: [], main: { ref: "refs/remotes/origin/main", commit: tip } }),
+		});
+		const approval = await screen.findByRole("region", { name: en["gate.approval.title"] });
+		await chooseApprover(approval, "评审人");
+		const approve = within(approval).getByRole("button", { name: en["gate.approval.approve"] });
+		await waitFor(() => expect(approve).toBeEnabled());
+		tip = OTHER;
+		await userEvent.click(approve);
+		const stale = en["gate.approval.releaseStale"].replace("{{commit}}", head.slice(0, 7)).replace("{{main}}", OTHER.slice(0, 7));
+		expect((await within(approval).findAllByText(stale, { exact: false })).length).toBeGreaterThan(0);
+		expect(calls.approve).toHaveLength(0);
+	});
+
+	it("says the approvers could not be read instead of 'nothing to approve'", async () => {
+		const { client } = gateClient({
+			branches: async () => ({ branches: [], main: { ref: "refs/remotes/origin/main", commit: head } }),
+		});
+		const query = client.query.bind(client);
+		client.query = async (sparql, target, options) => {
+			if (sparql === APPROVERS_QUERY) throw new AisepToolError("QUERY_FAILED", "boom", false);
+			return query(sparql, target, options);
+		};
+		const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+		render(
+			<QueryClientProvider client={queryClient}>
+				<AisepGatePage branch={RELEASE} client={client} />
+			</QueryClientProvider>,
+		);
+		const approval = await screen.findByRole("region", { name: en["gate.approval.title"] });
+		expect(await within(approval).findByRole("alert")).toHaveTextContent(en["gate.approval.releaseApproversFailed"].split("{{")[0]);
+		expect(within(approval).queryByText(en["gate.approval.none"])).toBeNull();
+		expect(within(approval).queryByRole("button", { name: en["gate.approval.approve"] })).toBeNull();
+	});
+
+	it("lets the user pick the model when several have approvers, and says none when no model has one", async () => {
+		const W = "https://aisep.example/model/workbench/";
+		const two: QueryResult = {
+			kind: "select", variables: ["approver", "prefLabel", "model"], truncated: false,
+			rows: [
+				{ approver: { type: "iri", value: `${M}reviewer` }, prefLabel: { type: "literal", value: "评审人" }, model: { type: "iri", value: M } },
+				{ approver: { type: "iri", value: `${W}projectLead` }, prefLabel: { type: "literal", value: "项目负责人" }, model: { type: "iri", value: W } },
+			],
+		};
+		const calls = renderRelease({
+			query: async (sparql: string) => {
+				if (sparql === APPROVERS_QUERY) return two;
+				if (sparql === APPROVAL_RECORDS_QUERY) return { kind: "select", variables: ["record", "decision"], rows: [], truncated: false };
+				throw new Error(`unexpected query ${sparql}`);
+			},
+		});
+		const approval = await screen.findByRole("region", { name: en["gate.approval.title"] });
+		await userEvent.click(await within(approval).findByRole("combobox", { name: en["gate.approval.model"] }));
+		await userEvent.click(await screen.findByRole("option", { name: "workbench" }));
+		const approve = within(approval).getByRole("button", { name: en["gate.approval.approve"] });
+		await waitFor(() => expect(approve).toBeEnabled());
+		await userEvent.click(approve);
+		await waitFor(() => expect(calls.approve).toHaveLength(1));
+		expect(calls.approve[0]).toMatchObject({ model: "workbench", approves: [W], approvedBy: `${W}projectLead` });
+		cleanup();
+		renderRelease({
+			query: async (sparql: string) => {
+				if (sparql === APPROVERS_QUERY) return { ...two, rows: [] };
+				if (sparql === APPROVAL_RECORDS_QUERY) return { kind: "select", variables: ["record", "decision"], rows: [], truncated: false };
+				throw new Error(`unexpected query ${sparql}`);
+			},
+		});
+		expect(await screen.findByText(en["gate.approval.none"])).toBeInTheDocument();
+	});
+
+	it("cannot approve a release whose gate fails (acReleaseGateFailBlocksApprove)", async () => {
+		renderRelease({ gate: async () => gateFail as GateResult });
+		const approval = await screen.findByRole("region", { name: en["gate.approval.title"] });
+		await chooseApprover(approval, "评审人");
+		expect(await within(approval).findByText(en["gate.approval.gateFailed"])).toBeInTheDocument();
+		const reject = within(approval).getByRole("button", { name: en["gate.approval.reject"] });
+		await waitFor(() => expect(reject).toBeEnabled());
+		expect(within(approval).getByRole("button", { name: en["gate.approval.approve"] })).toBeDisabled();
+	});
+});

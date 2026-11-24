@@ -529,6 +529,32 @@ describe("AisepWorkbenchPage gate entries (model_branches, §5.11)", () => {
 		expect(within(region()).queryByText("feat/merged")).toBeNull();
 	});
 
+	it("lists a release approval branch while it waits for a decision or for its merge (acReleaseBranchListed)", async () => {
+		const R = sha("1");
+		const waiting = `approval/release-${R.slice(0, 7)}-20261125120000`;
+		const decided = `approval/release-${R.slice(0, 7)}-20261125130000`;
+		const merged = `approval/release-${R.slice(0, 7)}-20261124120000`;
+		const release = (branch: string, facts: Partial<BranchInfo>) =>
+			info(branch, { hasModelChanges: false, mergedIntoMain: true, unpushed: false, remoteHead: R, head: R, ...facts });
+		const { client } = branchClient(async () => ({
+			branches: [
+				release(waiting, {}),
+				release(decided, { head: sha("d"), mergedIntoMain: false, unpushed: true, remoteHead: null }),
+				release(merged, { head: sha("e") }),
+				info("approval/release-nothex-20261125120000", { hasModelChanges: false, mergedIntoMain: true }),
+			],
+			main: MAIN,
+		}));
+		renderPage(client);
+		const links = within(await list()).getAllByRole("link");
+		expect(links.map((a) => a.getAttribute("href"))).toEqual([
+			"#/aisep/gate/approval/release-1111111-20261125120000",
+			"#/aisep/gate/approval/release-1111111-20261125130000",
+		]);
+		for (const link of links) expect(within(link).getByText(en["section.gates.branches.release"])).toBeInTheDocument();
+		expect(within(region()).queryByText(merged)).toBeNull();
+	});
+
 	it("recomputes a row's progress when its head moves, and only then", async () => {
 		vi.useFakeTimers({ shouldAdvanceTime: true });
 		try {

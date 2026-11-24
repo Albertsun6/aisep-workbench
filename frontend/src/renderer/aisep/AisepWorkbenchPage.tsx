@@ -34,6 +34,17 @@ export function defaultModelClient(url: string | undefined = import.meta.env.VIT
 
 export const modelClient = defaultModelClient();
 
+/**
+ * A release approval branch (§5.9 "发布关口" step 1), cut by the session from origin/main's tip R (aisep.release
+ * prepare; aisep models/workbench :adrReleaseStepsBySessionScript). Its page offers GateRelease only.
+ */
+export const RELEASE_BRANCH = /^approval\/release-([0-9a-f]{7})-[0-9]{14}$/;
+
+/** The 7-hex prefix of the R a release approval branch was cut from; undefined for any other branch. */
+export function releaseCommitPrefix(branch: string): string | undefined {
+	return RELEASE_BRANCH.exec(branch)?.[1];
+}
+
 /** The gate page of a branch (§8 step 5), under the `/aisep/*` splat route (hash history). */
 export function gateHref(branch: string): string {
 	return `#/aisep/gate/${branch.split("/").map(encodeURIComponent).join("/")}`;
@@ -251,6 +262,15 @@ function ElementSection({
 /** The branch list follows pushes and merges done outside the workbench; the server reads refs only, never fetches. */
 export const GATE_BRANCHES_REFRESH_MS = 15_000;
 
+/**
+ * A release approval branch is listed while it waits for a decision (its head is still R, which is on main and changes
+ * no model) and, once decided, until its approval commit is merged (aisep models/workbench :acReleaseBranchListed).
+ */
+function isReleaseRow(info: BranchInfo): boolean {
+	const prefix = releaseCommitPrefix(info.branch);
+	return prefix !== undefined && (info.head.startsWith(prefix) || !info.mergedIntoMain);
+}
+
 /** "待批准关口" entry points (model_branches, §5.11): local branches with model changes not yet on main, each row a link. */
 function GateBranches({ client, gateLinks }: { client: AisepModelClient; gateLinks: boolean }) {
 	const t = useAisepT();
@@ -259,7 +279,7 @@ function GateBranches({ client, gateLinks }: { client: AisepModelClient; gateLin
 		queryKey: ["aisep", "branches"],
 		queryFn: async ({ signal }) => {
 			const { branches: all, main } = await client.branches({}, { signal });
-			return { main, rows: all.filter((b) => b.hasModelChanges && !b.mergedIntoMain) };
+			return { main, rows: all.filter((b) => isReleaseRow(b) || (b.hasModelChanges && !b.mergedIntoMain)) };
 		},
 		refetchInterval: GATE_BRANCHES_REFRESH_MS,
 		retry: shouldRetryAisep,
@@ -334,6 +354,7 @@ function GateBranchRow({
 		<>
 			<span className="min-w-0 truncate font-mono text-foreground">{info.branch}</span>
 			<span className="font-mono text-muted-foreground">{info.head.slice(0, 7)}</span>
+			{releaseCommitPrefix(info.branch) !== undefined ? <Badge>{t("section.gates.branches.release")}</Badge> : null}
 			{info.unpushed ? <Badge variant="warning">{t("section.gates.branches.unpushed")}</Badge> : null}
 			<span className="ml-auto shrink-0 text-muted-foreground">
 				{!gateLinks ? null : progress.data ? (
