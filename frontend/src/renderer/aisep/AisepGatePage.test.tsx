@@ -642,7 +642,8 @@ describe("repeat approval guard: coverage unknown", () => {
 });
 
 // Approver choices (aisep models/workbench: the #68 approval was signed by procurement:chiefArchitect, a Stakeholder of
-// another model): only the approved model's own Stakeholders are offered, and none is chosen for the user.
+// another model): only the approved model's own Stakeholders are offered; the only one is chosen for the user, of two or
+// more none is.
 const WB_LEAD = {
 	approver: { type: "iri" as const, value: "https://aisep.example/model/workbench/projectLead" },
 	prefLabel: { type: "literal" as const, value: "项目负责人", lang: "zh" },
@@ -745,6 +746,23 @@ describe("approver choices", () => {
 		await userEvent.click(approve);
 		await waitFor(() => expect(calls.approve).toHaveLength(1));
 		expect(calls.approve[0].approvedBy).toBe(procurementApprovers[0].approver.value);
+	});
+
+	// With the approver chosen for the user, a failing gate is all that keeps Approve off.
+	it("still only offers Reject when the gate fails and the only Stakeholder is chosen", async () => {
+		const { client, calls } = approversClient([procurementApprovers[0]]);
+		client.gate = async () => gateFail as GateResult;
+		renderGate(client);
+		const approval = await screen.findByRole("region", { name: en["gate.approval.title"] });
+		expect(await screen.findByText(en["gate.approval.gateFailed"])).toBeInTheDocument();
+		expect(within(approval).getByRole("combobox", { name: en["gate.approval.approver"] })).toHaveTextContent("评审人");
+		const reject = within(approval).getByRole("button", { name: en["gate.approval.reject"] });
+		await waitFor(() => expect(reject).toBeEnabled());
+		const approve = within(approval).getByRole("button", { name: en["gate.approval.approve"] });
+		expect(approve).toBeDisabled();
+		fireEvent.click(approve);
+		await new Promise((r) => setTimeout(r, 20));
+		expect(calls.approve).toHaveLength(0);
 	});
 
 	it("chooses the only Stakeholder of the model switched to, not the one chosen before", async () => {

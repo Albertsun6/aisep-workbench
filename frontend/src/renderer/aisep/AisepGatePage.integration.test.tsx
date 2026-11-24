@@ -124,7 +124,7 @@ describe.skipIf(!AISEP_ROOT)("AisepGatePage against a real AISEP MCP Server", ()
 		renderGate();
 		const approve = await screen.findByRole("button", { name: en["gate.approval.approve"] }, { timeout: 60_000 });
 		const approval = screen.getByRole("region", { name: en["gate.approval.title"] });
-		// No approver is chosen for the user: pick the model's chief architect.
+		// Pick the model's chief architect (with one human Stakeholder it is already chosen; picking it again is harmless).
 		await userEvent.click(await within(approval).findByRole("combobox", { name: en["gate.approval.approver"] }, { timeout: 60_000 }));
 		await userEvent.click(await screen.findByRole("option", { name: "首席架构师" }));
 		await waitFor(() => expect(approve).toBeEnabled(), { timeout: 30_000 });
