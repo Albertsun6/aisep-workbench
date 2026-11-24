@@ -765,6 +765,37 @@ describe("approver choices", () => {
 		expect(calls.approve).toHaveLength(0);
 	});
 
+	// aisep models/workbench :acApproversUnreadable
+	it("offers no approver and no decision when the Stakeholders cannot be read", async () => {
+		let asked = 0;
+		const { client, calls } = gateClient({
+			query: async (sparql: string, target: { ref: string }) => {
+				if (sparql === APPROVAL_RECORDS_QUERY) return progressRecords(target.ref, false);
+				if (sparql === APPROVERS_QUERY) {
+					asked++;
+					throw new Error("approvers unreadable");
+				}
+				if (sparql === NOT_APPROVABLE_QUERY) return gateNotApprovable as QueryResult;
+				throw new Error(`unexpected query ${sparql}`);
+			},
+		});
+		renderGate(client);
+		const approval = await screen.findByRole("region", { name: en["gate.approval.title"] });
+		await screen.findByText(en["gate.check.pass"]);
+		await waitFor(() => expect(asked).toBeGreaterThan(0));
+		await new Promise((r) => setTimeout(r, 20));
+		expect(within(approval).queryByRole("combobox", { name: en["gate.approval.approver"] })).toBeNull();
+		expect(within(approval).queryByText(en["gate.approval.noApprovers"])).toBeNull();
+		const approve = within(approval).getByRole("button", { name: en["gate.approval.approve"] });
+		const reject = within(approval).getByRole("button", { name: en["gate.approval.reject"] });
+		expect(approve).toBeDisabled();
+		expect(reject).toBeDisabled();
+		fireEvent.click(approve);
+		fireEvent.click(reject);
+		await new Promise((r) => setTimeout(r, 20));
+		expect(calls.approve).toHaveLength(0);
+	});
+
 	it("chooses the only Stakeholder of the model switched to, not the one chosen before", async () => {
 		renderGate(twoModelClient([...procurementApprovers, WB_LEAD]));
 		const approval = await screen.findByRole("region", { name: en["gate.approval.title"] });
