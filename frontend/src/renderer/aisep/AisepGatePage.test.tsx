@@ -5,6 +5,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testi
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { appI18n } from "../i18n";
+import { Store as OxStore } from "oxigraph";
 import { APPROVERS_QUERY, AisepGatePage, NOT_APPROVABLE_QUERY, approvalCandidates } from "./AisepGatePage";
 import {
 	AisepToolError,
@@ -794,6 +795,49 @@ describe("approver choices", () => {
 		fireEvent.click(reject);
 		await new Promise((r) => setTimeout(r, 20));
 		expect(calls.approve).toHaveLength(0);
+	});
+
+	// aisep models/workbench :acNoAIAgentApprover (aisep #84): the real APPROVERS_QUERY, run on the same engine as the server
+	// (oxigraph = pyoxigraph 0.5.13), drops a Stakeholder that is an aisep:AIAgent, directly or through a subclass.
+	it("never offers an AI agent as approver: the approvers query itself leaves it out", async () => {
+		const store = new OxStore();
+		store.load(
+			`@prefix arch: <https://meta.linked.archi/core#> .
+			@prefix aisep: <https://aisep.example/ont/aisep#> .
+			@prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+			@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+			@prefix p: <https://aisep.example/model/procurement/> .
+			p:CodeBot rdfs:subClassOf aisep:AIAgent .
+			p:reviewer a arch:Stakeholder ; skos:prefLabel "评审人"@zh ; arch:inModel <https://aisep.example/model/procurement/> .
+			p:chiefArchitect a arch:Stakeholder ; skos:prefLabel "首席架构师"@zh ; arch:inModel <https://aisep.example/model/procurement/> .
+			p:aiReviewer a arch:Stakeholder , aisep:AIAgent ; skos:prefLabel "AI 评审代理"@zh ; arch:inModel <https://aisep.example/model/procurement/> .
+			p:codeBot a arch:Stakeholder , p:CodeBot ; skos:prefLabel "代码机器人"@zh ; arch:inModel <https://aisep.example/model/procurement/> .`,
+			{ format: "text/turtle" },
+		);
+		// The server runs queries with its prefix table (aisep core.NS: arch, skos, ...) and the default graph as the union of
+		// all graphs; oxigraph's JS binding takes no prefix table, so the two the query relies on are declared up front.
+		const serverPrefixes = "PREFIX arch: <https://meta.linked.archi/core#>\nPREFIX skos: <http://www.w3.org/2004/02/skos/core#>\n";
+		const bindings = store.query(serverPrefixes + APPROVERS_QUERY, { use_default_graph_as_union: true }) as Map<
+			string,
+			{ termType: string; value: string; language?: string }
+		>[];
+		const rows = bindings.map((b) =>
+			Object.fromEntries(
+				[...b.entries()].map(([name, term]) => [
+					name,
+					term.termType === "NamedNode"
+						? { type: "iri" as const, value: term.value }
+						: { type: "literal" as const, value: term.value, ...(term.language ? { lang: term.language } : {}) },
+				]),
+			),
+		);
+		expect(rows.map((r) => r.prefLabel.value).sort()).toEqual(["评审人", "首席架构师"].sort());
+		renderGate(approversClient(rows).client);
+		const approval = await screen.findByRole("region", { name: en["gate.approval.title"] });
+		await userEvent.click(await within(approval).findByRole("combobox", { name: en["gate.approval.approver"] }));
+		// SELECT has no ORDER BY: compare as sets.
+		const options = (await screen.findAllByRole("option")).map((o) => o.textContent ?? "");
+		expect(options.sort()).toEqual(["评审人", "首席架构师"].sort());
 	});
 
 	it("chooses the only Stakeholder of the model switched to, not the one chosen before", async () => {
