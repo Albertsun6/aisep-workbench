@@ -359,9 +359,15 @@ function ApprovalSection({
 	const [confirmedFor, setConfirmedFor] = useState<"approved" | "unknown">();
 
 	const items = model ? (candidates.get(model) ?? []) : [];
-	// Only this model's Stakeholders, and none chosen for the user: a choice left over from another model does not count.
+	// Only this model's Stakeholders: a choice left over from another model does not count. The only one is chosen for the
+	// user (aisep models/workbench :reqSingleApproverPreselect); with two or more, none is.
 	const modelApprovers = model ? (approvers.data ?? []).filter((a) => a.model === modelIri(model)) : [];
-	const approver = modelApprovers.some((a) => a.iri === chosenApprover) ? chosenApprover : undefined;
+	const approver =
+		modelApprovers.length === 1
+			? modelApprovers[0].iri
+			: modelApprovers.some((a) => a.iri === chosenApprover)
+				? chosenApprover
+				: undefined;
 	const approves = items.map((item) => item.iri).filter((iri) => !unchecked.has(iri));
 	const mutationKey = approvalMutationKey(branch, commit);
 	// Set in the click handler itself: a second click before React re-renders the disabled button must not write again.

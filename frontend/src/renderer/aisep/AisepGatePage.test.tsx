@@ -660,6 +660,24 @@ function approversClient(rows: unknown[]) {
 	});
 }
 const procurementApprovers = (gateApprovers as QueryResult & { kind: "select" }).rows;
+const WB_REVIEWER = {
+	...WB_LEAD,
+	approver: { type: "iri" as const, value: "https://aisep.example/model/workbench/reviewer" },
+	prefLabel: { type: "literal" as const, value: "工作台评审人", lang: "zh" },
+};
+// The branch changes an element of each model: the model picker appears.
+function twoModelClient(rows: unknown[]) {
+	const WB_ITEM = {
+		...diff.items![0],
+		iri: "https://aisep.example/model/workbench/gatePage",
+		label: undefined,
+		files: { base: [], head: ["models/workbench/elements.ttl"] },
+	};
+	const twoModels = { ...diff, items: [...(diff.items ?? []), WB_ITEM] } as DiffResult;
+	const { client } = approversClient(rows);
+	client.diff = async () => twoModels;
+	return client;
+}
 
 describe("approver choices", () => {
 	it("offers only the Stakeholders of the model being approved", async () => {
@@ -699,18 +717,8 @@ describe("approver choices", () => {
 		expect(calls.approve[0].approvedBy).toBe("https://aisep.example/model/procurement/chiefArchitect");
 	});
 
-	it("shows the placeholder again, not a blank picker, after switching to another model", async () => {
-		// The branch changes an element of each model: the model picker appears.
-		const WB_ITEM = {
-			...diff.items![0],
-			iri: "https://aisep.example/model/workbench/gatePage",
-			label: undefined,
-			files: { base: [], head: ["models/workbench/elements.ttl"] },
-		};
-		const twoModels = { ...diff, items: [...(diff.items ?? []), WB_ITEM] } as DiffResult;
-		const { client } = approversClient([...procurementApprovers, WB_LEAD]);
-		client.diff = async () => twoModels;
-		renderGate(client);
+	it("shows the placeholder again, not a blank picker, after switching to a model with two Stakeholders", async () => {
+		renderGate(twoModelClient([...procurementApprovers, WB_LEAD, WB_REVIEWER]));
 		const approval = await screen.findByRole("region", { name: en["gate.approval.title"] });
 		await chooseApprover(approval, "首席架构师");
 		const picker = within(approval).getByRole("combobox", { name: en["gate.approval.approver"] });
@@ -723,6 +731,31 @@ describe("approver choices", () => {
 			),
 		);
 		expect(within(approval).getByRole("button", { name: en["gate.approval.approve"] })).toBeDisabled();
+	});
+
+	// aisep models/workbench :acSingleApproverPreselected
+	it("chooses the only Stakeholder of the model being approved for the user", async () => {
+		const { client, calls } = approversClient([procurementApprovers[0], WB_LEAD]);
+		renderGate(client);
+		const approval = await screen.findByRole("region", { name: en["gate.approval.title"] });
+		await screen.findByText(en["gate.check.pass"]);
+		expect(await within(approval).findByRole("combobox", { name: en["gate.approval.approver"] })).toHaveTextContent("评审人");
+		const approve = within(approval).getByRole("button", { name: en["gate.approval.approve"] });
+		await waitFor(() => expect(approve).toBeEnabled());
+		await userEvent.click(approve);
+		await waitFor(() => expect(calls.approve).toHaveLength(1));
+		expect(calls.approve[0].approvedBy).toBe(procurementApprovers[0].approver.value);
+	});
+
+	it("chooses the only Stakeholder of the model switched to, not the one chosen before", async () => {
+		renderGate(twoModelClient([...procurementApprovers, WB_LEAD]));
+		const approval = await screen.findByRole("region", { name: en["gate.approval.title"] });
+		await chooseApprover(approval, "首席架构师");
+		await userEvent.click(within(approval).getByRole("combobox", { name: en["gate.approval.model"] }));
+		await userEvent.click(await screen.findByRole("option", { name: "workbench" }));
+		await waitFor(() =>
+			expect(within(approval).getByRole("combobox", { name: en["gate.approval.approver"] })).toHaveTextContent("项目负责人"),
+		);
 	});
 });
 
