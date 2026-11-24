@@ -77,6 +77,8 @@
 	"gate.approval.releaseApproves": "Approves the whole model {{model}} (a release does not pick elements).",
 	"gate.approval.releaseStale": "This release approval branch is based on {{commit}}, but origin/main is now {{main}}: it can be neither approved nor rejected. Prepare a new release branch.",
 	"gate.approval.releaseMainUnknown": "The latest commit of origin/main could not be read, so the release cannot be approved or rejected yet.",
+	"gate.approval.releaseHeadNotR": "The head {{head}} of this release approval branch is not origin/main's latest commit {{main}}: it may already have a decision, or the branch was not cut from the latest commit. It can be neither approved nor rejected; wait for a decided branch to be pushed and merged, otherwise prepare a new release branch.",
+	"gate.approval.releaseApproversFailed": "The approvers could not be read, so the release cannot be approved or rejected yet: {{message}}",
 	"gate.approval.none": "No added or modified elements to approve.",
 	"gate.approval.noApprovers": "No stakeholder in the model can approve.",
 	"gate.approval.approve": "Approve",

@@ -77,6 +77,8 @@
 	"gate.approval.releaseApproves": "Aprueba el modelo completo {{model}} (una publicación no elige elementos).",
 	"gate.approval.releaseStale": "Esta rama de aprobación de publicación parte de {{commit}}, pero origin/main ya es {{main}}: no se puede aprobar ni rechazar. Prepara una nueva rama de publicación.",
 	"gate.approval.releaseMainUnknown": "No se pudo leer el último commit de origin/main; la publicación aún no se puede aprobar ni rechazar.",
+	"gate.approval.releaseHeadNotR": "La cabeza {{head}} de esta rama de aprobación de publicación no es el último commit {{main}} de origin/main: quizá ya tiene una decisión, o la rama no salió del último commit. No se puede aprobar ni rechazar; espera a que una rama ya decidida se envíe y fusione, o prepara una nueva rama de publicación.",
+	"gate.approval.releaseApproversFailed": "No se pudieron leer los aprobadores; la publicación aún no se puede aprobar ni rechazar: {{message}}",
 	"gate.approval.none": "No hay elementos añadidos o modificados que aprobar.",
 	"gate.approval.noApprovers": "Ningún interesado del modelo puede aprobar.",
 	"gate.approval.approve": "Aprobar",

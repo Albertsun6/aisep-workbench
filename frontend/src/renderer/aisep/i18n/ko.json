@@ -77,6 +77,8 @@
 	"gate.approval.releaseApproves": "모델 {{model}} 전체를 승인합니다(릴리스는 요소를 고르지 않습니다).",
 	"gate.approval.releaseStale": "이 릴리스 승인 브랜치는 {{commit}} 기준인데 origin/main은 이미 {{main}}입니다. 승인도 반려도 할 수 없습니다. 릴리스 브랜치를 다시 준비하세요.",
 	"gate.approval.releaseMainUnknown": "origin/main의 최신 커밋을 읽지 못해 아직 릴리스를 승인하거나 반려할 수 없습니다.",
+	"gate.approval.releaseHeadNotR": "이 릴리스 승인 브랜치의 헤드 {{head}}는 origin/main의 최신 커밋 {{main}}이 아닙니다. 이미 결정되었거나 최신 커밋에서 만든 브랜치가 아닙니다. 승인도 반려도 할 수 없습니다. 결정된 브랜치는 푸시·병합을 기다리고, 아니면 릴리스 브랜치를 다시 준비하세요.",
+	"gate.approval.releaseApproversFailed": "승인자를 읽지 못해 아직 릴리스를 승인하거나 반려할 수 없습니다: {{message}}",
 	"gate.approval.none": "승인할 추가 또는 수정 요소가 없습니다.",
 	"gate.approval.noApprovers": "모델에 승인할 수 있는 이해관계자가 없습니다.",
 	"gate.approval.approve": "승인",

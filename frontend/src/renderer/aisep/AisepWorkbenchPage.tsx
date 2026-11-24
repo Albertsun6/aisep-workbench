@@ -34,7 +34,6 @@ export function defaultModelClient(url: string | undefined = import.meta.env.VIT
 
 export const modelClient = defaultModelClient();
 
-/** The gate page of a branch (§8 step 5), under the `/aisep/*` splat route (hash history). */
 /**
  * A release approval branch (§5.9 "发布关口" step 1), cut by the session from origin/main's tip R (aisep.release
  * prepare; aisep models/workbench :adrReleaseStepsBySessionScript). Its page offers GateRelease only.
@@ -46,6 +45,7 @@ export function releaseCommitPrefix(branch: string): string | undefined {
 	return RELEASE_BRANCH.exec(branch)?.[1];
 }
 
+/** The gate page of a branch (§8 step 5), under the `/aisep/*` splat route (hash history). */
 export function gateHref(branch: string): string {
 	return `#/aisep/gate/${branch.split("/").map(encodeURIComponent).join("/")}`;
 }

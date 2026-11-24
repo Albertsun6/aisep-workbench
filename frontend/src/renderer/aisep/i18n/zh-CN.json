@@ -77,6 +77,8 @@
 	"gate.approval.releaseApproves": "批准对象：整个模型 {{model}}（发布不逐个勾选元素）。",
 	"gate.approval.releaseStale": "这条发布批准分支基于 {{commit}}，但 origin/main 已是 {{main}}：不能批准也不能驳回，请重新准备发布分支。",
 	"gate.approval.releaseMainUnknown": "读不到 origin/main 的最新提交，暂不能批准或驳回发布。",
+	"gate.approval.releaseHeadNotR": "这条发布批准分支的头 {{head}} 不是 origin/main 最新提交 {{main}}：可能已经做过决定，或分支不是从最新提交拉出的。不能再批准或驳回；已有决定的请等它推送合入，否则重新准备发布分支。",
+	"gate.approval.releaseApproversFailed": "读不到可选的批准人，暂不能批准或驳回发布：{{message}}",
 	"gate.approval.none": "没有可批准的新增或修改元素。",
 	"gate.approval.noApprovers": "模型里没有可以批准的干系人。",
 	"gate.approval.approve": "批准",

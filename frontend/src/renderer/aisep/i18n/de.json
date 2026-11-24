@@ -77,6 +77,8 @@
 	"gate.approval.releaseApproves": "Gibt das ganze Modell {{model}} frei (ein Release wählt keine Elemente).",
 	"gate.approval.releaseStale": "Dieser Release-Freigabezweig basiert auf {{commit}}, origin/main steht aber auf {{main}}: weder Freigabe noch Ablehnung möglich. Bitte einen neuen Release-Zweig vorbereiten.",
 	"gate.approval.releaseMainUnknown": "Der neueste Commit von origin/main konnte nicht gelesen werden; das Release kann noch nicht freigegeben oder abgelehnt werden.",
+	"gate.approval.releaseHeadNotR": "Der Kopf {{head}} dieses Release-Freigabezweigs ist nicht der neueste Commit {{main}} von origin/main: Er hat vielleicht schon eine Entscheidung, oder der Zweig wurde nicht vom neuesten Commit abgezweigt. Weder Freigabe noch Ablehnung möglich; einen entschiedenen Zweig pushen und mergen lassen, sonst einen neuen Release-Zweig vorbereiten.",
+	"gate.approval.releaseApproversFailed": "Die Freigebenden konnten nicht gelesen werden; das Release kann noch nicht freigegeben oder abgelehnt werden: {{message}}",
 	"gate.approval.none": "Keine hinzugefügten oder geänderten Elemente zum Freigeben.",
 	"gate.approval.noApprovers": "Kein Stakeholder im Modell darf freigeben.",
 	"gate.approval.approve": "Freigeben",

@@ -77,6 +77,8 @@
 	"gate.approval.releaseApproves": "Aprova o modelo inteiro {{model}} (um lançamento não escolhe elementos).",
 	"gate.approval.releaseStale": "Este ramo de aprovação de lançamento parte de {{commit}}, mas origin/main já é {{main}}: não pode ser aprovado nem rejeitado. Prepare um novo ramo de lançamento.",
 	"gate.approval.releaseMainUnknown": "Não foi possível ler o último commit de origin/main; o lançamento ainda não pode ser aprovado nem rejeitado.",
+	"gate.approval.releaseHeadNotR": "A cabeça {{head}} deste ramo de aprovação de lançamento não é o último commit {{main}} de origin/main: talvez já tenha uma decisão, ou o ramo não saiu do último commit. Não pode ser aprovado nem rejeitado; aguarde um ramo já decidido ser enviado e mesclado, ou prepare um novo ramo de lançamento.",
+	"gate.approval.releaseApproversFailed": "Não foi possível ler os aprovadores; o lançamento ainda não pode ser aprovado nem rejeitado: {{message}}",
 	"gate.approval.none": "Nenhum elemento adicionado ou modificado para aprovar.",
 	"gate.approval.noApprovers": "Nenhuma parte interessada do modelo pode aprovar.",
 	"gate.approval.approve": "Aprovar",

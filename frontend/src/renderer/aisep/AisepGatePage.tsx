@@ -318,8 +318,10 @@ function ApprovalSection({
 }) {
 	const t = useAisepT();
 	const queryClient = useQueryClient();
+	const release = releaseCommitPrefix(branch) !== undefined;
 	const notApprovable = useQuery({
 		queryKey: ["aisep", "gate", "not-approvable", commit],
+		enabled: !release,
 		// The set only grows (every approval record and AI activity is in it): ask for the largest page (§5.6).
 		queryFn: async ({ signal }) =>
 			new Set(iriColumn(await client.query(NOT_APPROVABLE_QUERY, { ref: commit, limit: QUERY_LIMIT_MAX }, { signal }), "element")),
@@ -339,7 +341,6 @@ function ApprovalSection({
 	});
 	// A release approves a whole model (aisep models/workbench :reqApproveRelease): any model with a human approver.
 	const releasePrefix = releaseCommitPrefix(branch);
-	const release = releasePrefix !== undefined;
 	const models = release
 		? [...new Set((approvers.data ?? []).flatMap((a) => slugOfModel(a.model) ?? []))].sort()
 		: [...candidates.keys()];
@@ -351,7 +352,9 @@ function ApprovalSection({
 		enabled: release,
 		retry: shouldRetryAisep,
 	});
-	const releaseBlocked = release && !(mainHead.data !== undefined && mainHead.data.startsWith(releasePrefix));
+	// The pinned head itself must be origin/main's tip (the branch name only says this is a release branch): a branch
+	// whose head is an approval commit already has a decision, and one cut elsewhere is not R.
+	const releaseBlocked = release && mainHead.data !== commit;
 	const [chosenModel, setModel] = useState<string>();
 	const model = chosenModel !== undefined && models.includes(chosenModel) ? chosenModel : models[0];
 	const [chosenGate, setGate] = useState<GateId>("GateArchitecture");
@@ -399,11 +402,20 @@ function ApprovalSection({
 	const submitting = useRef(false);
 	const record = useMutation({
 		mutationKey,
-		mutationFn: (decision: Decision) =>
-			client.recordApproval(
+		mutationFn: async (decision: Decision) => {
+			if (release) {
+				// main may have moved while the page was open: read it again right before writing.
+				const tip = (await client.branches({})).main.commit;
+				if (tip !== commit) {
+					void queryClient.invalidateQueries({ queryKey: ["aisep", "branches", "main"] });
+					throw new Error(t("gate.approval.releaseStale", { commit: commit.slice(0, 7), main: tip.slice(0, 7) }));
+				}
+			}
+			return client.recordApproval(
 				approvalInput(branch, diff, { model: model as string, gate, decision, approvedBy: approver as Iri, approves }),
 				{ timeoutMs: GATE_TIMEOUT_MS },
-			),
+			);
+		},
 		// Main-branch rows stay Proposed until merge (§2); only the branch's own reads change: its changed-elements
 		// count and its "approved on the branch, not merged" marks in the pending gates.
 		// Only a failure frees the buttons again; a recorded decision is final for this head.
@@ -445,6 +457,15 @@ function ApprovalSection({
 		return (
 			<GateSection titleKey="gate.approval.title">
 				<p role="status" className="text-xs text-muted-foreground">{t("section.loading")}</p>
+			</GateSection>
+		);
+	}
+	if (release && approvers.isError) {
+		return (
+			<GateSection titleKey="gate.approval.title">
+				<p role="alert" className="text-xs text-destructive">
+					{t("gate.approval.releaseApproversFailed", { message: aisepErrorMessage(approvers.error) })}
+				</p>
 			</GateSection>
 		);
 	}
@@ -525,10 +546,14 @@ function ApprovalSection({
 			)}
 			{release && mainHead.data !== undefined && releaseBlocked ? (
 				<p role="alert" className="text-xs text-destructive">
-					{t("gate.approval.releaseStale", { commit: releasePrefix, main: mainHead.data.slice(0, 7) })}
+					{commit.startsWith(releasePrefix ?? "")
+						? t("gate.approval.releaseStale", { commit: commit.slice(0, 7), main: mainHead.data.slice(0, 7) })
+						: t("gate.approval.releaseHeadNotR", { head: commit.slice(0, 7), main: mainHead.data.slice(0, 7) })}
 				</p>
 			) : release && mainHead.isError ? (
 				<p role="alert" className="text-xs text-destructive">{t("gate.approval.releaseMainUnknown")}</p>
+			) : release && mainHead.isLoading ? (
+				<p role="status" className="text-xs text-muted-foreground">{t("section.loading")}</p>
 			) : null}
 			{gateFailed ? <p className="text-xs text-destructive">{t("gate.approval.gateFailed")}</p> : null}
 			{covered && coverage.data ? (

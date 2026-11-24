@@ -77,6 +77,8 @@
 	"gate.approval.releaseApproves": "Approuve le modèle entier {{model}} (une publication ne choisit pas d’éléments).",
 	"gate.approval.releaseStale": "Cette branche d’approbation de publication part de {{commit}}, mais origin/main est maintenant {{main}} : ni approbation ni rejet possible. Préparez une nouvelle branche de publication.",
 	"gate.approval.releaseMainUnknown": "Le dernier commit d’origin/main est illisible : la publication ne peut pas encore être approuvée ni rejetée.",
+	"gate.approval.releaseHeadNotR": "La tête {{head}} de cette branche d’approbation de publication n’est pas le dernier commit {{main}} d’origin/main : elle a peut-être déjà une décision, ou la branche ne part pas du dernier commit. Ni approbation ni rejet possible ; attendez qu’une branche décidée soit poussée et fusionnée, sinon préparez une nouvelle branche de publication.",
+	"gate.approval.releaseApproversFailed": "Les approbateurs sont illisibles : la publication ne peut pas encore être approuvée ni rejetée : {{message}}",
 	"gate.approval.none": "Aucun élément ajouté ou modifié à approuver.",
 	"gate.approval.noApprovers": "Aucune partie prenante du modèle ne peut approuver.",
 	"gate.approval.approve": "Approuver",
