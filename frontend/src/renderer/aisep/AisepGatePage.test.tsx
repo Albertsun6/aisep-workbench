@@ -965,13 +965,17 @@ describe("AisepGatePage on a release approval branch", () => {
 		await waitFor(() => expect(reject).toBeEnabled());
 		await userEvent.click(reject);
 		await waitFor(() => expect(calls.approve).toHaveLength(1));
-		expect(calls.approve[0]).toMatchObject({
+		expect(calls.approve[0]).toEqual({
 			model: "procurement",
 			gate: "GateRelease",
 			decision: "Rejected",
+			approvedBy: (gateApprovers as QueryResult & { rows: { approver: { value: string }; prefLabel: { value: string } }[] }).rows.find(
+				(row) => row.prefLabel.value === "评审人",
+			)?.approver.value,
 			approves: [M],
 			branch: RELEASE,
 			headCommit: head,
+			expectedBaseCommit: diff.base.commit,
 		});
 		expect(calls.approve[0]).not.toHaveProperty("activity");
 	});
