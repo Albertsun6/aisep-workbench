@@ -918,6 +918,7 @@ describe("AisepGatePage on a release approval branch", () => {
 		expect((await screen.findAllByRole("option")).map((o) => o.textContent)).toEqual(["procurement"]);
 		await userEvent.keyboard("{Escape}");
 		expect(within(approval).queryByRole("combobox", { name: en["gate.approval.approver"] })).toBeNull();
+		expect(within(approval).queryByText(en["gate.approval.noApprovers"])).toBeNull();
 		expect(within(approval).queryByText(en["gate.approval.releaseApproves"].split("{{")[0], { exact: false })).toBeNull();
 		await new Promise((done) => setTimeout(done, 50));
 		expect(within(approval).getByRole("button", { name: en["gate.approval.approve"] })).toBeDisabled();
@@ -931,6 +932,28 @@ describe("AisepGatePage on a release approval branch", () => {
 		).toBeInTheDocument();
 		await waitFor(() => expect(within(approval).getByRole("button", { name: en["gate.approval.approve"] })).toBeEnabled());
 		expect(calls.approve).toHaveLength(0);
+	});
+
+	it("names the single approver it fills in once the person picks the model (#93, reqSingleApproverPreselect)", async () => {
+		const one: QueryResult = {
+			kind: "select", variables: ["approver", "prefLabel", "model"], truncated: false,
+			rows: [{ approver: { type: "iri", value: `${M}chiefArchitect` }, prefLabel: { type: "literal", value: "首席架构师" }, model: { type: "iri", value: M } }],
+		};
+		renderRelease({
+			query: async (sparql: string) => {
+				if (sparql === APPROVERS_QUERY) return one;
+				if (sparql === APPROVAL_RECORDS_QUERY) return { kind: "select", variables: ["record", "decision"], rows: [], truncated: false };
+				throw new Error(`unexpected query ${sparql}`);
+			},
+		});
+		const approval = await screen.findByRole("region", { name: en["gate.approval.title"] });
+		expect(within(approval).queryByText(en["gate.approval.releaseApproves"].split("{{")[0], { exact: false })).toBeNull();
+		await chooseModel(approval, "procurement");
+		expect(
+			await within(approval).findByText(
+				en["gate.approval.releaseApproves"].replace("{{model}}", "procurement").replace("{{approver}}", "首席架构师"),
+			),
+		).toBeInTheDocument();
 	});
 
 	it("can neither approve nor reject once origin/main moved past R (acReleaseStaleBlocks)", async () => {

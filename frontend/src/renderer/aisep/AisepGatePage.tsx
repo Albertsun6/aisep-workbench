@@ -520,7 +520,7 @@ function ApprovalSection({
 					<LabeledSelect label={t("gate.approval.approver")} value={approver ?? ""} onValueChange={setApprover}
 						placeholder={t("gate.approval.approverPlaceholder")}
 						options={modelApprovers.map((a) => ({ value: a.iri, label: a.prefLabel }))} />
-				) : approvers.isSuccess ? (
+				) : model !== undefined && approvers.isSuccess ? (
 					<p className="text-destructive">{t("gate.approval.noApprovers")}</p>
 				) : null}
 			</div>

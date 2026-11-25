@@ -74,7 +74,7 @@
 	"gate.approval.approver": "Freigebende Person",
 	"gate.approval.approverPlaceholder": "Freigebende Person wählen",
 	"gate.approval.approves": "Freizugebende Elemente",
-	"gate.approval.releaseApproves": "Wird freigegeben: das ganze Modell {{model}}, freigebend {{approver}} (ein Release wählt keine Elemente).",
+	"gate.approval.releaseApproves": "Wird freigegeben: das ganze Modell {{model}}, freigegeben von {{approver}} (ein Release wählt keine Elemente).",
 	"gate.approval.releaseModelPlaceholder": "Zu veröffentlichendes Modell wählen",
 	"gate.approval.releaseStale": "Dieser Release-Freigabezweig basiert auf {{commit}}, origin/main steht aber auf {{main}}: weder Freigabe noch Ablehnung möglich. Bitte einen neuen Release-Zweig vorbereiten.",
 	"gate.approval.releaseMainUnknown": "Der neueste Commit von origin/main konnte nicht gelesen werden; das Release kann noch nicht freigegeben oder abgelehnt werden.",
