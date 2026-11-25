@@ -74,6 +74,7 @@
 	"gate.approval.approver": "承認者",
 	"gate.approval.approverPlaceholder": "承認者を選択",
 	"gate.approval.approves": "承認する要素",
+	"gate.approval.wholeModel": "モデル {{model}} 全体（main で承認済み：変更するにはモデル全体の再承認が必要）",
 	"gate.approval.releaseApproves": "承認内容：モデル {{model}} 全体、承認者 {{approver}}（リリースでは要素を選びません）。",
 	"gate.approval.releaseModelPlaceholder": "リリースするモデルを選択",
 	"gate.approval.releaseStale": "このリリース承認ブランチは {{commit}} を基にしていますが、origin/main はすでに {{main}} です。承認も却下もできません。リリースブランチを作り直してください。",

@@ -85,6 +85,23 @@ function slugOfModel(iri: Iri): string | undefined {
 	return iri.match(/^https:\/\/aisep\.example\/model\/([^/]+)\/$/)?.[1];
 }
 
+/**
+ * Models that are Approved on main (§5.9 check 6; aisep #95): once a model is approved as a whole (a release approves
+ * one), any change to its members needs a new approval of the whole model.
+ */
+export const APPROVED_MODELS_QUERY = `SELECT ?model WHERE { ?model a arch:Model ; arch:approvalState arch:Approved }`;
+
+/** Slugs of the models whose content the diff changes (approval records under models/<slug>/governance/ excluded). */
+export function changedModels(diff: DiffResult): Set<string> {
+	const slugs = new Set<string>();
+	for (const item of diff.items ?? []) {
+		const file = item.files.head[0] ?? item.files.base[0];
+		const slug = modelSlug(file);
+		if (slug && !file?.startsWith(`models/${slug}/governance/`)) slugs.add(slug);
+	}
+	return slugs;
+}
+
 /** "models/<slug>/…" -> slug. */
 function modelSlug(file: string | undefined): string | undefined {
 	return file?.match(/^models\/([^/]+)\//)?.[1];
@@ -339,11 +356,24 @@ function ApprovalSection({
 		staleTime: Number.POSITIVE_INFINITY,
 		refetchOnWindowFocus: false,
 	});
+	// Changed models that are Approved on main must be approved again as a whole (aisep #95).
+	const approvedOnMain = useQuery({
+		queryKey: ["aisep", "gate", "approved-models", diff.base.mainRef ?? DEFAULT_MAIN_REF],
+		enabled: !release,
+		queryFn: async ({ signal }) =>
+			new Set(
+				iriColumn(await client.query(APPROVED_MODELS_QUERY, { ref: diff.base.mainRef ?? DEFAULT_MAIN_REF }, { signal }), "model").flatMap(
+					(iri) => slugOfModel(iri) ?? [],
+				),
+			),
+		retry: shouldRetryAisep,
+	});
+	const reapprove = new Set([...changedModels(diff)].filter((slug) => approvedOnMain.data?.has(slug)));
 	// A release approves a whole model (aisep models/workbench :reqApproveRelease): any model with a human approver.
 	const releasePrefix = releaseCommitPrefix(branch);
 	const models = release
 		? [...new Set((approvers.data ?? []).flatMap((a) => slugOfModel(a.model) ?? []))].sort()
-		: [...candidates.keys()];
+		: [...new Set([...candidates.keys(), ...reapprove])].sort();
 	// Only origin/main's tip may be released: a branch cut from an older R can be neither approved nor rejected, and
 	// neither can one while the tip is unknown.
 	const mainHead = useQuery({
@@ -394,11 +424,12 @@ function ApprovalSection({
 			: modelApprovers.some((a) => a.iri === chosenApprover)
 				? chosenApprover
 				: undefined;
+	const wholeModel = !release && model !== undefined && reapprove.has(model) ? modelIri(model) : undefined;
 	const approves = release
 		? model
 			? [modelIri(model)]
 			: []
-		: items.map((item) => item.iri).filter((iri) => !unchecked.has(iri));
+		: [...(wholeModel ? [wholeModel] : []), ...items.map((item) => item.iri)].filter((iri) => !unchecked.has(iri));
 	const mutationKey = approvalMutationKey(branch, commit);
 	// Set in the click handler itself: a second click before React re-renders the disabled button must not write again.
 	const submitting = useRef(false);
@@ -478,6 +509,13 @@ function ApprovalSection({
 			</GateSection>
 		);
 	}
+	if (models.length === 0 && !release && approvedOnMain.isPending) {
+		return (
+			<GateSection titleKey="gate.approval.title">
+				<p role="status" className="text-xs text-muted-foreground">{t("section.loading")}</p>
+			</GateSection>
+		);
+	}
 	if (models.length === 0) {
 		return (
 			<GateSection titleKey="gate.approval.title">
@@ -504,6 +542,7 @@ function ApprovalSection({
 		!recorded &&
 		(progress.data !== undefined || progress.isError) &&
 		(coverage.data !== undefined || coverage.isError) &&
+		(release || !approvedOnMain.isPending) &&
 		(!needsConfirm || confirmedRepeat) &&
 		!releaseBlocked;
 	return (
@@ -536,6 +575,22 @@ function ApprovalSection({
 			) : (
 			<fieldset className="flex flex-col gap-1 text-xs">
 				<legend className="mb-1 text-muted-foreground">{t("gate.approval.approves")}</legend>
+				{wholeModel ? (
+					<label className="flex items-center gap-2" title={wholeModel}>
+						<Checkbox
+							checked={!unchecked.has(wholeModel)}
+							onCheckedChange={(checked) =>
+								setUnchecked((prev) => {
+									const next = new Set(prev);
+									if (checked === true) next.delete(wholeModel);
+									else next.add(wholeModel);
+									return next;
+								})
+							}
+						/>
+						{t("gate.approval.wholeModel", { model: model ?? "" })}
+					</label>
+				) : null}
 				{items.map((item) => (
 					<label key={item.iri} className="flex items-center gap-2" title={item.iri}>
 						<Checkbox

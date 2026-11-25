@@ -74,6 +74,7 @@
 	"gate.approval.approver": "Утверждающий",
 	"gate.approval.approverPlaceholder": "Выберите утверждающего",
 	"gate.approval.approves": "Элементы для утверждения",
+	"gate.approval.wholeModel": "Вся модель {{model}} (утверждена в main: её изменение требует повторного утверждения всей модели)",
 	"gate.approval.releaseApproves": "Будет утверждено: вся модель {{model}}, утверждающий {{approver}} (в релизе элементы не выбираются).",
 	"gate.approval.releaseModelPlaceholder": "Выберите модель для релиза",
 	"gate.approval.releaseStale": "Эта ветка утверждения релиза основана на {{commit}}, но origin/main уже {{main}}: нельзя ни утвердить, ни отклонить. Подготовьте новую ветку релиза.",

@@ -74,6 +74,7 @@
 	"gate.approval.approver": "批准人",
 	"gate.approval.approverPlaceholder": "选择批准人",
 	"gate.approval.approves": "要批准的元素",
+	"gate.approval.wholeModel": "整个模型 {{model}}（主分支上已批准，改动它须整模型重批）",
 	"gate.approval.releaseApproves": "将批准：整个模型 {{model}}，批准人 {{approver}}（发布不逐个勾选元素）。",
 	"gate.approval.releaseModelPlaceholder": "选择要发布的模型",
 	"gate.approval.releaseStale": "这条发布批准分支基于 {{commit}}，但 origin/main 已是 {{main}}：不能批准也不能驳回，请重新准备发布分支。",

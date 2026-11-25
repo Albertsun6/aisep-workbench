@@ -6,7 +6,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { appI18n } from "../i18n";
 import { Store as OxStore } from "oxigraph";
-import { APPROVERS_QUERY, AisepGatePage, NOT_APPROVABLE_QUERY, approvalCandidates } from "./AisepGatePage";
+import { APPROVED_MODELS_QUERY, APPROVERS_QUERY, AisepGatePage, NOT_APPROVABLE_QUERY, approvalCandidates, changedModels } from "./AisepGatePage";
 import {
 	AisepToolError,
 	iriColumn,
@@ -47,6 +47,21 @@ function progressRecords(ref: string, approved: boolean): QueryResult {
 }
 const DECISION_APPROVED = "https://aisep.example/ont/aisep#DecisionApproved";
 
+function approvedModels(models: string[]): QueryResult {
+	return { kind: "select", variables: ["model"], truncated: false, rows: models.map((m) => ({ model: { type: "iri", value: m } })) };
+}
+
+/** gateClient whose main has these models Approved (aisep #95), and whose diff is `changes` when given. */
+function approvedOnMainClient(models: string[], changes: DiffResult = diff) {
+	const made = gateClient({ diff: async () => changes });
+	const query = made.client.query.bind(made.client);
+	made.client.query = async (sparql, target, options) => {
+		if (sparql === APPROVED_MODELS_QUERY) return (made.calls.query.push([sparql, target]), approvedModels(models));
+		return query(sparql, target, options);
+	};
+	return made;
+}
+
 function gateClient(overrides: Partial<AisepModelClient> = {}) {
 	const calls = {
 		diff: [] as unknown[],
@@ -64,6 +79,7 @@ function gateClient(overrides: Partial<AisepModelClient> = {}) {
 			calls.query.push([sparql, target]);
 			if (sparql === APPROVERS_QUERY) return gateApprovers as QueryResult;
 			if (sparql === NOT_APPROVABLE_QUERY) return gateNotApprovable as QueryResult;
+			if (sparql === APPROVED_MODELS_QUERY) return approvedModels([]);
 			throw new Error(`unexpected query ${sparql}`);
 		},
 		recordApproval: async (input: ApprovalInput) => (calls.approve.push(input), gateApproval as ApprovalResult),
@@ -101,9 +117,14 @@ describe("AisepGatePage", () => {
 		expect(calls.diff).toEqual([{ head: BRANCH, detail: "items" }]);
 		expect(calls.gate).toEqual([{ ref: head }]);
 		expect(calls.query).toEqual(
-			expect.arrayContaining([[APPROVERS_QUERY, { ref: head }], [NOT_APPROVABLE_QUERY, { ref: head, limit: 10_000 }]]),
+			expect.arrayContaining([
+				[APPROVERS_QUERY, { ref: head }],
+				[NOT_APPROVABLE_QUERY, { ref: head, limit: 10_000 }],
+				// main's approval state, not the pinned commit's (aisep #95)
+				[APPROVED_MODELS_QUERY, { ref: diff.base.mainRef }],
+			]),
 		);
-		expect(calls.query).toHaveLength(2);
+		expect(calls.query).toHaveLength(3);
 		const progress = screen.getByRole("region", { name: en["gate.progress.title"] });
 		expect(await within(progress).findByText(en["gate.progress.stage.pending"])).toHaveAttribute("aria-current", "step");
 		expect(calls.progress).toEqual(
@@ -856,6 +877,69 @@ async function chooseApprover(approval: HTMLElement, name: string) {
 	await userEvent.click(await within(approval).findByRole("combobox", { name: en["gate.approval.approver"] }));
 	await userEvent.click(await screen.findByRole("option", { name }));
 }
+
+// A model Approved on main (e.g. by a release) needs re-approval as a whole when the branch changes it (aisep #95).
+describe("AisepGatePage on a branch that changes a model Approved on main", () => {
+	it("offers the whole model, checked, ahead of the elements, and reads main's approval state", async () => {
+		const { client, calls } = approvedOnMainClient([M]);
+		renderGate(client);
+		const approval = await screen.findByRole("region", { name: en["gate.approval.title"] });
+		const whole = await within(approval).findByRole("checkbox", { name: en["gate.approval.wholeModel"].replace("{{model}}", "procurement") });
+		expect(whole).toBeChecked();
+		expect(calls.query).toContainEqual([APPROVED_MODELS_QUERY, { ref: diff.base.mainRef ?? "refs/remotes/origin/main" }]);
+		await chooseApprover(approval, "评审人");
+		const approve = within(approval).getByRole("button", { name: en["gate.approval.approve"] });
+		await waitFor(() => expect(approve).toBeEnabled());
+		await userEvent.click(approve);
+		await waitFor(() => expect(calls.approve).toHaveLength(1));
+		expect(calls.approve[0].approves).toEqual([M, `${M}quotationLine`]);
+	});
+
+	it("leaves the whole model out when the user unchecks it", async () => {
+		const { client, calls } = approvedOnMainClient([M]);
+		renderGate(client);
+		const approval = await screen.findByRole("region", { name: en["gate.approval.title"] });
+		await userEvent.click(await within(approval).findByRole("checkbox", { name: en["gate.approval.wholeModel"].replace("{{model}}", "procurement") }));
+		await chooseApprover(approval, "评审人");
+		const approve = within(approval).getByRole("button", { name: en["gate.approval.approve"] });
+		await waitFor(() => expect(approve).toBeEnabled());
+		await userEvent.click(approve);
+		await waitFor(() => expect(calls.approve).toHaveLength(1));
+		expect(calls.approve[0].approves).toEqual([`${M}quotationLine`]);
+	});
+
+	it("offers the model even when the branch changes only its relationships", async () => {
+		const onlyRelationships: DiffResult = {
+			...diff,
+			items: [{ ...(diff.items ?? [])[0], iri: `${M}rel-a-assigned-b`, kind: "relationship", change: "added", files: { base: [], head: ["models/procurement/am4.ttl"] } }],
+		};
+		const { client, calls } = approvedOnMainClient([M], onlyRelationships);
+		renderGate(client);
+		const approval = await screen.findByRole("region", { name: en["gate.approval.title"] });
+		expect(await within(approval).findByRole("checkbox", { name: en["gate.approval.wholeModel"].replace("{{model}}", "procurement") })).toBeChecked();
+		await chooseApprover(approval, "评审人");
+		const approve = within(approval).getByRole("button", { name: en["gate.approval.approve"] });
+		await waitFor(() => expect(approve).toBeEnabled());
+		await userEvent.click(approve);
+		await waitFor(() => expect(calls.approve).toHaveLength(1));
+		expect(calls.approve[0]).toMatchObject({ model: "procurement", approves: [M] });
+	});
+
+	it("does not offer the whole model when it is not Approved on main", async () => {
+		renderGate(approvedOnMainClient(["https://aisep.example/model/sales/"]).client);
+		const approval = await screen.findByRole("region", { name: en["gate.approval.title"] });
+		expect(await within(approval).findByRole("button", { name: en["gate.approval.approve"] })).toBeInTheDocument();
+		expect(within(approval).queryByText(en["gate.approval.wholeModel"].split("{{")[0], { exact: false })).toBeNull();
+	});
+
+	it("counts a model as changed by anything but its approval records", () => {
+		const item = (diff.items ?? [])[0];
+		const at = (file: string) => ({ ...item, files: { base: [], head: [file] } });
+		expect([...changedModels({ ...diff, items: [at("models/workbench/governance/approval-x.ttl")] })]).toEqual([]);
+		expect([...changedModels({ ...diff, items: [at("models/workbench/governance.ttl"), at("models/sales/am4.ttl")] })]).toEqual(["workbench", "sales"]);
+		expect([...changedModels({ ...diff, items: [{ ...item, change: "removed", files: { base: ["models/sales/bpmn.ttl"], head: [] } }] })]).toEqual(["sales"]);
+	});
+});
 
 async function chooseModel(approval: HTMLElement, name: string) {
 	await userEvent.click(await within(approval).findByRole("combobox", { name: en["gate.approval.model"] }));
