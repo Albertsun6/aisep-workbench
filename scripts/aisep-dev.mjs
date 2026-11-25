@@ -2,7 +2,7 @@
 // AISEP 一键启动：aisep 的 MCP HTTP 服务（workbench 画像）+ 工作台网页版（dev:web），外加批准前只读预检。
 // 用法见 scripts/aisep-dev.md。只用 Node 内置模块，不碰上游依赖。
 // 默认是预览模式：allow-root 只含专用检出，分支 worktree 都不在里面，批准工具在这里会被拒（PATH_OUTSIDE_ROOT）。
-// --approve 才把 allow-root 扩到整个 aisep 目录，只由 Albert 本人在批准那一步启动。
+// --approve 才把 allow-root 扩到整个 aisep 目录，在批准那一步由会话启动，批准按钮只由 Albert 本人点。
 //
 //   node scripts/aisep-dev.mjs start [--approve] [--branch <分支>] [--workbench <工作台检出>] [--mcp-port N] [--web-port N] [--fetch-interval 秒]
 //   node scripts/aisep-dev.mjs refresh
@@ -541,7 +541,7 @@ async function start(opts) {
 	console.log("================ AISEP 工作台已就绪 ================");
 	console.log(`服务检出   ${SERVE_DIR} @ ${head.slice(0, 7)}（origin/main）`);
 	console.log(`工作台检出 ${workbench} @ ${tryGit(workbench, "rev-parse", "--short", "HEAD") ?? "?"}（${tryGit(workbench, "branch", "--show-current") || "游离"}）`);
-	console.log(`模式       ${approve ? "批准模式（--approve）：allow-root 覆盖所有会话的 worktree，只由 Albert 本人启动，批准完立即停止" : "预览模式：分支 worktree 不在 allow-root 内，批准会被拒（批准要用 --approve 重新启动）"}`);
+	console.log(`模式       ${approve ? "批准模式（--approve）：allow-root 覆盖所有会话的 worktree，由会话启动，批准按钮只由 Albert 本人点，批准完立即停止" : "预览模式：分支 worktree 不在 allow-root 内，批准会被拒（批准要用 --approve 重新启动）"}`);
 	console.log(`MCP        http://127.0.0.1:${mcpPort}/mcp  画像 workbench  allow-root ${roots.join(" , ")}`);
 	console.log(`AO 代理    ${aoApi}（「AI 进行中」一栏需要 AO 守护进程，默认不接）`);
 	console.log(`首页       ${base}/#/aisep`);
