@@ -74,6 +74,8 @@
 	"gate.approval.approver": "Approbateur",
 	"gate.approval.approverPlaceholder": "Choisir l’approbateur",
 	"gate.approval.approves": "Éléments à approuver",
+	"gate.approval.wholeModel": "Le modèle entier {{model}} (approuvé sur main : le modifier exige d’approuver à nouveau le modèle entier)",
+	"gate.approval.approvedModelsFailed": "Impossible de lire quels modèles sont approuvés sur main ; on ne sait pas s’il faut réapprouver le modèle entier, l’approbation est indisponible : {{message}}",
 	"gate.approval.releaseApproves": "Sera approuvé : le modèle entier {{model}}, approbateur {{approver}} (une publication ne choisit pas d’éléments).",
 	"gate.approval.releaseModelPlaceholder": "Choisir le modèle à publier",
 	"gate.approval.releaseStale": "Cette branche d’approbation de publication part de {{commit}}, mais origin/main est maintenant {{main}} : ni approbation ni rejet possible. Préparez une nouvelle branche de publication.",

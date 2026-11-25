@@ -74,6 +74,8 @@
 	"gate.approval.approver": "Aprovador",
 	"gate.approval.approverPlaceholder": "Escolha quem aprova",
 	"gate.approval.approves": "Elementos a aprovar",
+	"gate.approval.wholeModel": "O modelo inteiro {{model}} (aprovado na main: alterá-lo exige aprovar de novo o modelo inteiro)",
+	"gate.approval.approvedModelsFailed": "Não foi possível ler quais modelos estão aprovados na main, então não se sabe se o modelo inteiro precisa ser aprovado de novo; a aprovação está indisponível: {{message}}",
 	"gate.approval.releaseApproves": "Será aprovado: o modelo inteiro {{model}}, aprovador {{approver}} (um lançamento não escolhe elementos).",
 	"gate.approval.releaseModelPlaceholder": "Escolha o modelo a lançar",
 	"gate.approval.releaseStale": "Este ramo de aprovação de lançamento parte de {{commit}}, mas origin/main já é {{main}}: não pode ser aprovado nem rejeitado. Prepare um novo ramo de lançamento.",

@@ -74,6 +74,8 @@
 	"gate.approval.approver": "승인자",
 	"gate.approval.approverPlaceholder": "승인자 선택",
 	"gate.approval.approves": "승인할 요소",
+	"gate.approval.wholeModel": "모델 {{model}} 전체(main에서 승인됨: 바꾸려면 모델 전체를 다시 승인해야 함)",
+	"gate.approval.approvedModelsFailed": "main에서 승인된 모델을 읽지 못해 모델 전체를 다시 승인해야 하는지 알 수 없으므로 승인할 수 없습니다: {{message}}",
 	"gate.approval.releaseApproves": "승인 내용: 모델 {{model}} 전체, 승인자 {{approver}}(릴리스는 요소를 고르지 않습니다).",
 	"gate.approval.releaseModelPlaceholder": "릴리스할 모델 선택",
 	"gate.approval.releaseStale": "이 릴리스 승인 브랜치는 {{commit}} 기준인데 origin/main은 이미 {{main}}입니다. 승인도 반려도 할 수 없습니다. 릴리스 브랜치를 다시 준비하세요.",
