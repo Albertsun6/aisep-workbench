@@ -545,7 +545,7 @@ async function start(opts) {
 	console.log(`MCP        http://127.0.0.1:${mcpPort}/mcp  画像 workbench  allow-root ${roots.join(" , ")}`);
 	console.log(`AO 代理    ${aoApi}（「AI 进行中」一栏需要 AO 守护进程，默认不接）`);
 	console.log(`首页       ${base}/#/aisep`);
-	if (opts.branch) console.log(`关口页     ${base}/#/aisep/gate/${opts.branch}`);
+	if (opts.branch) console.log(`关口页     ${base}/#/aisep/gate/${opts.branch}（只对应 ${opts.branch}；别的分支从首页进）`);
 	else console.log(`关口页     ${base}/#/aisep/gate/<分支名>（start 加 --branch 直接打印）`);
 	if (opts.branch && approve) console.log(`预检       node ${join(WORKBENCH_DEFAULT, "scripts/aisep-dev.mjs")} preflight ${opts.branch} --mcp-port ${mcpPort}`);
 	console.log(
