@@ -75,6 +75,7 @@
 	"gate.approval.approverPlaceholder": "Elige quién aprueba",
 	"gate.approval.approves": "Elementos a aprobar",
 	"gate.approval.wholeModel": "El modelo completo {{model}} (aprobado en main: cambiarlo requiere aprobar de nuevo el modelo completo)",
+	"gate.approval.approvedModelsFailed": "No se pudo leer qué modelos están aprobados en main, así que no se sabe si hay que aprobar de nuevo el modelo completo; no se puede aprobar: {{message}}",
 	"gate.approval.releaseApproves": "Se aprobará: el modelo completo {{model}}, aprueba {{approver}} (una publicación no elige elementos).",
 	"gate.approval.releaseModelPlaceholder": "Elige el modelo a publicar",
 	"gate.approval.releaseStale": "Esta rama de aprobación de publicación parte de {{commit}}, pero origin/main ya es {{main}}: no se puede aprobar ni rechazar. Prepara una nueva rama de publicación.",

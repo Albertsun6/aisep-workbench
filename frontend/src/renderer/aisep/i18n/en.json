@@ -75,6 +75,7 @@
 	"gate.approval.approverPlaceholder": "Choose an approver",
 	"gate.approval.approves": "Elements to approve",
 	"gate.approval.wholeModel": "The whole model {{model}} (approved on main: changing it needs the whole model approved again)",
+	"gate.approval.approvedModelsFailed": "Could not read which models are approved on main, so it is unknown whether the whole model must be approved again; approval is unavailable: {{message}}",
 	"gate.approval.releaseApproves": "Will approve: the whole model {{model}}, approver {{approver}} (a release does not pick elements).",
 	"gate.approval.releaseModelPlaceholder": "Choose the model to release",
 	"gate.approval.releaseStale": "This release approval branch is based on {{commit}}, but origin/main is now {{main}}: it can be neither approved nor rejected. Prepare a new release branch.",

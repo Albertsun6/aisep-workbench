@@ -297,6 +297,7 @@ describe("AisepGatePage", () => {
 				if (sparql === APPROVAL_RECORDS_QUERY) return records(target.ref);
 				if (sparql === APPROVERS_QUERY) return gateApprovers as QueryResult;
 				if (sparql === NOT_APPROVABLE_QUERY) return gateNotApprovable as QueryResult;
+				if (sparql === APPROVED_MODELS_QUERY) return approvedModels([]);
 				throw new Error(`unexpected query ${sparql}`);
 			},
 		});
@@ -326,6 +327,7 @@ describe("AisepGatePage", () => {
 				if (sparql === APPROVAL_RECORDS_QUERY) return read.then(() => progressRecords(target.ref, false));
 				if (sparql === APPROVERS_QUERY) return gateApprovers as QueryResult;
 				if (sparql === NOT_APPROVABLE_QUERY) return gateNotApprovable as QueryResult;
+				if (sparql === APPROVED_MODELS_QUERY) return approvedModels([]);
 				throw new Error(`unexpected query ${sparql}`);
 			},
 		});
@@ -357,6 +359,7 @@ describe("AisepGatePage", () => {
 				}
 				if (sparql === APPROVERS_QUERY) return gateApprovers as QueryResult;
 				if (sparql === NOT_APPROVABLE_QUERY) return gateNotApprovable as QueryResult;
+				if (sparql === APPROVED_MODELS_QUERY) return approvedModels([]);
 				throw new Error(`unexpected query ${sparql}`);
 			},
 		});
@@ -482,6 +485,7 @@ function guardClient(
 					),
 				};
 			}
+			if (sparql === APPROVED_MODELS_QUERY) return approvedModels([]);
 			if (sparql !== APPROVAL_RECORDS_QUERY) throw new Error(`unexpected query ${sparql}`);
 			if (!target.ref.startsWith(`${head}~`)) return progressRecords(target.ref, true);
 			const m = target.ref.slice(head.length).match(/^~(\d+)(\^2)?$/);
@@ -616,6 +620,7 @@ describe("repeat approval guard: coverage unknown", () => {
 				if (sparql === NOT_APPROVABLE_QUERY) return gateNotApprovable as QueryResult;
 				// The branch progress reads fine (pending); only the walk from the pinned head fails.
 				if (sparql === APPROVAL_RECORDS_QUERY && !target.ref.startsWith(`${head}~`)) return progressRecords(target.ref, false);
+				if (sparql === APPROVED_MODELS_QUERY) return approvedModels([]);
 				throw new Error("socket hang up");
 			},
 		});
@@ -678,6 +683,7 @@ function approversClient(rows: unknown[]) {
 			if (sparql === APPROVAL_RECORDS_QUERY) return progressRecords(target.ref, false);
 			if (sparql === APPROVERS_QUERY) return answer;
 			if (sparql === NOT_APPROVABLE_QUERY) return gateNotApprovable as QueryResult;
+			if (sparql === APPROVED_MODELS_QUERY) return approvedModels([]);
 			throw new Error(`unexpected query ${sparql}`);
 		},
 	});
@@ -798,6 +804,7 @@ describe("approver choices", () => {
 					throw new Error("approvers unreadable");
 				}
 				if (sparql === NOT_APPROVABLE_QUERY) return gateNotApprovable as QueryResult;
+				if (sparql === APPROVED_MODELS_QUERY) return approvedModels([]);
 				throw new Error(`unexpected query ${sparql}`);
 			},
 		});
@@ -932,12 +939,45 @@ describe("AisepGatePage on a branch that changes a model Approved on main", () =
 		expect(within(approval).queryByText(en["gate.approval.wholeModel"].split("{{")[0], { exact: false })).toBeNull();
 	});
 
+	it("cannot approve until main's approval state is read", async () => {
+		const made = gateClient();
+		const query = made.client.query.bind(made.client);
+		made.client.query = async (sparql, target, options) =>
+			sparql === APPROVED_MODELS_QUERY ? new Promise<QueryResult>(() => {}) : query(sparql, target, options);
+		renderGate(made.client);
+		const approval = await screen.findByRole("region", { name: en["gate.approval.title"] });
+		await chooseApprover(approval, "评审人");
+		await new Promise((done) => setTimeout(done, 50));
+		expect(within(approval).getByRole("button", { name: en["gate.approval.approve"] })).toBeDisabled();
+		expect(within(approval).getByRole("button", { name: en["gate.approval.reject"] })).toBeDisabled();
+	});
+
+	it("says main's approval state could not be read and offers no approval, even for a relationship-only change", async () => {
+		for (const changes of [diff, { ...diff, items: [{ ...(diff.items ?? [])[0], kind: "relationship" as const, files: { base: [], head: ["models/procurement/am4.ttl"] } }] }]) {
+			const made = gateClient({ diff: async () => changes });
+			const query = made.client.query.bind(made.client);
+			made.client.query = async (sparql, target, options) => {
+				if (sparql === APPROVED_MODELS_QUERY) throw new AisepToolError("QUERY_FAILED", "boom", false);
+				return query(sparql, target, options);
+			};
+			renderGate(made.client);
+			const approval = await screen.findByRole("region", { name: en["gate.approval.title"] });
+			expect(await within(approval).findByRole("alert")).toHaveTextContent(en["gate.approval.approvedModelsFailed"].split("{{")[0]);
+			expect(within(approval).queryByRole("button", { name: en["gate.approval.approve"] })).toBeNull();
+			expect(within(approval).queryByText(en["gate.approval.none"])).toBeNull();
+			cleanup();
+		}
+	});
+
 	it("counts a model as changed by anything but its approval records", () => {
 		const item = (diff.items ?? [])[0];
 		const at = (file: string) => ({ ...item, files: { base: [], head: [file] } });
 		expect([...changedModels({ ...diff, items: [at("models/workbench/governance/approval-x.ttl")] })]).toEqual([]);
 		expect([...changedModels({ ...diff, items: [at("models/workbench/governance.ttl"), at("models/sales/am4.ttl")] })]).toEqual(["workbench", "sales"]);
 		expect([...changedModels({ ...diff, items: [{ ...item, change: "removed", files: { base: ["models/sales/bpmn.ttl"], head: [] } }] })]).toEqual(["sales"]);
+		// moved between models: both change; schema items are not model content
+		expect([...changedModels({ ...diff, items: [{ ...item, files: { base: ["models/sales/am4.ttl"], head: ["models/workbench/am4.ttl"] } }] })].sort()).toEqual(["sales", "workbench"]);
+		expect([...changedModels({ ...diff, items: [{ ...at("models/sales/am4.ttl"), kind: "schema" as const }] })]).toEqual([]);
 	});
 });
 
@@ -1027,6 +1067,7 @@ describe("AisepGatePage on a release approval branch", () => {
 			query: async (sparql: string) => {
 				if (sparql === APPROVERS_QUERY) return one;
 				if (sparql === APPROVAL_RECORDS_QUERY) return { kind: "select", variables: ["record", "decision"], rows: [], truncated: false };
+				if (sparql === APPROVED_MODELS_QUERY) return approvedModels([]);
 				throw new Error(`unexpected query ${sparql}`);
 			},
 		});
@@ -1168,6 +1209,7 @@ describe("AisepGatePage on a release approval branch", () => {
 			query: async (sparql: string) => {
 				if (sparql === APPROVERS_QUERY) return two;
 				if (sparql === APPROVAL_RECORDS_QUERY) return { kind: "select", variables: ["record", "decision"], rows: [], truncated: false };
+				if (sparql === APPROVED_MODELS_QUERY) return approvedModels([]);
 				throw new Error(`unexpected query ${sparql}`);
 			},
 		});
@@ -1184,6 +1226,7 @@ describe("AisepGatePage on a release approval branch", () => {
 			query: async (sparql: string) => {
 				if (sparql === APPROVERS_QUERY) return { ...two, rows: [] };
 				if (sparql === APPROVAL_RECORDS_QUERY) return { kind: "select", variables: ["record", "decision"], rows: [], truncated: false };
+				if (sparql === APPROVED_MODELS_QUERY) return approvedModels([]);
 				throw new Error(`unexpected query ${sparql}`);
 			},
 		});

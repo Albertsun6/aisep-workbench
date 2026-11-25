@@ -91,13 +91,18 @@ function slugOfModel(iri: Iri): string | undefined {
  */
 export const APPROVED_MODELS_QUERY = `SELECT ?model WHERE { ?model a arch:Model ; arch:approvalState arch:Approved }`;
 
-/** Slugs of the models whose content the diff changes (approval records under models/<slug>/governance/ excluded). */
+/**
+ * Slugs of the models whose content the diff changes: every file an item lives in, on either side (an element moved
+ * between models changes both). Approval records under models/<slug>/governance/ and schema items are not model content.
+ */
 export function changedModels(diff: DiffResult): Set<string> {
 	const slugs = new Set<string>();
 	for (const item of diff.items ?? []) {
-		const file = item.files.head[0] ?? item.files.base[0];
-		const slug = modelSlug(file);
-		if (slug && !file?.startsWith(`models/${slug}/governance/`)) slugs.add(slug);
+		if (item.kind === "schema") continue;
+		for (const file of [...item.files.head, ...item.files.base]) {
+			const slug = modelSlug(file);
+			if (slug && !file.startsWith(`models/${slug}/governance/`)) slugs.add(slug);
+		}
 	}
 	return slugs;
 }
@@ -477,6 +482,17 @@ function ApprovalSection({
 		record.mutate(decision);
 	};
 
+	// Without main's approval state the page cannot tell whether a whole model must be approved again (aisep #95):
+	// an approval of the elements alone would then fail the merge check.
+	if (!release && approvedOnMain.isError) {
+		return (
+			<GateSection titleKey="gate.approval.title">
+				<p role="alert" className="text-xs text-destructive">
+					{t("gate.approval.approvedModelsFailed", { message: aisepErrorMessage(approvedOnMain.error) })}
+				</p>
+			</GateSection>
+		);
+	}
 	if (notApprovable.isError) {
 		return (
 			<GateSection titleKey="gate.approval.title">

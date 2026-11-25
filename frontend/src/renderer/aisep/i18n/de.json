@@ -75,6 +75,7 @@
 	"gate.approval.approverPlaceholder": "Freigebende Person wählen",
 	"gate.approval.approves": "Freizugebende Elemente",
 	"gate.approval.wholeModel": "Das ganze Modell {{model}} (auf main freigegeben: Änderungen erfordern eine erneute Freigabe des ganzen Modells)",
+	"gate.approval.approvedModelsFailed": "Konnte nicht lesen, welche Modelle auf main freigegeben sind; ob das ganze Modell erneut freigegeben werden muss, ist unklar, daher ist keine Freigabe möglich: {{message}}",
 	"gate.approval.releaseApproves": "Wird freigegeben: das ganze Modell {{model}}, freigegeben von {{approver}} (ein Release wählt keine Elemente).",
 	"gate.approval.releaseModelPlaceholder": "Zu veröffentlichendes Modell wählen",
 	"gate.approval.releaseStale": "Dieser Release-Freigabezweig basiert auf {{commit}}, origin/main steht aber auf {{main}}: weder Freigabe noch Ablehnung möglich. Bitte einen neuen Release-Zweig vorbereiten.",
