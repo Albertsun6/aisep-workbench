@@ -956,6 +956,30 @@ describe("AisepGatePage on a release approval branch", () => {
 		).toBeInTheDocument();
 	});
 
+	it("rejects a release as a GateRelease record on R (acRejectReleaseRecorded)", async () => {
+		const calls = renderRelease();
+		const approval = await screen.findByRole("region", { name: en["gate.approval.title"] });
+		await chooseModel(approval, "procurement");
+		await chooseApprover(approval, "评审人");
+		const reject = within(approval).getByRole("button", { name: en["gate.approval.reject"] });
+		await waitFor(() => expect(reject).toBeEnabled());
+		await userEvent.click(reject);
+		await waitFor(() => expect(calls.approve).toHaveLength(1));
+		expect(calls.approve[0]).toEqual({
+			model: "procurement",
+			gate: "GateRelease",
+			decision: "Rejected",
+			approvedBy: (gateApprovers as QueryResult & { rows: { approver: { value: string }; prefLabel: { value: string } }[] }).rows.find(
+				(row) => row.prefLabel.value === "评审人",
+			)?.approver.value,
+			approves: [M],
+			branch: RELEASE,
+			headCommit: head,
+			expectedBaseCommit: diff.base.commit,
+		});
+		expect(calls.approve[0]).not.toHaveProperty("activity");
+	});
+
 	it("can neither approve nor reject once origin/main moved past R (acReleaseStaleBlocks)", async () => {
 		renderRelease({}, OTHER);
 		const approval = await screen.findByRole("region", { name: en["gate.approval.title"] });
