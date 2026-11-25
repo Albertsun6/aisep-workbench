@@ -32,8 +32,8 @@ import { useAisepT, type AisepMessageKey } from "./i18n";
 
 /**
  * §5.9 approvedBy: an existing arch:Stakeholder that is not an aisep:AIAgent (AI cannot approve). The page offers only
- * the Stakeholders of the model being approved (?model): the server accepts any model's, and the first approval of
- * aisep models/workbench #68 ended up signed by a procurement Stakeholder that way.
+ * the Stakeholders of the model being approved (?model): the approver must be a Stakeholder of the approved model
+ * (arch:inModel), and the server's approval tool rejects any other with approver-not-in-model (aisep/approval.py).
  */
 export const APPROVERS_QUERY = `PREFIX aisep: <https://aisep.example/ont/aisep#>
 PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
