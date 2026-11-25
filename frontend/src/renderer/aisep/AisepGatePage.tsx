@@ -356,7 +356,9 @@ function ApprovalSection({
 	// whose head is an approval commit already has a decision, and one cut elsewhere is not R.
 	const releaseBlocked = release && mainHead.data !== commit;
 	const [chosenModel, setModel] = useState<string>();
-	const model = chosenModel !== undefined && models.includes(chosenModel) ? chosenModel : models[0];
+	// A release names no model until the person picks one (#93: the alphabetically first was approved by mistake).
+	const model =
+		chosenModel !== undefined && models.includes(chosenModel) ? chosenModel : release ? undefined : models[0];
 	const [chosenGate, setGate] = useState<GateId>("GateArchitecture");
 	const gate: GateId = release ? "GateRelease" : chosenGate;
 	const [chosenApprover, setApprover] = useState<Iri | undefined>();
@@ -507,8 +509,9 @@ function ApprovalSection({
 	return (
 		<GateSection titleKey="gate.approval.title">
 			<div className="flex flex-wrap items-end gap-3 text-xs">
-				{models.length > 1 ? (
+				{release || models.length > 1 ? (
 					<LabeledSelect label={t("gate.approval.model")} value={model} onValueChange={setModel}
+						placeholder={release ? t("gate.approval.releaseModelPlaceholder") : undefined}
 						options={models.map((slug) => ({ value: slug, label: slug }))} />
 				) : null}
 				<LabeledSelect label={t("gate.approval.gate")} value={gate} onValueChange={(value) => setGate(value as GateId)}
@@ -522,7 +525,14 @@ function ApprovalSection({
 				) : null}
 			</div>
 			{release ? (
-				<p className="text-xs">{t("gate.approval.releaseApproves", { model: model ?? "" })}</p>
+				model !== undefined && approver !== undefined ? (
+					<p className="text-xs">
+						{t("gate.approval.releaseApproves", {
+							model,
+							approver: modelApprovers.find((a) => a.iri === approver)?.prefLabel ?? "",
+						})}
+					</p>
+				) : null
 			) : (
 			<fieldset className="flex flex-col gap-1 text-xs">
 				<legend className="mb-1 text-muted-foreground">{t("gate.approval.approves")}</legend>
