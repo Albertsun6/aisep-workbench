@@ -319,7 +319,6 @@ function ModelFilter({ value, onChange, onCommit }: { value: string; onChange: (
 			<Input
 				id={id}
 				value={value}
-				placeholder="procurement"
 				onChange={(event) => onChange(event.target.value)}
 				onBlur={onCommit}
 				className="h-control-form w-40 text-xs"
