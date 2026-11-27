@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { expect, test } from "@playwright/test";
 
 // AISEP views page (src/renderer/aisep/AisepViewsPage.tsx) on the web build, which has no model server URL and so
@@ -35,6 +36,27 @@ test("aisep: views page lists the example views and shows one as an image @T0 @A
 
 	await page.getByRole("button", { name: "适应窗口" }).click();
 	await expect(level).toHaveText(fitted ?? "");
+
+	// Still fitted after a window resize (no manual zoom since "fit"); the zoom level follows the new size.
+	await page.setViewportSize({ width: 1000, height: 700 });
+	await expect(level).not.toHaveText(fitted ?? "");
+	const refitted = await level.textContent();
+	await page.setViewportSize({ width: 1440, height: 900 });
+	await expect(level).toHaveText(fitted ?? "");
+	// After a manual zoom a resize leaves the zoom alone.
+	await page.getByRole("button", { name: "放大" }).click();
+	const zoomed = await level.textContent();
+	await page.setViewportSize({ width: 1000, height: 700 });
+	await expect(level).toHaveText(zoomed ?? "");
+	expect(zoomed).not.toBe(refitted);
+	await page.setViewportSize({ width: 1440, height: 900 });
+
+	// The web build saves through a blob download (the desktop app shows a save dialog); the file is the server's SVG.
+	const [download] = await Promise.all([page.waitForEvent("download"), page.getByRole("button", { name: "下载 SVG" }).click()]);
+	expect(download.suggestedFilename()).toBe("Layered Viewpoint.svg");
+	const saved = await download.path();
+	const layered = JSON.parse(readFileSync("src/renderer/aisep/data/fixtures/view-procurement-layered.json", "utf8")) as { svg: string };
+	expect(readFileSync(saved, "utf8")).toBe(layered.svg);
 
 	const screenshot = process.env.AISEP_VIEWS_SCREENSHOT;
 	if (screenshot) await page.screenshot({ path: screenshot });

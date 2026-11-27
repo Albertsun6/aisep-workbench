@@ -143,6 +143,7 @@
 	"views.zoomLevel": "{{percent}} %",
 	"views.zoomLevelLabel": "Масштаб",
 	"views.fit": "По размеру окна",
-	"views.actualSize": "100 %",
-	"views.download": "Скачать SVG"
+	"views.actualSize": "Реальный размер",
+	"views.download": "Скачать SVG",
+	"views.downloadError": "Не удалось сохранить SVG: {{message}}"
 }

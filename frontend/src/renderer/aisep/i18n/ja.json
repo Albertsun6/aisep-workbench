@@ -143,6 +143,7 @@
 	"views.zoomLevel": "{{percent}}%",
 	"views.zoomLevelLabel": "拡大率",
 	"views.fit": "ウィンドウに合わせる",
-	"views.actualSize": "100%",
-	"views.download": "SVG をダウンロード"
+	"views.actualSize": "実際のサイズ",
+	"views.download": "SVG をダウンロード",
+	"views.downloadError": "SVG を保存できませんでした：{{message}}"
 }

@@ -2,11 +2,12 @@
 // Read-only: writing views is not in this version (§1). The SVG is never put into the DOM as markup: it is shown as an
 // <img> of a data: URL, where scripts never run and its <style> and ids stay inside the image.
 import { useQuery } from "@tanstack/react-query";
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, type PointerEvent } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type PointerEvent } from "react";
 import { Download, LayoutGrid, Maximize2, ZoomIn, ZoomOut } from "@/components/app-icons";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import { Pressable } from "@/components/ui/pressable";
 import { PageTopbar, PageTopbarTitle } from "../components/PageTopbar";
+import { aoBridge } from "../lib/bridge";
 import { aisepErrorMessage } from "./AisepApprovalProgress";
 import { modelClient } from "./AisepWorkbenchPage";
 import { AisepToolError, type AisepModelClient, type ModelViews, type RenderViewInput, type ViewsResult } from "./data/client";
@@ -14,8 +15,22 @@ import { FixtureClient, fixtureClient, renderKey } from "./data/fixture-client";
 import { McpProtocolError, shouldRetryAisep } from "./data/mcp-client";
 import { useAisepT, type AisepT } from "./i18n";
 
-/** JSON-RPC "invalid params": what a server without the view tools (before aisep PR #174) answers for an unknown tool. */
-const UNKNOWN_TOOL = -32602;
+/** JSON-RPC "invalid params". */
+const INVALID_PARAMS = -32602;
+
+/**
+ * A server without the view tools (before aisep PR #174) refuses the name: "invalid params" with the message
+ * "Unknown tool: model_list_views" (aisep/server.py). The code alone is not enough: the same code also means the tool
+ * is there and refused its arguments, a real failure that must be shown, not papered over with the examples.
+ */
+function hasNoViewTools(error: unknown): boolean {
+	return (
+		error instanceof McpProtocolError &&
+		error.rpcCode === INVALID_PARAMS &&
+		// The client prefixes every message with the tool it called, so the name must follow "Unknown tool".
+		/Unknown tool:?\s*model_list_views\b/i.test(error.message)
+	);
+}
 
 /** The listed views, and whether they are the recorded examples because the server has no view tools yet. */
 interface ViewsListing {
@@ -63,7 +78,7 @@ export function AisepViewsPage({ client = modelClient }: { client?: AisepModelCl
 			try {
 				return { result: await client.listViews({}, { signal }), fallback: false };
 			} catch (error) {
-				if (error instanceof McpProtocolError && error.rpcCode === UNKNOWN_TOOL) {
+				if (hasNoViewTools(error)) {
 					return { result: await fixtureClient.listViews(), fallback: true };
 				}
 				throw error;
@@ -157,7 +172,7 @@ function ModelGroup({
 			{groups.length === 0 ? <p className="px-2 text-xs text-muted-foreground">{t("views.modelEmpty")}</p> : null}
 			{groups.map((group) => (
 				<div key={group.id} className="mb-2">
-					<h3 className="px-2 py-1 text-2xs text-muted-foreground">{group.title}</h3>
+					<h3 className="px-2 py-1 text-caption text-muted-foreground">{group.title}</h3>
 					<ul>
 						{group.items.map((item) => {
 							const key = `${model.slug}|${renderKey(item.render)}`;
@@ -169,7 +184,7 @@ function ModelGroup({
 										className="flex w-full flex-col rounded-md px-2 py-1 text-xs hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring/60 aria-[current=true]:bg-muted"
 									>
 										<span className="text-foreground">{item.label}</span>
-										<span className="text-2xs text-muted-foreground">{item.meta}</span>
+										<span className="text-caption text-muted-foreground">{item.meta}</span>
 									</Pressable>
 								</li>
 							);
@@ -224,16 +239,24 @@ function ViewPane({ client, selected, t }: { client: AisepModelClient; selected:
 	);
 }
 
-/** Zoom with the buttons, pan by dragging; opens fitted to the pane. */
+/**
+ * Zoom with the buttons, pan by dragging; opens fitted to the pane and stays fitted when the window or the panes are
+ * resized, until the user zooms or pans (fit goes back to that).
+ */
 function SvgViewer({ svg, title, t }: { svg: string; title: string; t: AisepT }) {
 	const viewport = useRef<HTMLDivElement>(null);
-	const size = svgSize(svg);
+	// Computed once per SVG, not on every drag move (a large SVG is hundreds of KB to encode).
+	const size = useMemo(() => svgSize(svg), [svg]);
+	const src = useMemo(() => svgDataUrl(svg), [svg]);
 	const [scale, setScale] = useState(1);
 	const [offset, setOffset] = useState({ x: 0, y: 0 });
 	const drag = useRef<{ x: number; y: number; ox: number; oy: number } | undefined>(undefined);
-	const src = svgDataUrl(svg);
+	/** The user zoomed or panned: a resize must not undo that. */
+	const adjusted = useRef(false);
+	const [downloadError, setDownloadError] = useState("");
 
 	const fit = useCallback(() => {
+		adjusted.current = false;
 		const box = viewport.current;
 		const width = box?.clientWidth ?? 0;
 		const height = box?.clientHeight ?? 0;
@@ -242,7 +265,16 @@ function SvgViewer({ svg, title, t }: { svg: string; title: string; t: AisepT })
 		setScale(next);
 		setOffset({ x: Math.max(0, (width - size.width * next) / 2), y: Math.max(0, (height - size.height * next) / 2) });
 	}, [size.width, size.height]);
-	useLayoutEffect(fit, [fit]);
+	useLayoutEffect(() => {
+		fit();
+		const box = viewport.current;
+		if (!box || typeof ResizeObserver === "undefined") return;
+		const observer = new ResizeObserver(() => {
+			if (!adjusted.current) fit();
+		});
+		observer.observe(box);
+		return () => observer.disconnect();
+	}, [fit]);
 
 	/** Zoom about the pane's centre, so what is in the middle stays there. */
 	const zoomTo = (next: number) => {
@@ -250,6 +282,7 @@ function SvgViewer({ svg, title, t }: { svg: string; title: string; t: AisepT })
 		const cx = (box?.clientWidth ?? 0) / 2;
 		const cy = (box?.clientHeight ?? 0) / 2;
 		const clamped = clampZoom(next);
+		adjusted.current = true;
 		setOffset((o) => ({ x: cx - ((cx - o.x) * clamped) / scale, y: cy - ((cy - o.y) * clamped) / scale }));
 		setScale(clamped);
 	};
@@ -264,7 +297,22 @@ function SvgViewer({ svg, title, t }: { svg: string; title: string; t: AisepT })
 	};
 	const onPointerMove = (event: PointerEvent<HTMLDivElement>) => {
 		const d = drag.current;
-		if (d) setOffset({ x: d.ox + event.clientX - d.x, y: d.oy + event.clientY - d.y });
+		if (!d) return;
+		adjusted.current = true;
+		setOffset({ x: d.ox + event.clientX - d.x, y: d.oy + event.clientY - d.y });
+	};
+	/**
+	 * Saved through the app's own save path (a save dialog in the desktop app, a blob download on the web), as other
+	 * downloads are: the desktop window blocks navigation, so a data: link may not download there. The file is the
+	 * server's SVG byte for byte.
+	 */
+	const download = async () => {
+		setDownloadError("");
+		try {
+			await aoBridge.chatImage.save({ name: fileName(title), bytes: new TextEncoder().encode(svg) });
+		} catch (error) {
+			setDownloadError(t("views.downloadError", { message: aisepErrorMessage(error) }));
+		}
 	};
 
 	return (
@@ -286,33 +334,45 @@ function SvgViewer({ svg, title, t }: { svg: string; title: string; t: AisepT })
 				<Button variant="ghost" size="sm" onClick={() => zoomTo(1)}>
 					{t("views.actualSize")}
 				</Button>
-				<a href={src} download={fileName(title)} className={buttonVariants({ variant: "ghost", size: "sm" })}>
+				<Button variant="ghost" size="sm" onClick={() => void download()}>
 					<Download aria-hidden="true" />
 					{t("views.download")}
-				</a>
+				</Button>
+				{downloadError ? (
+					<p role="alert" className="text-xs text-destructive">
+						{downloadError}
+					</p>
+				) : null}
 			</div>
-			<div
-				ref={viewport}
-				data-testid="aisep-view-viewport"
-				onPointerDown={onPointerDown}
-				onPointerMove={onPointerMove}
-				className="relative min-h-0 flex-1 cursor-grab touch-none overflow-hidden bg-white select-none active:cursor-grabbing"
-			>
-				<img
-					src={src}
-					alt={title}
-					draggable={false}
-					width={size.width}
-					height={size.height}
-					style={{
-						position: "absolute",
-						left: 0,
-						top: 0,
-						maxWidth: "none",
-						transformOrigin: "0 0",
-						transform: `translate(${offset.x}px, ${offset.y}px) scale(${scale})`,
-					}}
-				/>
+			{/*
+			  White in both themes on purpose: the diagrams are drawn in the light ArchiMate/C4 notation (dark text and
+			  pale fills, no background of their own), so on a dark backdrop they would be unreadable. The theme border
+			  sets the white area off from a dark page.
+			*/}
+			<div className="flex min-h-0 flex-1 p-3">
+				<div
+					ref={viewport}
+					data-testid="aisep-view-viewport"
+					onPointerDown={onPointerDown}
+					onPointerMove={onPointerMove}
+					className="relative min-h-0 flex-1 cursor-grab touch-none overflow-hidden rounded-md border border-border bg-white select-none active:cursor-grabbing"
+				>
+					<img
+						src={src}
+						alt={title}
+						draggable={false}
+						width={size.width}
+						height={size.height}
+						style={{
+							position: "absolute",
+							left: 0,
+							top: 0,
+							maxWidth: "none",
+							transformOrigin: "0 0",
+							transform: `translate(${offset.x}px, ${offset.y}px) scale(${scale})`,
+						}}
+					/>
+				</div>
 			</div>
 		</div>
 	);

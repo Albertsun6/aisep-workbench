@@ -1,9 +1,10 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { cleanup, render, screen, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { aoBridge } from "../lib/bridge";
 import { AisepViewsPage, svgDataUrl, svgSize } from "./AisepViewsPage";
 import { AisepToolError, type AisepModelClient, type RenderedView, type ViewsResult } from "./data/client";
 import { fixtureClient } from "./data/fixture-client";
@@ -90,7 +91,11 @@ const MIXED: ViewsResult = {
 	source: { repo: "/fixture/repo", ref: null, commit: null },
 };
 
-afterEach(cleanup);
+afterEach(() => {
+	cleanup();
+	vi.restoreAllMocks();
+	vi.unstubAllGlobals();
+});
 
 describe("AisepViewsPage list", () => {
 	it("lists the recorded views by model and says it is example data", async () => {
@@ -141,6 +146,21 @@ describe("AisepViewsPage list", () => {
 		await open(/Layered Viewpoint/);
 		expect(await screen.findByRole("img", { name: "Layered Viewpoint" })).toBeInTheDocument();
 	});
+
+	it("shows a refused argument as an error, not the examples: invalid params is not always an unknown tool", async () => {
+		const badArgs = new McpProtocolError("model_list_views: Invalid arguments: model: Input should be a valid string", 200, -32602);
+		renderPage(liveClient({ listViews: async () => Promise.reject(badArgs) }));
+		expect(await screen.findByRole("alert")).toHaveTextContent("Invalid arguments");
+		expect(screen.queryByText(en["views.fallbackNotice"])).toBeNull();
+		expect(screen.queryByRole("region", { name: "采购" })).toBeNull();
+	});
+
+	it("does not fall back when another tool is unknown", async () => {
+		const other = new McpProtocolError("model_list_views: Unknown tool: model_query", 200, -32602);
+		renderPage(liveClient({ listViews: async () => Promise.reject(other) }));
+		expect(await screen.findByRole("alert")).toHaveTextContent("Unknown tool: model_query");
+		expect(screen.queryByText(en["views.fallbackNotice"])).toBeNull();
+	});
 });
 
 describe("AisepViewsPage viewer", () => {
@@ -155,9 +175,80 @@ describe("AisepViewsPage viewer", () => {
 		expect(image).toHaveAttribute("height", "726");
 		expect(screen.getByRole("heading", { level: 2, name: "Layered Viewpoint" })).toBeInTheDocument();
 		expect(screen.getByRole("button", { name: /Layered Viewpoint/ })).toHaveAttribute("aria-current", "true");
-		const download = screen.getByRole("link", { name: en["views.download"] });
-		expect(download).toHaveAttribute("download", "Layered Viewpoint.svg");
-		expect(download).toHaveAttribute("href", svgDataUrl(layered.svg));
+	});
+
+	it("downloads the server's SVG unchanged through the app's save path, not a data: link", async () => {
+		const save = vi.spyOn(aoBridge.chatImage, "save").mockResolvedValue(true);
+		renderPage();
+		await open(/Layered Viewpoint/);
+		await screen.findByRole("img", { name: "Layered Viewpoint" });
+		expect(screen.queryByRole("link", { name: en["views.download"] })).toBeNull();
+		await userEvent.click(screen.getByRole("button", { name: en["views.download"] }));
+		expect(save).toHaveBeenCalledTimes(1);
+		const { name, bytes } = save.mock.calls[0][0];
+		expect(name).toBe("Layered Viewpoint.svg");
+		expect(new TextDecoder().decode(bytes)).toBe(layered.svg);
+	});
+
+	it("says so when the SVG cannot be saved", async () => {
+		vi.spyOn(aoBridge.chatImage, "save").mockRejectedValue(new Error("disk full"));
+		renderPage();
+		await open(/Layered Viewpoint/);
+		await userEvent.click(await screen.findByRole("button", { name: en["views.download"] }));
+		expect(await screen.findByRole("alert")).toHaveTextContent("Could not save the SVG: disk full");
+	});
+
+	it("does not re-encode the SVG while it is dragged", async () => {
+		renderPage();
+		await open(/Layered Viewpoint/);
+		await screen.findByRole("img", { name: "Layered Viewpoint" });
+		const viewport = screen.getByTestId("aisep-view-viewport");
+		const encode = vi.spyOn(globalThis, "encodeURIComponent");
+		fireEvent.pointerDown(viewport, { clientX: 10, clientY: 10 });
+		for (let i = 1; i <= 5; i++) fireEvent.pointerMove(viewport, { clientX: 10 + i * 10, clientY: 10 });
+		fireEvent.pointerUp(window);
+		expect(screen.getByRole("img", { name: "Layered Viewpoint" }).style.transform).toContain("translate(50px, 0px)");
+		expect(encode).not.toHaveBeenCalled();
+	});
+
+	it("refits when the pane is resized, until the user zooms; fit resumes it", async () => {
+		let resize: () => void = () => undefined;
+		vi.stubGlobal(
+			"ResizeObserver",
+			class {
+				constructor(private readonly callback: ResizeObserverCallback) {}
+				// Only an observed box reports its resizes.
+				observe() {
+					resize = () => this.callback([], this as unknown as ResizeObserver);
+				}
+				disconnect() {
+					resize = () => undefined;
+				}
+			},
+		);
+		const box = { width: 0, height: 0 };
+		vi.spyOn(HTMLElement.prototype, "clientWidth", "get").mockImplementation(() => box.width);
+		vi.spyOn(HTMLElement.prototype, "clientHeight", "get").mockImplementation(() => box.height);
+		renderPage();
+		await open(/Layered Viewpoint/);
+		await screen.findByRole("img", { name: "Layered Viewpoint" });
+		const level = screen.getByRole("status", { name: en["views.zoomLevelLabel"] });
+		expect(level).toHaveTextContent("100%");
+		// 814 × 726 into 407 × 900: half size.
+		box.width = 407;
+		box.height = 900;
+		act(resize);
+		expect(level).toHaveTextContent("50%");
+		await userEvent.click(screen.getByRole("button", { name: en["views.zoomIn"] }));
+		expect(level).toHaveTextContent("63%");
+		box.width = 814;
+		act(resize);
+		expect(level).toHaveTextContent("63%");
+		await userEvent.click(screen.getByRole("button", { name: en["views.fit"] }));
+		expect(level).toHaveTextContent("100%");
+		box.width = 407;
+		act(resize);
+		expect(level).toHaveTextContent("50%");
 	});
 
 	it("never puts the SVG markup into the page", async () => {
@@ -172,7 +263,7 @@ describe("AisepViewsPage viewer", () => {
 		expect(source).not.toMatch(/dangerouslySetInnerHTML|\.innerHTML|\.outerHTML|insertAdjacentHTML|createContextualFragment/);
 	});
 
-	it("zooms with the buttons and resets to 100 %", async () => {
+	it("zooms with the buttons and resets to actual size", async () => {
 		renderPage();
 		await open(/Layered Viewpoint/);
 		const image = await screen.findByRole("img", { name: "Layered Viewpoint" });

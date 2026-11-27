@@ -143,6 +143,7 @@
 	"views.zoomLevel": "{{percent}}%",
 	"views.zoomLevelLabel": "확대 비율",
 	"views.fit": "창에 맞추기",
-	"views.actualSize": "100%",
-	"views.download": "SVG 다운로드"
+	"views.actualSize": "실제 크기",
+	"views.download": "SVG 다운로드",
+	"views.downloadError": "SVG를 저장하지 못했습니다: {{message}}"
 }

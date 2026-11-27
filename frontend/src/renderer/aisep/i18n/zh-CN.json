@@ -143,6 +143,7 @@
 	"views.zoomLevel": "{{percent}}%",
 	"views.zoomLevelLabel": "缩放比例",
 	"views.fit": "适应窗口",
-	"views.actualSize": "100%",
-	"views.download": "下载 SVG"
+	"views.actualSize": "实际大小",
+	"views.download": "下载 SVG",
+	"views.downloadError": "保存 SVG 失败：{{message}}"
 }

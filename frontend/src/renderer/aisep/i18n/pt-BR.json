@@ -143,6 +143,7 @@
 	"views.zoomLevel": "{{percent}}%",
 	"views.zoomLevelLabel": "Nível de zoom",
 	"views.fit": "Ajustar à janela",
-	"views.actualSize": "100%",
-	"views.download": "Baixar SVG"
+	"views.actualSize": "Tamanho real",
+	"views.download": "Baixar SVG",
+	"views.downloadError": "Não foi possível salvar o SVG: {{message}}"
 }
