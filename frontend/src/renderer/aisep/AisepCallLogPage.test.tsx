@@ -55,7 +55,8 @@ describe("AisepCallLogPage", () => {
 
 	it("renders the sample with an 'interface not connected' notice when the fixture client has no recording", async () => {
 		renderPage(fixtureClient);
-		expect(await screen.findByText(en["callLog.unconnected"])).toHaveAttribute("role", "status");
+		expect(await screen.findByText(en["sample.badge"])).toHaveAttribute("role", "status");
+		expect(screen.getByText(en["callLog.unconnected"])).toBeInTheDocument();
 		expect(rows()).toHaveLength(3);
 		expect(screen.getByText("ok")).toBeInTheDocument();
 		expect(screen.getByText("PRECONDITION_FAILED")).toBeInTheDocument();
@@ -69,8 +70,26 @@ describe("AisepCallLogPage", () => {
 			new Response(JSON.stringify({ jsonrpc: "2.0", id: 1, error: { code: -32602, message: "Unknown tool: model_call_log" } })),
 		);
 		renderPage(new McpModelClient("http://127.0.0.1:1/mcp", fetchImpl as unknown as typeof fetch));
-		expect(await screen.findByText(en["callLog.unconnected"])).toHaveAttribute("role", "status");
+		expect(await screen.findByText(en["sample.badge"])).toHaveAttribute("role", "status");
 		expect(rows()).toHaveLength(3);
+	});
+
+	it("shows -32602 that is not an unknown tool (bad parameters) as an error, not as sample data", async () => {
+		const fetchImpl = vi.fn(async () =>
+			new Response(JSON.stringify({ jsonrpc: "2.0", id: 1, error: { code: -32602, message: "Invalid params: limit must be at most 500" } })),
+		);
+		renderPage(new McpModelClient("http://127.0.0.1:1/mcp", fetchImpl as unknown as typeof fetch));
+		expect(await screen.findByRole("alert")).toHaveTextContent("limit must be at most 500");
+		expect(screen.queryByText(en["sample.badge"])).toBeNull();
+		expect(screen.queryByRole("table")).toBeNull();
+	});
+
+	it("does not fall back on an 'Unknown tool' message that comes with another JSON-RPC code", async () => {
+		renderPage(clientWith(async () => {
+			throw new McpProtocolError("Unknown tool: model_call_log", 200, -32603);
+		}).client);
+		expect(await screen.findByRole("alert")).toHaveTextContent("Unknown tool: model_call_log");
+		expect(screen.queryByText(en["sample.badge"])).toBeNull();
 	});
 
 	it("does not dress any other failure up as sample data", async () => {
@@ -79,6 +98,7 @@ describe("AisepCallLogPage", () => {
 			throw new McpProtocolError("model_call_log: internal error", 200, -32603);
 		}).client);
 		expect(await screen.findByRole("alert")).toHaveTextContent("model_call_log: internal error");
+		expect(screen.queryByText(en["sample.badge"])).toBeNull();
 		expect(screen.queryByText(en["callLog.unconnected"])).toBeNull();
 		expect(screen.queryByRole("table")).toBeNull();
 	});
@@ -86,8 +106,34 @@ describe("AisepCallLogPage", () => {
 	it("shows live data without the sample notice", async () => {
 		renderPage(clientWith(async () => live(CALL_LOG_SAMPLE.items.slice(0, 1))).client);
 		expect(await screen.findByText("ok")).toBeInTheDocument();
+		expect(screen.queryByText(en["sample.badge"])).toBeNull();
 		expect(screen.queryByText(en["callLog.unconnected"])).toBeNull();
 		expect(rows()).toHaveLength(1);
+	});
+
+	it("lists branch, files changed and duration, and marks the client as self-reported", async () => {
+		renderPage(fixtureClient);
+		await screen.findByText("PRECONDITION_FAILED");
+		const header = screen.getAllByRole("columnheader").map((cell) => cell.textContent);
+		expect(header).toEqual([
+			en["callLog.column.time"],
+			en["callLog.column.tool"],
+			en["callLog.column.outcome"],
+			en["callLog.column.model"],
+			en["callLog.column.branch"],
+			en["callLog.column.files"],
+			en["callLog.detail.duration"],
+			en["callLog.column.client"],
+		]);
+		const cells = rows().map((row) => within(row).getAllByRole("cell").map((cell) => cell.textContent));
+		// Newest first: a write with one file, a refused write, and a call refused before any repository was found.
+		expect(cells.map((row) => row.slice(4, 7))).toEqual([
+			["claude/req-ac", "1", "184 ms"],
+			["claude/req-ac", "0", "96 ms"],
+			["—", "0", "1 ms"],
+		]);
+		for (const row of cells) expect(row[7]?.endsWith(en["callLog.selfReported"])).toBe(true);
+		expect(cells[0][7]).toBe(`claude-code 2.3.1${en["callLog.selfReported"]}`);
 	});
 
 	it("sends the outcome, tool and model filters to the server", async () => {
@@ -102,6 +148,21 @@ describe("AisepCallLogPage", () => {
 		);
 		await userEvent.type(screen.getByLabelText(en["callLog.filter.model"]), "procurement{Enter}");
 		await waitFor(() => expect(callLog).toHaveBeenLastCalledWith(expect.objectContaining({ model: "procurement" }), expect.anything()));
+	});
+
+	it("filters the sample by model, applied on Enter", async () => {
+		renderPage(fixtureClient);
+		await screen.findByText("PRECONDITION_FAILED");
+		const field = screen.getByLabelText(en["callLog.filter.model"]);
+		await userEvent.type(field, "procurement");
+		// Not applied per keystroke.
+		expect(rows()).toHaveLength(3);
+		await userEvent.type(field, "{Enter}");
+		await waitFor(() => expect(rows()).toHaveLength(2));
+		expect(screen.queryByText("UNKNOWN_TOOL")).toBeNull();
+		await userEvent.clear(field);
+		await userEvent.type(field, "no-such-model{Enter}");
+		expect(await screen.findByText(en["callLog.empty.filtered"])).toBeInTheDocument();
 	});
 
 	it("filters the sample the way the server would", async () => {
@@ -139,18 +200,21 @@ describe("AisepCallLogPage", () => {
 		expect(await screen.findByText(en["callLog.empty.noPath"])).toBeInTheDocument();
 	});
 
-	it("counts skipped lines and pages to older entries with the cursor", async () => {
+	it("counts skipped lines across pages and pages to older entries with the cursor", async () => {
 		const [newest, ...older] = CALL_LOG_SAMPLE.items;
 		const { client, callLog } = clientWith(async (input) =>
 			input.cursor === "c1"
-				? live(older)
+				? live(older, { skipped: { malformed: 3, unknownVersion: 0 } })
 				: live([newest], { nextCursor: "c1", skipped: { malformed: 1, unknownVersion: 2 } }),
 		);
+		const skippedText = (malformed: number, unknownVersion: number) =>
+			en["callLog.skipped"].replace("{{malformed}}", String(malformed)).replace("{{unknownVersion}}", String(unknownVersion));
 		renderPage(client);
-		expect(await screen.findByText(en["callLog.skipped"].replace("{{malformed}}", "1").replace("{{unknownVersion}}", "2"))).toBeInTheDocument();
+		expect(await screen.findByText(skippedText(1, 2))).toBeInTheDocument();
 		expect(rows()).toHaveLength(1);
 		await userEvent.click(screen.getByRole("button", { name: en["callLog.older"] }));
 		await waitFor(() => expect(rows()).toHaveLength(3));
+		expect(screen.getByText(skippedText(4, 2))).toBeInTheDocument();
 		expect(callLog).toHaveBeenLastCalledWith(expect.objectContaining({ cursor: "c1" }), expect.anything());
 		expect(screen.queryByRole("button", { name: en["callLog.older"] })).toBeNull();
 	});

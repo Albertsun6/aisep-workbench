@@ -1,4 +1,9 @@
-{
+// Example B of coordination/workbench-readonly-contract-20261127.md §2.2: model_list_actions run on aisep main (not via
+// the workbench profile, which does not list the tool yet). Kept as TypeScript, not JSON, so the type checker holds it
+// to ListActionsResult (a JSON import widens `valid` to boolean and could only be cast).
+import type { ListActionsResult } from "../client";
+
+export const LIST_ACTIONS_SAMPLE: ListActionsResult = {
 	"catalogVersion": "0.2.0",
 	"operations": [
 		"model_add_element",
@@ -119,4 +124,4 @@
 			"definitionDigest": "sha256:bfaa7c61f1b2e442ac1c75fd817f77089e039523f40e0d0c8dc53c72d02768f8"
 		}
 	]
-}
+};

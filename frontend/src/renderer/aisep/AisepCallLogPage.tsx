@@ -3,7 +3,7 @@
 // filters, "older" by cursor, a row expands to the whole event. Diagnostic only: the log is not tamper-proof.
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { Fragment, useId, useState } from "react";
-import { ChevronDown, ChevronRight, ScrollText } from "@/components/app-icons";
+import { AlertTriangle, ChevronDown, ChevronRight, ScrollText } from "@/components/app-icons";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -44,6 +44,14 @@ export function AisepCallLogPage({ client = modelClient }: { client?: AisepModel
 	});
 	const first = log.data?.pages[0];
 	const items = log.data?.pages.flatMap((page) => page.data.items) ?? [];
+	// Every page reports the lines it skipped, so the count is the sum over the pages loaded so far.
+	const skipped = (log.data?.pages ?? []).reduce(
+		(sum, page) => ({
+			malformed: sum.malformed + page.data.skipped.malformed,
+			unknownVersion: sum.unknownVersion + page.data.skipped.unknownVersion,
+		}),
+		{ malformed: 0, unknownVersion: 0 },
+	);
 	const commitModel = () => setModel(modelDraft.trim());
 
 	return (
@@ -54,6 +62,14 @@ export function AisepCallLogPage({ client = modelClient }: { client?: AisepModel
 						{t("callLog.title")}
 					</PageTopbarTitle>
 				}
+				actions={
+					first?.sample ? (
+						<Badge role="status" variant="warning">
+							<AlertTriangle aria-hidden="true" />
+							{t("sample.badge")}
+						</Badge>
+					) : null
+				}
 			/>
 			<div className="min-h-0 flex-1 overflow-y-auto">
 				<div className="mx-auto flex w-full max-w-6xl flex-col gap-4 px-6 pt-3 pb-6">
@@ -62,7 +78,7 @@ export function AisepCallLogPage({ client = modelClient }: { client?: AisepModel
 						{t("callLog.notice.body")}
 					</p>
 					{first?.sample ? (
-						<p role="status" className="text-xs text-warning">{t("callLog.unconnected")}</p>
+						<p className="text-xs text-muted-foreground">{t("callLog.unconnected")}</p>
 					) : null}
 					<div className="flex flex-wrap items-end gap-3 text-xs">
 						<FilterSelect
@@ -100,9 +116,9 @@ export function AisepCallLogPage({ client = modelClient }: { client?: AisepModel
 					) : (
 						<CallLogTable items={items} />
 					)}
-					{first && (first.data.skipped.malformed > 0 || first.data.skipped.unknownVersion > 0) ? (
+					{skipped.malformed > 0 || skipped.unknownVersion > 0 ? (
 						<p role="note" className="text-caption text-warning">
-							{t("callLog.skipped", first.data.skipped)}
+							{t("callLog.skipped", skipped)}
 						</p>
 					) : null}
 					{log.hasNextPage ? (
@@ -133,6 +149,9 @@ function CallLogTable({ items }: { items: CallLogEntry[] }) {
 					<TableHead>{t("callLog.column.tool")}</TableHead>
 					<TableHead>{t("callLog.column.outcome")}</TableHead>
 					<TableHead>{t("callLog.column.model")}</TableHead>
+					<TableHead>{t("callLog.column.branch")}</TableHead>
+					<TableHead>{t("callLog.column.files")}</TableHead>
+					<TableHead>{t("callLog.detail.duration")}</TableHead>
 					<TableHead>{t("callLog.column.client")}</TableHead>
 				</TableRow>
 			</TableHeader>
@@ -171,6 +190,9 @@ function CallLogTable({ items }: { items: CallLogEntry[] }) {
 									<Badge variant={measured.outcome === "ok" ? "success" : "error"}>{measured.outcome}</Badge>
 								</TableCell>
 								<TableCell>{measured.request.model ?? "—"}</TableCell>
+								<TableCell className="font-mono">{measured.target?.branch ?? "—"}</TableCell>
+								<TableCell className="tabular-nums">{measured.files.length}</TableCell>
+								<TableCell className="tabular-nums">{measured.durationMs} ms</TableCell>
 								<TableCell className="text-muted-foreground">
 									{client ? `${client.name} ${client.version}` : "—"}
 									<span className="ml-1 text-caption">{t("callLog.selfReported")}</span>
@@ -178,7 +200,7 @@ function CallLogTable({ items }: { items: CallLogEntry[] }) {
 							</TableRow>
 							{expanded ? (
 								<TableRow>
-									<TableCell colSpan={5} className="whitespace-normal">
+									<TableCell colSpan={8} className="whitespace-normal">
 										<CallLogDetail entry={entry} />
 									</TableCell>
 								</TableRow>

@@ -123,7 +123,7 @@
 	"callLog.title": "Call log",
 	"callLog.notice.lead": "Diagnostic record, not tamper-proof. ",
 	"callLog.notice.body": "This page reads the local server's call log. It records only write and action calls made through MCP (successful and refused); read-only calls are not recorded, and changes made outside MCP leave no record. An agent can bypass, edit or delete this log, so it is not audit or identity evidence.",
-	"callLog.unconnected": "Interface not connected (showing sample data): the server has no model_call_log yet (depends on aisep #170 and the interface proposal). The entries below are illustrative, not real calls.",
+	"callLog.unconnected": "The server has no model_call_log yet (depends on aisep #170 and the interface proposal). The entries below are illustrative, not real calls.",
 	"callLog.filter.tool": "Tool",
 	"callLog.filter.outcome": "Outcome",
 	"callLog.filter.model": "Model",
@@ -134,6 +134,8 @@
 	"callLog.column.tool": "Tool / action",
 	"callLog.column.outcome": "Outcome",
 	"callLog.column.model": "Model",
+	"callLog.column.branch": "Branch",
+	"callLog.column.files": "Files changed",
 	"callLog.column.client": "Client",
 	"callLog.selfReported": "(self-reported)",
 	"callLog.dryRun": "(dry run)",
@@ -158,8 +160,9 @@
 	"callLog.file.new": "(new)",
 	"actions.title": "Actions",
 	"actions.readOnly": "Read-only: the action catalogue merged into main. Actions are run by an AI through MCP; this page has no run button.",
-	"actions.unconnected": "Interface not connected (showing sample data): the workbench profile does not list model_list_actions yet. Below is a sample recorded on aisep main (1d76fee), which may differ from the server's current catalogue.",
+	"actions.unconnected": "The workbench profile does not list model_list_actions yet. Below is a sample recorded on aisep main, which may differ from the server's current catalogue.",
 	"actions.source": "Catalogue version {{version}} · Source: the action catalogue merged into main (read-only)",
+	"actions.sourceSample": "Catalogue version {{version}} · Source: sample data (recorded on aisep main, may differ from the server's current catalogue)",
 	"actions.empty": "The catalogue has no actions.",
 	"actions.version": "Version {{version}}",
 	"actions.destructive": "Destructive: dry run first, then run with planDigest",
@@ -174,5 +177,6 @@
 	"actions.guards": "Guards",
 	"actions.steps": "Steps",
 	"actions.none": "None",
-	"actions.invalid": "Invalid definition"
+	"actions.invalid": "Invalid definition",
+	"sample.badge": "Not connected · sample data"
 }

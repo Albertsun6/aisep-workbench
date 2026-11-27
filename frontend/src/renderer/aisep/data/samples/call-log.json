@@ -1,6 +1,6 @@
 {
 	"log": {
-		"path": "/Users/yongqian/code/AISEP/aisep/.git/aisep/calls.jsonl",
+		"path": "/home/dev/aisep/.git/aisep/calls.jsonl",
 		"present": true,
 		"sizeBytes": 48213,
 		"resolvedFrom": "allow-root"
@@ -17,9 +17,9 @@
 					"profile": "agent",
 					"transport": "stdio",
 					"allowRoots": [
-						"/Users/yongqian/code/AISEP/aisep"
+						"/home/dev/aisep"
 					],
-					"repo": "/Users/yongqian/code/AISEP/aisep/.claude/worktrees/req-ac"
+					"repo": "/home/dev/aisep/.claude/worktrees/req-ac"
 				},
 				"tool": "model_apply_action",
 				"request": {
@@ -37,7 +37,7 @@
 				},
 				"outcome": "ok",
 				"target": {
-					"worktree": "/Users/yongqian/code/AISEP/aisep/.claude/worktrees/req-ac",
+					"worktree": "/home/dev/aisep/.claude/worktrees/req-ac",
 					"branch": "claude/req-ac",
 					"head": "3f9c1d0a7b2e4c6f8d0a1b3c5e7f9a2b4c6d8e0f"
 				},
@@ -67,9 +67,9 @@
 					"profile": "agent",
 					"transport": "stdio",
 					"allowRoots": [
-						"/Users/yongqian/code/AISEP/aisep"
+						"/home/dev/aisep"
 					],
-					"repo": "/Users/yongqian/code/AISEP/aisep/.claude/worktrees/req-ac"
+					"repo": "/home/dev/aisep/.claude/worktrees/req-ac"
 				},
 				"tool": "model_apply_action",
 				"request": {
@@ -87,7 +87,7 @@
 				},
 				"outcome": "PRECONDITION_FAILED",
 				"target": {
-					"worktree": "/Users/yongqian/code/AISEP/aisep/.claude/worktrees/req-ac",
+					"worktree": "/home/dev/aisep/.claude/worktrees/req-ac",
 					"branch": "claude/req-ac",
 					"head": "3f9c1d0a7b2e4c6f8d0a1b3c5e7f9a2b4c6d8e0f"
 				},
@@ -111,9 +111,9 @@
 					"profile": "agent",
 					"transport": "stdio",
 					"allowRoots": [
-						"/Users/yongqian/code/AISEP/aisep"
+						"/home/dev/aisep"
 					],
-					"repo": "/Users/yongqian/code/AISEP/aisep/.claude/worktrees/g6-impl"
+					"repo": "/home/dev/aisep/.claude/worktrees/g6-impl"
 				},
 				"tool": "governance_record_approval",
 				"request": {

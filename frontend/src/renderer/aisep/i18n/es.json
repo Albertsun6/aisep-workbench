@@ -123,7 +123,7 @@
 	"callLog.title": "Registro de llamadas",
 	"callLog.notice.lead": "Registro de diagnóstico, no a prueba de manipulaciones. ",
 	"callLog.notice.body": "Esta página lee el registro de llamadas del servidor local. Solo registra las llamadas de escritura y de acción hechas por MCP (correctas y rechazadas); las llamadas de solo lectura no se registran y los cambios hechos fuera de MCP no dejan rastro. Un agente puede eludir, editar o borrar este registro, así que no sirve como prueba de auditoría ni de identidad.",
-	"callLog.unconnected": "Interfaz no conectada (datos de ejemplo): el servidor aún no tiene model_call_log (depende de aisep #170 y de la propuesta de interfaz). Las entradas siguientes son ilustrativas, no llamadas reales.",
+	"callLog.unconnected": "El servidor aún no tiene model_call_log (depende de aisep #170 y de la propuesta de interfaz). Las entradas siguientes son ilustrativas, no llamadas reales.",
 	"callLog.filter.tool": "Herramienta",
 	"callLog.filter.outcome": "Resultado",
 	"callLog.filter.model": "Modelo",
@@ -134,6 +134,8 @@
 	"callLog.column.tool": "Herramienta / acción",
 	"callLog.column.outcome": "Resultado",
 	"callLog.column.model": "Modelo",
+	"callLog.column.branch": "Rama",
+	"callLog.column.files": "Archivos modificados",
 	"callLog.column.client": "Cliente",
 	"callLog.selfReported": "(declarado)",
 	"callLog.dryRun": "(simulación)",
@@ -158,8 +160,9 @@
 	"callLog.file.new": "(nuevo)",
 	"actions.title": "Acciones",
 	"actions.readOnly": "Solo lectura: el catálogo de acciones fusionado en main. Las acciones las ejecuta una IA por MCP; esta página no tiene botón de ejecutar.",
-	"actions.unconnected": "Interfaz no conectada (datos de ejemplo): el perfil del workbench aún no incluye model_list_actions. Abajo hay un ejemplo grabado en aisep main (1d76fee), que puede diferir del catálogo actual del servidor.",
+	"actions.unconnected": "El perfil del workbench aún no incluye model_list_actions. Abajo hay un ejemplo grabado en aisep main, que puede diferir del catálogo actual del servidor.",
 	"actions.source": "Versión del catálogo {{version}} · Fuente: el catálogo de acciones fusionado en main (solo lectura)",
+	"actions.sourceSample": "Versión del catálogo {{version}} · Fuente: datos de ejemplo (grabados en aisep main, pueden diferir del catálogo actual del servidor)",
 	"actions.empty": "El catálogo no tiene acciones.",
 	"actions.version": "Versión {{version}}",
 	"actions.destructive": "Destructiva: primero simular, luego ejecutar con planDigest",
@@ -174,5 +177,6 @@
 	"actions.guards": "Comprobaciones previas",
 	"actions.steps": "Pasos",
 	"actions.none": "Ninguno",
-	"actions.invalid": "Definición no válida"
+	"actions.invalid": "Definición no válida",
+	"sample.badge": "Sin conexión · datos de ejemplo"
 }

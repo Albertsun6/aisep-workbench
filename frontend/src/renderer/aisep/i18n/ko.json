@@ -123,7 +123,7 @@
 	"callLog.title": "호출 로그",
 	"callLog.notice.lead": "진단용 기록이며 위변조 방지가 되지 않습니다. ",
 	"callLog.notice.body": "이 페이지는 로컬 서버의 호출 로그를 보여 줍니다. MCP를 통한 쓰기 호출과 액션 호출(성공과 거부 모두)만 기록하며, 읽기 전용 호출과 MCP를 거치지 않은 변경은 기록되지 않습니다. 에이전트가 이 로그를 우회하거나 수정·삭제할 수 있으므로 감사나 신원 증거로 쓸 수 없습니다.",
-	"callLog.unconnected": "인터페이스 미연결(샘플 데이터 표시 중): 서버에 아직 model_call_log가 없습니다(aisep #170 및 인터페이스 제안에 의존). 아래 항목은 설명용 예시이며 실제 호출이 아닙니다.",
+	"callLog.unconnected": "서버에 아직 model_call_log가 없습니다(aisep #170 및 인터페이스 제안에 의존). 아래 항목은 설명용 예시이며 실제 호출이 아닙니다.",
 	"callLog.filter.tool": "도구",
 	"callLog.filter.outcome": "결과",
 	"callLog.filter.model": "모델",
@@ -134,6 +134,8 @@
 	"callLog.column.tool": "도구 / 액션",
 	"callLog.column.outcome": "결과",
 	"callLog.column.model": "모델",
+	"callLog.column.branch": "브랜치",
+	"callLog.column.files": "변경 파일 수",
 	"callLog.column.client": "클라이언트",
 	"callLog.selfReported": "(자체 보고)",
 	"callLog.dryRun": "(드라이 런)",
@@ -158,8 +160,9 @@
 	"callLog.file.new": "(신규)",
 	"actions.title": "액션",
 	"actions.readOnly": "읽기 전용: main에 병합된 액션 카탈로그입니다. 액션은 AI가 MCP를 통해 실행하며 이 페이지에는 실행 버튼이 없습니다.",
-	"actions.unconnected": "인터페이스 미연결(샘플 데이터 표시 중): 워크벤치 프로필에 아직 model_list_actions가 없습니다. 아래는 aisep main(1d76fee)에서 기록한 샘플로, 서버의 현재 카탈로그와 다를 수 있습니다.",
+	"actions.unconnected": "워크벤치 프로필에 아직 model_list_actions가 없습니다. 아래는 aisep main에서 기록한 샘플로, 서버의 현재 카탈로그와 다를 수 있습니다.",
 	"actions.source": "카탈로그 버전 {{version}} · 출처: main에 병합된 액션 카탈로그(읽기 전용)",
+	"actions.sourceSample": "카탈로그 버전 {{version}} · 출처: 샘플 데이터(aisep main에서 기록, 서버의 현재 카탈로그와 다를 수 있음)",
 	"actions.empty": "카탈로그에 액션이 없습니다.",
 	"actions.version": "버전 {{version}}",
 	"actions.destructive": "파괴적: 먼저 드라이 런한 뒤 planDigest와 함께 실행",
@@ -174,5 +177,6 @@
 	"actions.guards": "사전 검사",
 	"actions.steps": "단계",
 	"actions.none": "없음",
-	"actions.invalid": "잘못된 정의"
+	"actions.invalid": "잘못된 정의",
+	"sample.badge": "미연결 · 샘플 데이터"
 }

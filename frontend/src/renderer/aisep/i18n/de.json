@@ -123,7 +123,7 @@
 	"callLog.title": "Aufrufprotokoll",
 	"callLog.notice.lead": "Diagnoseaufzeichnung, nicht manipulationssicher. ",
 	"callLog.notice.body": "Diese Seite liest das Aufrufprotokoll des lokalen Servers. Es erfasst nur Schreib- und Aktionsaufrufe über MCP (erfolgreiche und abgelehnte); Nur-Lese-Aufrufe werden nicht erfasst, und Änderungen außerhalb von MCP hinterlassen keine Spur. Ein Agent kann dieses Protokoll umgehen, ändern oder löschen; es ist kein Audit- oder Identitätsnachweis.",
-	"callLog.unconnected": "Schnittstelle nicht verbunden (Beispieldaten): Der Server hat noch kein model_call_log (hängt von aisep #170 und dem Schnittstellenvorschlag ab). Die Einträge unten sind veranschaulichend, keine echten Aufrufe.",
+	"callLog.unconnected": "Der Server hat noch kein model_call_log (hängt von aisep #170 und dem Schnittstellenvorschlag ab). Die Einträge unten sind veranschaulichend, keine echten Aufrufe.",
 	"callLog.filter.tool": "Werkzeug",
 	"callLog.filter.outcome": "Ergebnis",
 	"callLog.filter.model": "Modell",
@@ -134,6 +134,8 @@
 	"callLog.column.tool": "Werkzeug / Aktion",
 	"callLog.column.outcome": "Ergebnis",
 	"callLog.column.model": "Modell",
+	"callLog.column.branch": "Branch",
+	"callLog.column.files": "Geänderte Dateien",
 	"callLog.column.client": "Client",
 	"callLog.selfReported": "(selbst angegeben)",
 	"callLog.dryRun": "(Probelauf)",
@@ -158,8 +160,9 @@
 	"callLog.file.new": "(neu)",
 	"actions.title": "Aktionen",
 	"actions.readOnly": "Nur lesen: der in main gemergte Aktionskatalog. Aktionen führt eine KI über MCP aus; diese Seite hat keine Ausführen-Schaltfläche.",
-	"actions.unconnected": "Schnittstelle nicht verbunden (Beispieldaten): Das Workbench-Profil enthält model_list_actions noch nicht. Unten ein auf aisep main (1d76fee) aufgezeichnetes Beispiel, das vom aktuellen Katalog des Servers abweichen kann.",
+	"actions.unconnected": "Das Workbench-Profil enthält model_list_actions noch nicht. Unten ein auf aisep main aufgezeichnetes Beispiel, das vom aktuellen Katalog des Servers abweichen kann.",
 	"actions.source": "Katalogversion {{version}} · Quelle: der in main gemergte Aktionskatalog (nur lesen)",
+	"actions.sourceSample": "Katalogversion {{version}} · Quelle: Beispieldaten (auf aisep main aufgezeichnet, kann vom aktuellen Katalog des Servers abweichen)",
 	"actions.empty": "Der Katalog enthält keine Aktionen.",
 	"actions.version": "Version {{version}}",
 	"actions.destructive": "Destruktiv: erst Probelauf, dann mit planDigest ausführen",
@@ -174,5 +177,6 @@
 	"actions.guards": "Vorbedingungen",
 	"actions.steps": "Schritte",
 	"actions.none": "Keine",
-	"actions.invalid": "Ungültige Definition"
+	"actions.invalid": "Ungültige Definition",
+	"sample.badge": "Nicht verbunden · Beispieldaten"
 }

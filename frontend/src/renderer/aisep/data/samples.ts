@@ -1,17 +1,15 @@
 // Example data for the two pages whose server tool is not reachable yet, kept apart from ./fixtures/ (fixtures are
 // recorded off a real server, never hand-written). Source: coordination/workbench-readonly-contract-20261127.md
 //   samples/call-log.json     = example A: the PROPOSED model_call_log shape, illustrative values, not a recording.
-//   samples/list-actions.json = example B: model_list_actions run on aisep origin/main 1d76fee (not via the workbench
-//                               profile, which does not list the tool yet).
+//   samples/list-actions.ts   = example B: model_list_actions run on aisep main (not via the workbench profile, which
+//                               does not list the tool yet), typed as ListActionsResult.
 // Once the tools are live, record real fixtures (AISEP_RECORD_FIXTURES=1) and delete these.
-import { AisepToolError, type CallLogInput, type CallLogResult, type ListActionsResult } from "./client";
+import { AisepToolError, type CallLogInput, type CallLogResult } from "./client";
 import { McpProtocolError } from "./mcp-client";
 import callLogJson from "./samples/call-log.json";
-import listActionsJson from "./samples/list-actions.json";
 
+export { LIST_ACTIONS_SAMPLE } from "./samples/list-actions";
 export const CALL_LOG_SAMPLE = callLogJson as CallLogResult;
-// JSON imports widen `valid` to boolean and give the actions' param objects different keys, so TS cannot compare them.
-export const LIST_ACTIONS_SAMPLE = listActionsJson as unknown as ListActionsResult;
 
 /** JSON-RPC INVALID_PARAMS: what the server answers for a tool its profile does not list ("Unknown tool: …"). */
 const INVALID_PARAMS = -32602;

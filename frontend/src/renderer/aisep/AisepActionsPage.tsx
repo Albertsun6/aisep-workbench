@@ -1,7 +1,7 @@
 // 动作: the action catalogue merged into main, from model_list_actions (aisep §5.13; contract §2). Read-only, like
 // Foundry's Action type view: parameters, guards and steps, no "run" button. Actions are run by an AI through MCP.
 import { useQuery } from "@tanstack/react-query";
-import { Zap } from "@/components/app-icons";
+import { AlertTriangle, Zap } from "@/components/app-icons";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { PageTopbar, PageTopbarTitle } from "../components/PageTopbar";
@@ -32,12 +32,20 @@ export function AisepActionsPage({ client = modelClient }: { client?: AisepModel
 						{t("actions.title")}
 					</PageTopbarTitle>
 				}
+				actions={
+					catalog.data?.sample ? (
+						<Badge role="status" variant="warning">
+							<AlertTriangle aria-hidden="true" />
+							{t("sample.badge")}
+						</Badge>
+					) : null
+				}
 			/>
 			<div className="min-h-0 flex-1 overflow-y-auto">
 				<div className="mx-auto flex w-full max-w-6xl flex-col gap-4 px-6 pt-3 pb-6">
 					<p className="text-xs text-muted-foreground">{t("actions.readOnly")}</p>
 					{catalog.data?.sample ? (
-						<p role="status" className="text-xs text-warning">{t("actions.unconnected")}</p>
+						<p className="text-xs text-muted-foreground">{t("actions.unconnected")}</p>
 					) : null}
 					{catalog.isLoading ? (
 						<p role="status" className="text-xs text-muted-foreground">{t("section.loading")}</p>
@@ -45,7 +53,7 @@ export function AisepActionsPage({ client = modelClient }: { client?: AisepModel
 						<p role="alert" className="text-xs text-destructive">{t("gate.error", { message: aisepErrorMessage(catalog.error) })}</p>
 					) : catalog.data ? (
 						<>
-							<p className="text-caption text-muted-foreground">{t("actions.source", { version: catalog.data.data.catalogVersion })}</p>
+							<p className="text-caption text-muted-foreground">{t(catalog.data.sample ? "actions.sourceSample" : "actions.source", { version: catalog.data.data.catalogVersion })}</p>
 							{actions.length === 0 ? (
 								<p className="text-xs text-muted-foreground">{t("actions.empty")}</p>
 							) : (
@@ -139,8 +147,8 @@ function InvalidItem({ action }: { action: InvalidActionDefinition }) {
 				<Badge variant="error">{t("actions.invalid")}</Badge>
 			</div>
 			<ul className="flex flex-col gap-1 text-destructive">
-				{action.problems.map((problem) => (
-					<li key={problem}>{problem}</li>
+				{action.problems.map((problem, index) => (
+					<li key={`${index}:${problem}`}>{problem}</li>
 				))}
 			</ul>
 		</li>

@@ -123,7 +123,7 @@
 	"callLog.title": "Journal des appels",
 	"callLog.notice.lead": "Enregistrement de diagnostic, non infalsifiable. ",
 	"callLog.notice.body": "Cette page lit le journal des appels du serveur local. Il ne consigne que les appels d'écriture et d'action passés par MCP (réussis et refusés) ; les appels en lecture seule ne sont pas consignés et les modifications faites hors MCP ne laissent aucune trace. Un agent peut contourner, modifier ou supprimer ce journal : ce n'est pas une preuve d'audit ni d'identité.",
-	"callLog.unconnected": "Interface non connectée (données d'exemple) : le serveur n'a pas encore model_call_log (dépend d'aisep #170 et de la proposition d'interface). Les entrées ci-dessous sont illustratives, pas de vrais appels.",
+	"callLog.unconnected": "Le serveur n'a pas encore model_call_log (dépend d'aisep #170 et de la proposition d'interface). Les entrées ci-dessous sont illustratives, pas de vrais appels.",
 	"callLog.filter.tool": "Outil",
 	"callLog.filter.outcome": "Résultat",
 	"callLog.filter.model": "Modèle",
@@ -134,6 +134,8 @@
 	"callLog.column.tool": "Outil / action",
 	"callLog.column.outcome": "Résultat",
 	"callLog.column.model": "Modèle",
+	"callLog.column.branch": "Branche",
+	"callLog.column.files": "Fichiers modifiés",
 	"callLog.column.client": "Client",
 	"callLog.selfReported": "(déclaré)",
 	"callLog.dryRun": "(simulation)",
@@ -158,8 +160,9 @@
 	"callLog.file.new": "(nouveau)",
 	"actions.title": "Actions",
 	"actions.readOnly": "Lecture seule : le catalogue d'actions fusionné dans main. Les actions sont exécutées par une IA via MCP ; cette page n'a pas de bouton d'exécution.",
-	"actions.unconnected": "Interface non connectée (données d'exemple) : le profil workbench ne liste pas encore model_list_actions. Ci-dessous, un exemple enregistré sur aisep main (1d76fee), qui peut différer du catalogue actuel du serveur.",
+	"actions.unconnected": "Le profil workbench ne liste pas encore model_list_actions. Ci-dessous, un exemple enregistré sur aisep main, qui peut différer du catalogue actuel du serveur.",
 	"actions.source": "Version du catalogue {{version}} · Source : le catalogue d'actions fusionné dans main (lecture seule)",
+	"actions.sourceSample": "Version du catalogue {{version}} · Source : données d'exemple (enregistrées sur aisep main, peuvent différer du catalogue actuel du serveur)",
 	"actions.empty": "Le catalogue ne contient aucune action.",
 	"actions.version": "Version {{version}}",
 	"actions.destructive": "Destructive : simuler d'abord, puis exécuter avec planDigest",
@@ -174,5 +177,6 @@
 	"actions.guards": "Vérifications préalables",
 	"actions.steps": "Étapes",
 	"actions.none": "Aucun",
-	"actions.invalid": "Définition invalide"
+	"actions.invalid": "Définition invalide",
+	"sample.badge": "Non connecté · données d'exemple"
 }

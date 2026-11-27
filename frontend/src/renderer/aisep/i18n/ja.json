@@ -123,7 +123,7 @@
 	"callLog.title": "呼び出しログ",
 	"callLog.notice.lead": "診断用の記録で、改ざん防止ではありません。",
 	"callLog.notice.body": "このページはローカルサーバーの呼び出しログを表示します。MCP 経由の書き込み呼び出しとアクション呼び出し(成功・拒否とも)のみ記録し、読み取り専用の呼び出しや MCP を経由しない変更は記録されません。エージェントはこのログを回避・改変・削除できるため、監査や本人確認の証拠にはなりません。",
-	"callLog.unconnected": "インターフェース未接続(サンプルデータ表示中):サーバーにはまだ model_call_log がありません(aisep #170 とインターフェース提案に依存)。以下は説明用の例で、実際の呼び出しではありません。",
+	"callLog.unconnected": "サーバーにはまだ model_call_log がありません(aisep #170 とインターフェース提案に依存)。以下は説明用の例で、実際の呼び出しではありません。",
 	"callLog.filter.tool": "ツール",
 	"callLog.filter.outcome": "結果",
 	"callLog.filter.model": "モデル",
@@ -134,6 +134,8 @@
 	"callLog.column.tool": "ツール / アクション",
 	"callLog.column.outcome": "結果",
 	"callLog.column.model": "モデル",
+	"callLog.column.branch": "ブランチ",
+	"callLog.column.files": "変更ファイル数",
 	"callLog.column.client": "クライアント",
 	"callLog.selfReported": "(自己申告)",
 	"callLog.dryRun": "(ドライラン)",
@@ -158,8 +160,9 @@
 	"callLog.file.new": "(新規)",
 	"actions.title": "アクション",
 	"actions.readOnly": "読み取り専用:main にマージ済みのアクションカタログです。アクションは AI が MCP 経由で実行し、このページに実行ボタンはありません。",
-	"actions.unconnected": "インターフェース未接続(サンプルデータ表示中):ワークベンチのプロファイルにはまだ model_list_actions がありません。以下は aisep main(1d76fee)で記録したサンプルで、サーバーの現在のカタログとは異なる場合があります。",
+	"actions.unconnected": "ワークベンチのプロファイルにはまだ model_list_actions がありません。以下は aisep main で記録したサンプルで、サーバーの現在のカタログとは異なる場合があります。",
 	"actions.source": "カタログバージョン {{version}} · ソース:main にマージ済みのアクションカタログ(読み取り専用)",
+	"actions.sourceSample": "カタログバージョン {{version}} · ソース:サンプルデータ(aisep main で記録、サーバーの現在のカタログとは異なる場合があります)",
 	"actions.empty": "カタログにアクションがありません。",
 	"actions.version": "バージョン {{version}}",
 	"actions.destructive": "破壊的:先にドライランし、planDigest を付けて実行",
@@ -174,5 +177,6 @@
 	"actions.guards": "前提チェック",
 	"actions.steps": "ステップ",
 	"actions.none": "なし",
-	"actions.invalid": "無効な定義"
+	"actions.invalid": "無効な定義",
+	"sample.badge": "未接続 · サンプルデータ"
 }
