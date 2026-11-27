@@ -191,6 +191,9 @@
 	"views.group.declared": "声明视图",
 	"views.group.archimate": "ArchiMate 视点",
 	"views.group.c4": "C4 视点",
+	"views.group.bpmn": "BPMN 流程",
+	"views.group.uml": "UML",
+	"views.group.ddd": "DDD",
 	"views.counts": "元素 {{elements}} · 关系 {{relationships}}",
 	"views.members": "成员 {{count}}",
 	"views.pick": "从左侧选一个视图。",
@@ -206,5 +209,9 @@
 	"views.fit": "适应窗口",
 	"views.actualSize": "实际大小",
 	"views.download": "下载 SVG",
-	"views.downloadError": "保存 SVG 失败：{{message}}"
+	"views.downloadError": "保存 SVG 失败：{{message}}",
+	"views.downloadBpmn": "下载 BPMN",
+	"views.downloadBpmnError": "保存 BPMN 文件失败：{{message}}",
+	"views.bpmnError": "BPMN 查看器无法显示这个流程：{{message}}",
+	"views.bpmnViewer": "BPMN 流程图（只读）"
 }

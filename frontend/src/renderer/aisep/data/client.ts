@@ -321,15 +321,21 @@ export interface ListActionsResult {
 	operations: string[];
 	actions: (ActionDefinition | InvalidActionDefinition)[];
 }
-/** model_render_view's three entries (aisep §5.16): {view} | {viewpoint, model} | {c4viewpoint, of} (C4Deployment may add model). */
+/**
+ * model_render_view's entries (aisep §5.16): {view} | {viewpoint, model} | {c4viewpoint, of} (C4Deployment may add
+ * model) | {umldiagram, model} | {dddviewpoint: "ContextMap", model} | {dddviewpoint: "AggregateDiagram", of} | {process}.
+ */
 export interface RenderViewInput {
 	view?: string;
 	viewpoint?: string;
 	model?: string;
 	c4viewpoint?: string;
 	of?: string;
+	umldiagram?: string;
+	dddviewpoint?: string;
+	process?: string;
 }
-export type ViewNotation = "archimate" | "c4";
+export type ViewNotation = "archimate" | "c4" | "bpmn" | "uml" | "ddd";
 /** A declared view (arch:Diagram) of model_list_views (§5.15). */
 export interface DeclaredView {
 	iri: Iri;
@@ -340,7 +346,7 @@ export interface DeclaredView {
 	memberCount: number;
 	render: RenderViewInput;
 }
-/** A viewpoint projection that draws at least one element (§5.15); scope only on C4 projections. */
+/** A projection that draws at least one element (§5.15); scope on C4 projections, BPMN processes and DDD aggregate diagrams. */
 export interface ViewProjection {
 	notation: ViewNotation;
 	viewpoint: string;
@@ -362,9 +368,8 @@ export interface ViewsResult {
 	models: ModelViews[];
 	source: Source;
 }
-/** model_render_view (§5.16): the same SVG as `tools/aisep.py diagram`. */
-export interface RenderedView {
-	svg: string;
+/** model_render_view (§5.16): the same output as `tools/aisep.py diagram`, SVG or (a BPMN process) BPMN 2.0 XML. */
+interface RenderedViewBase {
 	title: string;
 	notation: ViewNotation;
 	elementCount: number;
@@ -372,6 +377,17 @@ export interface RenderedView {
 	warnings: string[];
 	source: Source;
 }
+/** An SVG; `format` is absent on servers before the BPMN/UML/DDD views (aisep PR #193). */
+export interface RenderedSvgView extends RenderedViewBase {
+	format?: "svg";
+	svg: string;
+}
+/** A BPMN process as BPMN 2.0 XML with BPMNDI, for a BPMN viewer (bpmn-js). */
+export interface RenderedBpmnView extends RenderedViewBase {
+	format: "bpmn-xml";
+	content: string;
+}
+export type RenderedView = RenderedSvgView | RenderedBpmnView;
 
 /** Client-side, never sent to the server: a caller signal (TanStack Query passes one per query) and a timeout. */
 export interface CallOptions {
