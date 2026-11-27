@@ -8,6 +8,8 @@ import {
 	type CallOptions,
 	type ApprovalResult,
 	type BranchesResult,
+	type CallLogInput,
+	type CallLogResult,
 	type DiffInput,
 	type DiffResult,
 	type FindingsResult,
@@ -15,6 +17,7 @@ import {
 	type ImpactMode,
 	type ImpactResult,
 	type Iri,
+	type ListActionsResult,
 	type QueryResult,
 	type RenderViewInput,
 	type RenderedView,
@@ -194,6 +197,14 @@ export class McpModelClient implements AisepModelClient {
 
 	branches(target: { repo?: string } = {}, options?: CallOptions): Promise<BranchesResult> {
 		return this.call("model_branches", { ...target }, options);
+	}
+
+	callLog(input: CallLogInput = {}, options?: CallOptions): Promise<CallLogResult> {
+		return this.call("model_call_log", { ...input }, options);
+	}
+
+	listActions(options?: CallOptions): Promise<ListActionsResult> {
+		return this.call("model_list_actions", {}, options);
 	}
 
 	listViews(target: Target & { model?: string } = {}, options?: CallOptions): Promise<ViewsResult> {

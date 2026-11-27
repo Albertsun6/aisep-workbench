@@ -1,4 +1,6 @@
 import { useParams } from "@tanstack/react-router";
+import { AisepActionsPage } from "./AisepActionsPage";
+import { AisepCallLogPage } from "./AisepCallLogPage";
 import { AisepGatePage } from "./AisepGatePage";
 import { AisepViewsPage } from "./AisepViewsPage";
 import { AisepWorkbenchPage } from "./AisepWorkbenchPage";
@@ -11,6 +13,8 @@ import { useAisepT } from "./i18n";
 export function AisepRoot() {
 	const { _splat: splat = "" } = useParams({ strict: false });
 	if (splat === "") return <AisepWorkbenchPage />;
+	if (splat === "calls") return <AisepCallLogPage />;
+	if (splat === "actions") return <AisepActionsPage />;
 	if (splat === "views") return <AisepViewsPage />;
 	// gate/<branch>: branch names contain "/", so the rest of the splat is the branch (§8 step 5).
 	if (splat.startsWith("gate/") && splat.length > "gate/".length) return <AisepGatePage branch={splat.slice("gate/".length)} />;

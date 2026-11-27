@@ -269,6 +269,8 @@ function liveLike(client: AisepModelClient): AisepModelClient {
 		diff: (...a) => client.diff(...a),
 		recordApproval: (...a) => client.recordApproval(...a),
 		branches: (...a) => client.branches(...a),
+		callLog: (...a) => client.callLog(...a),
+		listActions: (...a) => client.listActions(...a),
 		listViews: (...a) => client.listViews(...a),
 		renderView: (...a) => client.renderView(...a),
 	};
