@@ -1,0 +1,37 @@
+{
+	"code": "INVALID_ARGUMENT",
+	"message": "没有 ArchiMate 视点 'Nope'",
+	"retryable": false,
+	"details": {
+		"rejectedFields": [
+			"viewpoint"
+		],
+		"candidates": [
+			"ApplicationCooperationViewpoint",
+			"ApplicationStructureViewpoint",
+			"ApplicationUsageViewpoint",
+			"CapabilityMapViewpoint",
+			"GoalRealizationViewpoint",
+			"ImplementationAndDeploymentViewpoint",
+			"ImplementationAndMigrationViewpoint",
+			"InformationStructureViewpoint",
+			"LayeredViewpoint",
+			"MigrationViewpoint",
+			"MotivationViewpoint",
+			"OrganizationViewpoint",
+			"OutcomeRealizationViewpoint",
+			"PhysicalViewpoint",
+			"ProcessCooperationViewpoint",
+			"ProductViewpoint",
+			"ProjectViewpoint",
+			"RequirementsRealizationViewpoint",
+			"ResourceMapViewpoint",
+			"ServiceRealizationViewpoint",
+			"StakeholderViewpoint",
+			"StrategyViewpoint",
+			"TechnologyUsageViewpoint",
+			"TechnologyViewpoint",
+			"ValueStreamViewpoint"
+		]
+	}
+}

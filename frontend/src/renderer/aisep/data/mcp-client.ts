@@ -16,7 +16,10 @@ import {
 	type ImpactResult,
 	type Iri,
 	type QueryResult,
+	type RenderViewInput,
+	type RenderedView,
 	type Target,
+	type ViewsResult,
 } from "./client";
 
 export const MCP_PROTOCOL_VERSION = "2026-07-28";
@@ -191,5 +194,13 @@ export class McpModelClient implements AisepModelClient {
 
 	branches(target: { repo?: string } = {}, options?: CallOptions): Promise<BranchesResult> {
 		return this.call("model_branches", { ...target }, options);
+	}
+
+	listViews(target: Target & { model?: string } = {}, options?: CallOptions): Promise<ViewsResult> {
+		return this.call("model_list_views", { ...target }, options);
+	}
+
+	renderView(input: RenderViewInput & Target, options?: CallOptions): Promise<RenderedView> {
+		return this.call("model_render_view", { ...input }, options);
 	}
 }

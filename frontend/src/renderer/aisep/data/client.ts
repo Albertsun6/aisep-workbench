@@ -209,6 +209,58 @@ export interface BranchesResult {
 	main: { ref: string; commit: Sha };
 }
 
+/** model_render_view's three entries (aisep §5.16): {view} | {viewpoint, model} | {c4viewpoint, of} (C4Deployment may add model). */
+export interface RenderViewInput {
+	view?: string;
+	viewpoint?: string;
+	model?: string;
+	c4viewpoint?: string;
+	of?: string;
+}
+export type ViewNotation = "archimate" | "c4";
+/** A declared view (arch:Diagram) of model_list_views (§5.15). */
+export interface DeclaredView {
+	iri: Iri;
+	label: string;
+	notation: ViewNotation;
+	viewpoint: Iri | null;
+	viewpointLabel: string | null;
+	memberCount: number;
+	render: RenderViewInput;
+}
+/** A viewpoint projection that draws at least one element (§5.15); scope only on C4 projections. */
+export interface ViewProjection {
+	notation: ViewNotation;
+	viewpoint: string;
+	label: string;
+	scope?: string;
+	scopeLabel?: string;
+	elementCount: number;
+	relationshipCount: number;
+	render: RenderViewInput;
+}
+export interface ModelViews {
+	model: Iri;
+	slug: string;
+	label: string;
+	views: DeclaredView[];
+	projections: ViewProjection[];
+}
+export interface ViewsResult {
+	models: ModelViews[];
+	source: Source;
+}
+/** model_render_view (§5.16): the same SVG as `tools/aisep.py diagram`. */
+export interface RenderedView {
+	svg: string;
+	title: string;
+	notation: ViewNotation;
+	elementCount: number;
+	relationshipCount: number;
+	warnings: string[];
+	source: Source;
+}
+
 /** Client-side, never sent to the server: a caller signal (TanStack Query passes one per query) and a timeout. */
 export interface CallOptions {
 	signal?: AbortSignal;
@@ -231,6 +283,9 @@ export interface AisepModelClient {
 	diff(input: DiffInput, options?: CallOptions): Promise<DiffResult>;
 	recordApproval(input: ApprovalInput, options?: CallOptions): Promise<ApprovalResult>;
 	branches(target?: { repo?: string }, options?: CallOptions): Promise<BranchesResult>;
+	/** Read-only views (aisep §5.15, §5.16; aisep PR #174). Writing views is not in this version (§1). */
+	listViews(target?: Target & { model?: string }, options?: CallOptions): Promise<ViewsResult>;
+	renderView(input: RenderViewInput & Target, options?: CallOptions): Promise<RenderedView>;
 }
 
 /** A tool result with isError: true; code is one of §7.2 (or a client-side code such as UNEXPECTED_RESULT_KIND). */
