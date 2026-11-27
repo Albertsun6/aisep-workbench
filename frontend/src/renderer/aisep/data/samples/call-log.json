@@ -1,0 +1,147 @@
+{
+	"log": {
+		"path": "/Users/yongqian/code/AISEP/aisep/.git/aisep/calls.jsonl",
+		"present": true,
+		"sizeBytes": 48213,
+		"resolvedFrom": "allow-root"
+	},
+	"items": [
+		{
+			"offset": 47120,
+			"v": 1,
+			"measured": {
+				"time": "2026-11-27T08:12:03.412Z",
+				"durationMs": 184,
+				"server": {
+					"pid": 51234,
+					"profile": "agent",
+					"transport": "stdio",
+					"allowRoots": [
+						"/Users/yongqian/code/AISEP/aisep"
+					],
+					"repo": "/Users/yongqian/code/AISEP/aisep/.claude/worktrees/req-ac"
+				},
+				"tool": "model_apply_action",
+				"request": {
+					"argsSha256": "sha256:9b1f0c2e6a4d8f3b7e5c1a9d0f2b4c6e8a1d3f5b7c9e0a2b4d6f8a1c3e5b7d9f",
+					"model": "procurement",
+					"iris": [
+						"https://aisep.example/model/procurement/ReqQuotationCompare"
+					],
+					"actionId": "register-acceptance-criterion",
+					"actionVersion": "1.0.0",
+					"definitionDigest": "sha256:1c35bb552acc916448882f8df8dc669a8ba3d0cbcda62fad6a6391ec7f9e8b0d",
+					"dryRun": false,
+					"planDigestGiven": false,
+					"repoArg": null
+				},
+				"outcome": "ok",
+				"target": {
+					"worktree": "/Users/yongqian/code/AISEP/aisep/.claude/worktrees/req-ac",
+					"branch": "claude/req-ac",
+					"head": "3f9c1d0a7b2e4c6f8d0a1b3c5e7f9a2b4c6d8e0f"
+				},
+				"files": [
+					{
+						"path": "models/procurement/requirements.ttl",
+						"before": "sha256:5d1e…",
+						"after": "sha256:a07c…"
+					}
+				]
+			},
+			"declared": {
+				"clientInfo": {
+					"name": "claude-code",
+					"version": "2.3.1"
+				}
+			}
+		},
+		{
+			"offset": 46050,
+			"v": 1,
+			"measured": {
+				"time": "2026-11-27T08:11:40.007Z",
+				"durationMs": 96,
+				"server": {
+					"pid": 51234,
+					"profile": "agent",
+					"transport": "stdio",
+					"allowRoots": [
+						"/Users/yongqian/code/AISEP/aisep"
+					],
+					"repo": "/Users/yongqian/code/AISEP/aisep/.claude/worktrees/req-ac"
+				},
+				"tool": "model_apply_action",
+				"request": {
+					"argsSha256": "sha256:0e4a…",
+					"model": "procurement",
+					"iris": [
+						"https://aisep.example/model/procurement/AcQuotationWithin3Days"
+					],
+					"actionId": "register-acceptance-criterion",
+					"actionVersion": "1.0.0",
+					"definitionDigest": "sha256:1c35bb552acc916448882f8df8dc669a8ba3d0cbcda62fad6a6391ec7f9e8b0d",
+					"dryRun": false,
+					"planDigestGiven": false,
+					"repoArg": null
+				},
+				"outcome": "PRECONDITION_FAILED",
+				"target": {
+					"worktree": "/Users/yongqian/code/AISEP/aisep/.claude/worktrees/req-ac",
+					"branch": "claude/req-ac",
+					"head": "3f9c1d0a7b2e4c6f8d0a1b3c5e7f9a2b4c6d8e0f"
+				},
+				"files": []
+			},
+			"declared": {
+				"clientInfo": {
+					"name": "claude-code",
+					"version": "2.3.1"
+				}
+			}
+		},
+		{
+			"offset": 45310,
+			"v": 1,
+			"measured": {
+				"time": "2026-11-27T08:02:17.551Z",
+				"durationMs": 1,
+				"server": {
+					"pid": 50987,
+					"profile": "agent",
+					"transport": "stdio",
+					"allowRoots": [
+						"/Users/yongqian/code/AISEP/aisep"
+					],
+					"repo": "/Users/yongqian/code/AISEP/aisep/.claude/worktrees/g6-impl"
+				},
+				"tool": "governance_record_approval",
+				"request": {
+					"argsSha256": "sha256:77d2…",
+					"model": null,
+					"iris": [],
+					"actionId": null,
+					"actionVersion": null,
+					"definitionDigest": null,
+					"dryRun": null,
+					"planDigestGiven": null,
+					"repoArg": null
+				},
+				"outcome": "UNKNOWN_TOOL",
+				"target": null,
+				"files": []
+			},
+			"declared": {
+				"clientInfo": {
+					"name": "claude-code",
+					"version": "2.3.1"
+				}
+			}
+		}
+	],
+	"skipped": {
+		"malformed": 0,
+		"unknownVersion": 0
+	},
+	"nextCursor": "cl1.eyJpbm8iOjEyMzQ1Njc4LCJlbmQiOjQ1MzEwfQ"
+}

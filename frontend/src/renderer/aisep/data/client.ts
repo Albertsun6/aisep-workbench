@@ -209,6 +209,119 @@ export interface BranchesResult {
 	main: { ref: string; commit: Sha };
 }
 
+/**
+ * The tools ADR-031 (aisep PR #171) audits: the five model_* write tools, model_apply_action and
+ * governance_record_approval. model_call_log's `tools` filter takes only these names.
+ */
+export const AUDITED_TOOLS = [
+	"model_add_element",
+	"model_add_relationship",
+	"model_remove",
+	"model_set_attributes",
+	"model_set_labels",
+	"model_apply_action",
+	"governance_record_approval",
+] as const;
+
+/**
+ * model_call_log (PROPOSED, not on the server yet: coordination/workbench-readonly-contract-20261127.md §1.1). All
+ * filters are optional and combine; `outcome` is "ok", "rejected" (anything but ok) or one exact code.
+ */
+export interface CallLogInput {
+	limit?: number;
+	cursor?: string;
+	tools?: string[];
+	outcome?: string;
+	/** AISEP model slug (measured.request.model), not an LLM. */
+	model?: string;
+	actionId?: string;
+	branch?: string;
+	since?: string;
+	until?: string;
+}
+
+/** One log line, v1 (contract §1.2). `measured` is what the server saw; `declared` is what the caller says. */
+export interface CallLogEntry {
+	/** Byte offset of the line in the log file: the row key. */
+	offset: number;
+	v: 1;
+	measured: {
+		time: string;
+		durationMs: number;
+		server: { pid: number; profile: string; transport: string; allowRoots: string[]; repo: string | null };
+		tool: string;
+		request: {
+			argsSha256: string;
+			model: string | null;
+			iris: Iri[];
+			actionId: string | null;
+			actionVersion: string | null;
+			definitionDigest: string | null;
+			dryRun: boolean | null;
+			planDigestGiven: boolean | null;
+			repoArg: string | null;
+		};
+		/** "ok", a §7.2 code, or the log-only UNKNOWN_TOOL. */
+		outcome: string;
+		/** null when the call was refused before a repository was resolved. */
+		target: { worktree: string; branch: string; head: Sha } | null;
+		files: { path: string; before: string | null; after: string }[];
+		/** governance_record_approval only. */
+		approval?: { commit: Sha; activity: Iri | null };
+	};
+	declared: {
+		clientInfo?: { name: string; version: string } | null;
+		/** governance_record_approval only. */
+		activity?: { agent: Iri; sessionRef: string };
+	};
+}
+
+export interface CallLogResult {
+	/** path null: the server found no log location; present false: no log written yet. */
+	log: { path: string | null; present: boolean; sizeBytes: number; resolvedFrom: "allow-root" | "repo" | null };
+	/** Newest first. */
+	items: CallLogEntry[];
+	skipped: { malformed: number; unknownVersion: number };
+	/** Opaque; null when there is nothing older. */
+	nextCursor: string | null;
+}
+
+/** model_list_actions (§5.13): a valid definition. */
+export interface ActionDefinition {
+	id: string;
+	iri: Iri;
+	title: string;
+	description: string;
+	version: string;
+	valid: true;
+	/** JSON Schema of the parameters. */
+	params: {
+		type: "object";
+		properties: Record<string, { type?: string; description?: string }>;
+		required?: string[];
+		additionalProperties?: boolean;
+	};
+	/** Parameters whose value is an IRI. */
+	iriParams: string[];
+	destructive: boolean;
+	requiresPlanDigest: boolean;
+	guards: { id: string; hint: string }[];
+	steps: { id: string; op: string }[];
+	definitionDigest: string;
+}
+/** A definition the server could not use; id and iri may be null. */
+export interface InvalidActionDefinition {
+	id: string | null;
+	iri: Iri | null;
+	valid: false;
+	problems: string[];
+}
+export interface ListActionsResult {
+	catalogVersion: string;
+	operations: string[];
+	actions: (ActionDefinition | InvalidActionDefinition)[];
+}
+
 /** Client-side, never sent to the server: a caller signal (TanStack Query passes one per query) and a timeout. */
 export interface CallOptions {
 	signal?: AbortSignal;
@@ -231,6 +344,10 @@ export interface AisepModelClient {
 	diff(input: DiffInput, options?: CallOptions): Promise<DiffResult>;
 	recordApproval(input: ApprovalInput, options?: CallOptions): Promise<ApprovalResult>;
 	branches(target?: { repo?: string }, options?: CallOptions): Promise<BranchesResult>;
+	/** Not on the server yet (contract §1.1; needs aisep #170 and a new ADR). */
+	callLog(input?: CallLogInput, options?: CallOptions): Promise<CallLogResult>;
+	/** Today only in the agent profile; the workbench profile still has to list it (contract §2.1). */
+	listActions(options?: CallOptions): Promise<ListActionsResult>;
 }
 
 /** A tool result with isError: true; code is one of §7.2 (or a client-side code such as UNEXPECTED_RESULT_KIND). */

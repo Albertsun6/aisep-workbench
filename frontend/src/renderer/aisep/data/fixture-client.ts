@@ -7,12 +7,14 @@ import {
 	type AisepModelClient,
 	type ApprovalResult,
 	type BranchesResult,
+	type CallLogResult,
 	type DiffInput,
 	type DiffResult,
 	type FindingsResult,
 	type GateResult,
 	type ImpactResult,
 	type Iri,
+	type ListActionsResult,
 	type QueryResult,
 } from "./client";
 import branchesFixture from "./fixtures/branches.json";
@@ -61,6 +63,16 @@ export class FixtureClient implements AisepModelClient {
 
 	async branches(): Promise<BranchesResult> {
 		return branchesFixture as BranchesResult;
+	}
+
+	// No recording yet: model_call_log does not exist and model_list_actions is not in the workbench profile, so there
+	// is nothing to record from (fixtures are never hand-written). The pages fall back to data/samples.ts and say so.
+	async callLog(): Promise<CallLogResult> {
+		return noFixture("model_call_log (not on the server yet)");
+	}
+
+	async listActions(): Promise<ListActionsResult> {
+		return noFixture("model_list_actions (not in the workbench profile yet)");
 	}
 }
 
