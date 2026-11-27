@@ -1,0 +1,443 @@
+{
+	"models": [
+		{
+			"model": "https://aisep.example/model/procurement/",
+			"slug": "procurement",
+			"label": "采购",
+			"views": [],
+			"projections": [
+				{
+					"notation": "archimate",
+					"viewpoint": "ApplicationCooperationViewpoint",
+					"label": "Application Cooperation Viewpoint",
+					"elementCount": 4,
+					"relationshipCount": 3,
+					"render": {
+						"viewpoint": "ApplicationCooperationViewpoint",
+						"model": "procurement"
+					}
+				},
+				{
+					"notation": "archimate",
+					"viewpoint": "ApplicationStructureViewpoint",
+					"label": "Application Structure Viewpoint",
+					"elementCount": 1,
+					"relationshipCount": 0,
+					"render": {
+						"viewpoint": "ApplicationStructureViewpoint",
+						"model": "procurement"
+					}
+				},
+				{
+					"notation": "archimate",
+					"viewpoint": "ApplicationUsageViewpoint",
+					"label": "Application Usage Viewpoint",
+					"elementCount": 7,
+					"relationshipCount": 8,
+					"render": {
+						"viewpoint": "ApplicationUsageViewpoint",
+						"model": "procurement"
+					}
+				},
+				{
+					"notation": "archimate",
+					"viewpoint": "GoalRealizationViewpoint",
+					"label": "Goal Realization Viewpoint",
+					"elementCount": 1,
+					"relationshipCount": 0,
+					"render": {
+						"viewpoint": "GoalRealizationViewpoint",
+						"model": "procurement"
+					}
+				},
+				{
+					"notation": "archimate",
+					"viewpoint": "ImplementationAndDeploymentViewpoint",
+					"label": "Implementation and Deployment Viewpoint",
+					"elementCount": 4,
+					"relationshipCount": 3,
+					"render": {
+						"viewpoint": "ImplementationAndDeploymentViewpoint",
+						"model": "procurement"
+					}
+				},
+				{
+					"notation": "archimate",
+					"viewpoint": "ImplementationAndMigrationViewpoint",
+					"label": "Implementation and Migration Viewpoint",
+					"elementCount": 8,
+					"relationshipCount": 9,
+					"render": {
+						"viewpoint": "ImplementationAndMigrationViewpoint",
+						"model": "procurement"
+					}
+				},
+				{
+					"notation": "archimate",
+					"viewpoint": "InformationStructureViewpoint",
+					"label": "Information Structure Viewpoint",
+					"elementCount": 1,
+					"relationshipCount": 0,
+					"render": {
+						"viewpoint": "InformationStructureViewpoint",
+						"model": "procurement"
+					}
+				},
+				{
+					"notation": "archimate",
+					"viewpoint": "LayeredViewpoint",
+					"label": "Layered Viewpoint",
+					"elementCount": 7,
+					"relationshipCount": 8,
+					"render": {
+						"viewpoint": "LayeredViewpoint",
+						"model": "procurement"
+					}
+				},
+				{
+					"notation": "archimate",
+					"viewpoint": "MotivationViewpoint",
+					"label": "Motivation Viewpoint",
+					"elementCount": 1,
+					"relationshipCount": 0,
+					"render": {
+						"viewpoint": "MotivationViewpoint",
+						"model": "procurement"
+					}
+				},
+				{
+					"notation": "archimate",
+					"viewpoint": "OrganizationViewpoint",
+					"label": "Organization Viewpoint",
+					"elementCount": 2,
+					"relationshipCount": 0,
+					"render": {
+						"viewpoint": "OrganizationViewpoint",
+						"model": "procurement"
+					}
+				},
+				{
+					"notation": "archimate",
+					"viewpoint": "OutcomeRealizationViewpoint",
+					"label": "Outcome Realization Viewpoint",
+					"elementCount": 7,
+					"relationshipCount": 8,
+					"render": {
+						"viewpoint": "OutcomeRealizationViewpoint",
+						"model": "procurement"
+					}
+				},
+				{
+					"notation": "archimate",
+					"viewpoint": "ProcessCooperationViewpoint",
+					"label": "Process Cooperation Viewpoint",
+					"elementCount": 7,
+					"relationshipCount": 8,
+					"render": {
+						"viewpoint": "ProcessCooperationViewpoint",
+						"model": "procurement"
+					}
+				},
+				{
+					"notation": "archimate",
+					"viewpoint": "ProductViewpoint",
+					"label": "Product Viewpoint",
+					"elementCount": 7,
+					"relationshipCount": 8,
+					"render": {
+						"viewpoint": "ProductViewpoint",
+						"model": "procurement"
+					}
+				},
+				{
+					"notation": "archimate",
+					"viewpoint": "ProjectViewpoint",
+					"label": "Project Viewpoint",
+					"elementCount": 2,
+					"relationshipCount": 0,
+					"render": {
+						"viewpoint": "ProjectViewpoint",
+						"model": "procurement"
+					}
+				},
+				{
+					"notation": "archimate",
+					"viewpoint": "RequirementsRealizationViewpoint",
+					"label": "Requirements Realization Viewpoint",
+					"elementCount": 8,
+					"relationshipCount": 9,
+					"render": {
+						"viewpoint": "RequirementsRealizationViewpoint",
+						"model": "procurement"
+					}
+				},
+				{
+					"notation": "archimate",
+					"viewpoint": "ServiceRealizationViewpoint",
+					"label": "Service Realization Viewpoint",
+					"elementCount": 7,
+					"relationshipCount": 8,
+					"render": {
+						"viewpoint": "ServiceRealizationViewpoint",
+						"model": "procurement"
+					}
+				},
+				{
+					"notation": "archimate",
+					"viewpoint": "TechnologyUsageViewpoint",
+					"label": "Technology Usage Viewpoint",
+					"elementCount": 4,
+					"relationshipCount": 3,
+					"render": {
+						"viewpoint": "TechnologyUsageViewpoint",
+						"model": "procurement"
+					}
+				},
+				{
+					"notation": "archimate",
+					"viewpoint": "TechnologyViewpoint",
+					"label": "Technology Viewpoint",
+					"elementCount": 3,
+					"relationshipCount": 2,
+					"render": {
+						"viewpoint": "TechnologyViewpoint",
+						"model": "procurement"
+					}
+				}
+			]
+		},
+		{
+			"model": "https://aisep.example/model/workbench/",
+			"slug": "workbench",
+			"label": "AISEP 工作台",
+			"views": [],
+			"projections": [
+				{
+					"notation": "archimate",
+					"viewpoint": "ApplicationCooperationViewpoint",
+					"label": "Application Cooperation Viewpoint",
+					"elementCount": 1,
+					"relationshipCount": 0,
+					"render": {
+						"viewpoint": "ApplicationCooperationViewpoint",
+						"model": "workbench"
+					}
+				},
+				{
+					"notation": "archimate",
+					"viewpoint": "ApplicationUsageViewpoint",
+					"label": "Application Usage Viewpoint",
+					"elementCount": 2,
+					"relationshipCount": 1,
+					"render": {
+						"viewpoint": "ApplicationUsageViewpoint",
+						"model": "workbench"
+					}
+				},
+				{
+					"notation": "archimate",
+					"viewpoint": "CapabilityMapViewpoint",
+					"label": "Capability Map Viewpoint",
+					"elementCount": 2,
+					"relationshipCount": 0,
+					"render": {
+						"viewpoint": "CapabilityMapViewpoint",
+						"model": "workbench"
+					}
+				},
+				{
+					"notation": "archimate",
+					"viewpoint": "GoalRealizationViewpoint",
+					"label": "Goal Realization Viewpoint",
+					"elementCount": 20,
+					"relationshipCount": 8,
+					"render": {
+						"viewpoint": "GoalRealizationViewpoint",
+						"model": "workbench"
+					}
+				},
+				{
+					"notation": "archimate",
+					"viewpoint": "ImplementationAndDeploymentViewpoint",
+					"label": "Implementation and Deployment Viewpoint",
+					"elementCount": 1,
+					"relationshipCount": 0,
+					"render": {
+						"viewpoint": "ImplementationAndDeploymentViewpoint",
+						"model": "workbench"
+					}
+				},
+				{
+					"notation": "archimate",
+					"viewpoint": "ImplementationAndMigrationViewpoint",
+					"label": "Implementation and Migration Viewpoint",
+					"elementCount": 20,
+					"relationshipCount": 9,
+					"render": {
+						"viewpoint": "ImplementationAndMigrationViewpoint",
+						"model": "workbench"
+					}
+				},
+				{
+					"notation": "archimate",
+					"viewpoint": "LayeredViewpoint",
+					"label": "Layered Viewpoint",
+					"elementCount": 2,
+					"relationshipCount": 1,
+					"render": {
+						"viewpoint": "LayeredViewpoint",
+						"model": "workbench"
+					}
+				},
+				{
+					"notation": "archimate",
+					"viewpoint": "MotivationViewpoint",
+					"label": "Motivation Viewpoint",
+					"elementCount": 22,
+					"relationshipCount": 10,
+					"render": {
+						"viewpoint": "MotivationViewpoint",
+						"model": "workbench"
+					}
+				},
+				{
+					"notation": "archimate",
+					"viewpoint": "OrganizationViewpoint",
+					"label": "Organization Viewpoint",
+					"elementCount": 1,
+					"relationshipCount": 0,
+					"render": {
+						"viewpoint": "OrganizationViewpoint",
+						"model": "workbench"
+					}
+				},
+				{
+					"notation": "archimate",
+					"viewpoint": "OutcomeRealizationViewpoint",
+					"label": "Outcome Realization Viewpoint",
+					"elementCount": 4,
+					"relationshipCount": 1,
+					"render": {
+						"viewpoint": "OutcomeRealizationViewpoint",
+						"model": "workbench"
+					}
+				},
+				{
+					"notation": "archimate",
+					"viewpoint": "ProcessCooperationViewpoint",
+					"label": "Process Cooperation Viewpoint",
+					"elementCount": 2,
+					"relationshipCount": 1,
+					"render": {
+						"viewpoint": "ProcessCooperationViewpoint",
+						"model": "workbench"
+					}
+				},
+				{
+					"notation": "archimate",
+					"viewpoint": "ProductViewpoint",
+					"label": "Product Viewpoint",
+					"elementCount": 2,
+					"relationshipCount": 1,
+					"render": {
+						"viewpoint": "ProductViewpoint",
+						"model": "workbench"
+					}
+				},
+				{
+					"notation": "archimate",
+					"viewpoint": "ProjectViewpoint",
+					"label": "Project Viewpoint",
+					"elementCount": 5,
+					"relationshipCount": 2,
+					"render": {
+						"viewpoint": "ProjectViewpoint",
+						"model": "workbench"
+					}
+				},
+				{
+					"notation": "archimate",
+					"viewpoint": "RequirementsRealizationViewpoint",
+					"label": "Requirements Realization Viewpoint",
+					"elementCount": 22,
+					"relationshipCount": 17,
+					"render": {
+						"viewpoint": "RequirementsRealizationViewpoint",
+						"model": "workbench"
+					}
+				},
+				{
+					"notation": "archimate",
+					"viewpoint": "ServiceRealizationViewpoint",
+					"label": "Service Realization Viewpoint",
+					"elementCount": 2,
+					"relationshipCount": 1,
+					"render": {
+						"viewpoint": "ServiceRealizationViewpoint",
+						"model": "workbench"
+					}
+				},
+				{
+					"notation": "archimate",
+					"viewpoint": "StakeholderViewpoint",
+					"label": "Stakeholder Viewpoint",
+					"elementCount": 6,
+					"relationshipCount": 4,
+					"render": {
+						"viewpoint": "StakeholderViewpoint",
+						"model": "workbench"
+					}
+				},
+				{
+					"notation": "archimate",
+					"viewpoint": "StrategyViewpoint",
+					"label": "Strategy Viewpoint",
+					"elementCount": 2,
+					"relationshipCount": 0,
+					"render": {
+						"viewpoint": "StrategyViewpoint",
+						"model": "workbench"
+					}
+				},
+				{
+					"notation": "archimate",
+					"viewpoint": "TechnologyUsageViewpoint",
+					"label": "Technology Usage Viewpoint",
+					"elementCount": 1,
+					"relationshipCount": 0,
+					"render": {
+						"viewpoint": "TechnologyUsageViewpoint",
+						"model": "workbench"
+					}
+				},
+				{
+					"notation": "archimate",
+					"viewpoint": "TechnologyViewpoint",
+					"label": "Technology Viewpoint",
+					"elementCount": 1,
+					"relationshipCount": 0,
+					"render": {
+						"viewpoint": "TechnologyViewpoint",
+						"model": "workbench"
+					}
+				},
+				{
+					"notation": "archimate",
+					"viewpoint": "ValueStreamViewpoint",
+					"label": "Value Stream Viewpoint",
+					"elementCount": 2,
+					"relationshipCount": 0,
+					"render": {
+						"viewpoint": "ValueStreamViewpoint",
+						"model": "workbench"
+					}
+				}
+			]
+		}
+	],
+	"source": {
+		"repo": "/fixture/repo",
+		"ref": null,
+		"commit": null
+	}
+}

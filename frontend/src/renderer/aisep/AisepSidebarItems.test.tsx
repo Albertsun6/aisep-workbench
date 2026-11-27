@@ -53,6 +53,15 @@ describe("AisepSidebarItems", () => {
 		expect(screen.getByRole("button", { name: "AISEP" })).not.toHaveAttribute("aria-current");
 	});
 
+	it("has a Views row that opens /aisep/views and is the current page there, instead of the AISEP row", async () => {
+		router.pathname = "/aisep/views";
+		renderItems();
+		expect(screen.getByRole("button", { name: "Views" })).toHaveAttribute("aria-current", "page");
+		expect(screen.getByRole("button", { name: "AISEP" })).not.toHaveAttribute("aria-current");
+		await userEvent.setup().click(screen.getByRole("button", { name: "Views" }));
+		expect(router.navigate).toHaveBeenCalledWith({ to: "/aisep/$", params: { _splat: "views" } });
+	});
+
 	// Upstream-sync guard: the single mount line must survive merges, right after the Artifacts row.
 	it("stays mounted in the upstream Sidebar after the Artifacts row", () => {
 		const source = readFileSync(path.resolve(process.cwd(), "src/renderer/components/Sidebar.tsx"), "utf8");

@@ -14,6 +14,9 @@ import {
 	type ImpactResult,
 	type Iri,
 	type QueryResult,
+	type RenderViewInput,
+	type RenderedView,
+	type ViewsResult,
 } from "./client";
 import branchesFixture from "./fixtures/branches.json";
 import diffMain from "./fixtures/diff-main.json";
@@ -22,10 +25,31 @@ import findingsFixture from "./fixtures/findings.json";
 import gateFixture from "./fixtures/gate.json";
 import pendingQuery from "./fixtures/pending-query.json";
 import quotationImpact from "./fixtures/impact-quotation.json";
+import viewProcurementLayered from "./fixtures/view-procurement-layered.json";
+import viewWorkbenchMotivation from "./fixtures/view-workbench-motivation.json";
+import viewWorkbenchStakeholder from "./fixtures/view-workbench-stakeholder.json";
+import viewsList from "./fixtures/views-list.json";
 
 const impacts: Record<Iri, ImpactResult> = {
 	[quotationImpact.focus.iri]: quotationImpact as ImpactResult,
 };
+
+/**
+ * Views recorded off aisep PR #174's server on the real models (not the procurement-only test repo): the SVGs are
+ * byte-identical to `tools/aisep.py diagram`. Keyed by renderKey of the item's `render`.
+ */
+const renderedViews: Record<string, RenderedView> = {
+	"viewpoint=LayeredViewpoint&model=procurement": viewProcurementLayered as RenderedView,
+	"viewpoint=MotivationViewpoint&model=workbench": viewWorkbenchMotivation as RenderedView,
+	"viewpoint=StakeholderViewpoint&model=workbench": viewWorkbenchStakeholder as RenderedView,
+};
+
+/** A stable key for one model_render_view input. */
+export function renderKey(input: RenderViewInput): string {
+	return (["view", "viewpoint", "c4viewpoint", "of", "model"] as const)
+		.flatMap((field) => (input[field] === undefined ? [] : [`${field}=${input[field]}`]))
+		.join("&");
+}
 
 function noFixture(what: string): never {
 	throw new AisepToolError("NO_FIXTURE", `fixture client has no answer for ${what}`, false);
@@ -61,6 +85,23 @@ export class FixtureClient implements AisepModelClient {
 
 	async branches(): Promise<BranchesResult> {
 		return branchesFixture as BranchesResult;
+	}
+
+	/** The recorded list, cut down to the items that have a recorded SVG, so every listed item opens. */
+	async listViews(target: { model?: string } = {}): Promise<ViewsResult> {
+		const recorded = viewsList as ViewsResult;
+		const models = recorded.models
+			.filter((model) => target.model === undefined || model.slug === target.model)
+			.map((model) => ({
+				...model,
+				views: model.views.filter((view) => renderKey(view.render) in renderedViews),
+				projections: model.projections.filter((projection) => renderKey(projection.render) in renderedViews),
+			}));
+		return { ...recorded, models };
+	}
+
+	async renderView(input: RenderViewInput): Promise<RenderedView> {
+		return renderedViews[renderKey(input)] ?? noFixture(`view ${renderKey(input)}`);
 	}
 }
 
