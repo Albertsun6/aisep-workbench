@@ -192,7 +192,7 @@ function CallLogTable({ items }: { items: CallLogEntry[] }) {
 								<TableCell>{measured.request.model ?? "—"}</TableCell>
 								<TableCell className="font-mono">{measured.target?.branch ?? "—"}</TableCell>
 								<TableCell className="tabular-nums">{measured.files.length}</TableCell>
-								<TableCell className="tabular-nums">{measured.durationMs} ms</TableCell>
+								<TableCell className="tabular-nums">{`${measured.durationMs} ms`}</TableCell>
 								<TableCell className="text-muted-foreground">
 									{client ? `${client.name} ${client.version}` : "—"}
 									<span className="ml-1 text-caption">{t("callLog.selfReported")}</span>
