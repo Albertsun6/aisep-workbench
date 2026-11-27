@@ -191,6 +191,9 @@
 	"views.group.declared": "宣言されたビュー",
 	"views.group.archimate": "ArchiMate ビューポイント",
 	"views.group.c4": "C4 ビューポイント",
+	"views.group.bpmn": "BPMN プロセス",
+	"views.group.uml": "UML",
+	"views.group.ddd": "DDD",
 	"views.counts": "要素 {{elements}} · 関係 {{relationships}}",
 	"views.members": "メンバー {{count}}",
 	"views.pick": "左からビューを選んでください。",
@@ -206,5 +209,9 @@
 	"views.fit": "ウィンドウに合わせる",
 	"views.actualSize": "実際のサイズ",
 	"views.download": "SVG をダウンロード",
-	"views.downloadError": "SVG を保存できませんでした：{{message}}"
+	"views.downloadError": "SVG を保存できませんでした：{{message}}",
+	"views.downloadBpmn": "BPMN をダウンロード",
+	"views.downloadBpmnError": "BPMN ファイルを保存できませんでした：{{message}}",
+	"views.bpmnError": "BPMN ビューアーでこのプロセスを表示できませんでした：{{message}}",
+	"views.bpmnViewer": "BPMN プロセス図（読み取り専用）"
 }

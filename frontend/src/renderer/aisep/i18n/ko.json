@@ -191,6 +191,9 @@
 	"views.group.declared": "선언된 뷰",
 	"views.group.archimate": "ArchiMate 관점",
 	"views.group.c4": "C4 관점",
+	"views.group.bpmn": "BPMN 프로세스",
+	"views.group.uml": "UML",
+	"views.group.ddd": "DDD",
 	"views.counts": "요소 {{elements}} · 관계 {{relationships}}",
 	"views.members": "구성원 {{count}}",
 	"views.pick": "왼쪽에서 뷰를 선택하세요.",
@@ -206,5 +209,9 @@
 	"views.fit": "창에 맞추기",
 	"views.actualSize": "실제 크기",
 	"views.download": "SVG 다운로드",
-	"views.downloadError": "SVG를 저장하지 못했습니다: {{message}}"
+	"views.downloadError": "SVG를 저장하지 못했습니다: {{message}}",
+	"views.downloadBpmn": "BPMN 다운로드",
+	"views.downloadBpmnError": "BPMN 파일을 저장하지 못했습니다: {{message}}",
+	"views.bpmnError": "BPMN 뷰어가 이 프로세스를 표시하지 못했습니다: {{message}}",
+	"views.bpmnViewer": "BPMN 프로세스 다이어그램(읽기 전용)"
 }

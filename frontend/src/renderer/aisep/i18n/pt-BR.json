@@ -191,6 +191,9 @@
 	"views.group.declared": "Visões declaradas",
 	"views.group.archimate": "Pontos de vista ArchiMate",
 	"views.group.c4": "Pontos de vista C4",
+	"views.group.bpmn": "Processos BPMN",
+	"views.group.uml": "UML",
+	"views.group.ddd": "DDD",
 	"views.counts": "{{elements}} elementos · {{relationships}} relações",
 	"views.members": "{{count}} membros",
 	"views.pick": "Escolha uma visão à esquerda.",
@@ -206,5 +209,9 @@
 	"views.fit": "Ajustar à janela",
 	"views.actualSize": "Tamanho real",
 	"views.download": "Baixar SVG",
-	"views.downloadError": "Não foi possível salvar o SVG: {{message}}"
+	"views.downloadError": "Não foi possível salvar o SVG: {{message}}",
+	"views.downloadBpmn": "Baixar BPMN",
+	"views.downloadBpmnError": "Não foi possível salvar o arquivo BPMN: {{message}}",
+	"views.bpmnError": "O visualizador BPMN não conseguiu mostrar este processo: {{message}}",
+	"views.bpmnViewer": "Diagrama de processo BPMN (somente leitura)"
 }

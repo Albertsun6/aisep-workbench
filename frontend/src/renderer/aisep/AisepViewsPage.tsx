@@ -1,8 +1,9 @@
-// Views page (aisep docs/mcp-interface.md §5.15, §5.16; aisep PR #174): browse each model's views and look at one.
-// Read-only: writing views is not in this version (§1). The SVG is never put into the DOM as markup: it is shown as an
-// <img> of a data: URL, where scripts never run and its <style> and ids stay inside the image.
+// Views page (aisep docs/mcp-interface.md §5.15, §5.16; aisep PR #174, #193): browse each model's views, grouped by
+// notation (ArchiMate, C4, BPMN, UML, DDD), and look at one. Read-only: writing views is not in this version (§1). An
+// SVG is never put into the DOM as markup: it is shown as an <img> of a data: URL, where scripts never run and its
+// <style> and ids stay inside the image. A BPMN process (BPMN 2.0 XML) goes to bpmn-js's read-only viewer.
 import { useQuery } from "@tanstack/react-query";
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type PointerEvent } from "react";
+import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type PointerEvent } from "react";
 import { Download, LayoutGrid, Maximize2, ZoomIn, ZoomOut } from "@/components/app-icons";
 import { Button } from "@/components/ui/button";
 import { Pressable } from "@/components/ui/pressable";
@@ -10,10 +11,29 @@ import { PageTopbar, PageTopbarTitle } from "../components/PageTopbar";
 import { aoBridge } from "../lib/bridge";
 import { aisepErrorMessage } from "./AisepApprovalProgress";
 import { modelClient } from "./AisepWorkbenchPage";
-import { AisepToolError, type AisepModelClient, type ModelViews, type RenderViewInput, type ViewsResult } from "./data/client";
+import {
+	AisepToolError,
+	type AisepModelClient,
+	type ModelViews,
+	type RenderViewInput,
+	type ViewNotation,
+	type ViewsResult,
+} from "./data/client";
 import { FixtureClient, fixtureClient, renderKey } from "./data/fixture-client";
 import { McpProtocolError, shouldRetryAisep } from "./data/mcp-client";
-import { useAisepT, type AisepT } from "./i18n";
+import { useAisepT, type AisepMessageKey, type AisepT } from "./i18n";
+
+/** bpmn-js is large: loaded only when a BPMN process is opened. */
+const AisepBpmnViewer = lazy(() => import("./AisepBpmnViewer"));
+
+/** The sidebar's groups, in this order; a declared view goes into its notation's group. */
+const NOTATIONS: { notation: ViewNotation; title: AisepMessageKey }[] = [
+	{ notation: "archimate", title: "views.group.archimate" },
+	{ notation: "c4", title: "views.group.c4" },
+	{ notation: "bpmn", title: "views.group.bpmn" },
+	{ notation: "uml", title: "views.group.uml" },
+	{ notation: "ddd", title: "views.group.ddd" },
+];
 
 /** JSON-RPC "invalid params". */
 const INVALID_PARAMS = -32602;
@@ -142,28 +162,28 @@ function ModelGroup({
 	onSelect: (selected: Selected) => void;
 	t: AisepT;
 }) {
-	const groups = [
-		{
-			id: "declared",
-			title: t("views.group.declared"),
-			items: model.views.map((view) => ({
-				render: view.render,
-				label: view.label,
-				meta: [view.viewpointLabel, t("views.members", { count: view.memberCount })].filter(Boolean).join(" · "),
-			})),
-		},
-		...(["archimate", "c4"] as const).map((notation) => ({
-			id: notation,
-			title: t(notation === "c4" ? "views.group.c4" : "views.group.archimate"),
-			items: model.projections
+	const groups = NOTATIONS.map(({ notation, title }) => ({
+		id: notation,
+		title: t(title),
+		items: [
+			...model.views
+				.filter((view) => view.notation === notation)
+				.map((view) => ({
+					render: view.render,
+					label: view.label,
+					meta: [t("views.group.declared"), view.viewpointLabel, t("views.members", { count: view.memberCount })]
+						.filter(Boolean)
+						.join(" · "),
+				})),
+			...model.projections
 				.filter((projection) => projection.notation === notation)
 				.map((projection) => ({
 					render: projection.render,
 					label: projection.scopeLabel ? `${projection.label}：${projection.scopeLabel}` : projection.label,
 					meta: t("views.counts", { elements: projection.elementCount, relationships: projection.relationshipCount }),
 				})),
-		})),
-	].filter((group) => group.items.length > 0);
+		],
+	})).filter((group) => group.items.length > 0);
 	return (
 		<section aria-label={model.label} className="mb-4">
 			<h2 className="px-2 pb-1 text-xs font-semibold text-foreground">
@@ -215,7 +235,7 @@ function ViewPane({ client, selected, t }: { client: AisepModelClient; selected:
 		);
 	}
 	if (!view.data) return null;
-	const { svg, title, elementCount, relationshipCount, warnings } = view.data;
+	const { title, elementCount, relationshipCount, warnings } = view.data;
 	return (
 		<>
 			<div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 border-b border-border px-4 py-2">
@@ -234,7 +254,13 @@ function ViewPane({ client, selected, t }: { client: AisepModelClient; selected:
 					</div>
 				) : null}
 			</div>
-			<SvgViewer key={selected.key} svg={svg} title={title} t={t} />
+			{view.data.format === "bpmn-xml" ? (
+				<Suspense fallback={<p className="px-6 pt-6 text-xs text-muted-foreground">{t("views.rendering")}</p>}>
+					<AisepBpmnViewer key={selected.key} xml={view.data.content} title={title} t={t} />
+				</Suspense>
+			) : (
+				<SvgViewer key={selected.key} svg={view.data.svg} title={title} t={t} />
+			)}
 		</>
 	);
 }

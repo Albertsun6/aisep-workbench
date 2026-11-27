@@ -191,6 +191,9 @@
 	"views.group.declared": "Deklarierte Ansichten",
 	"views.group.archimate": "ArchiMate-Blickwinkel",
 	"views.group.c4": "C4-Blickwinkel",
+	"views.group.bpmn": "BPMN-Prozesse",
+	"views.group.uml": "UML",
+	"views.group.ddd": "DDD",
 	"views.counts": "{{elements}} Elemente · {{relationships}} Beziehungen",
 	"views.members": "{{count}} Mitglieder",
 	"views.pick": "Wählen Sie links eine Ansicht.",
@@ -206,5 +209,9 @@
 	"views.fit": "An Fenster anpassen",
 	"views.actualSize": "Originalgröße",
 	"views.download": "SVG herunterladen",
-	"views.downloadError": "SVG konnte nicht gespeichert werden: {{message}}"
+	"views.downloadError": "SVG konnte nicht gespeichert werden: {{message}}",
+	"views.downloadBpmn": "BPMN herunterladen",
+	"views.downloadBpmnError": "BPMN-Datei konnte nicht gespeichert werden: {{message}}",
+	"views.bpmnError": "Der BPMN-Viewer konnte diesen Prozess nicht anzeigen: {{message}}",
+	"views.bpmnViewer": "BPMN-Prozessdiagramm (nur lesen)"
 }

@@ -4,11 +4,23 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
+
+// bpmn-js needs a real browser (SVG text measuring); the page's contract is what it hands the viewer. The viewer
+// itself is covered by AisepBpmnViewer.test.tsx and the e2e spec.
+vi.mock("./AisepBpmnViewer", () => ({
+	default: ({ xml, title }: { xml: string; title: string }) => (
+		<div data-testid="bpmn-viewer-stub" data-title={title}>
+			{xml.length}
+		</div>
+	),
+}));
 import { aoBridge } from "../lib/bridge";
 import { AisepViewsPage, svgDataUrl, svgSize } from "./AisepViewsPage";
 import { AisepToolError, type AisepModelClient, type RenderedView, type ViewsResult } from "./data/client";
 import { fixtureClient } from "./data/fixture-client";
 import unknownViewpoint from "./data/fixtures/error-unknown-viewpoint.json";
+import bpmnQuote from "./data/fixtures/view-procurement-bpmn-quote-approval.json";
+import contextMap from "./data/fixtures/view-procurement-ddd-context-map.json";
 import layered from "./data/fixtures/view-procurement-layered.json";
 import { McpProtocolError } from "./data/mcp-client";
 import { aisepCatalogs } from "./i18n";
@@ -108,19 +120,20 @@ describe("AisepViewsPage list", () => {
 		expect(within(workbench).getAllByRole("button").map((b) => b.textContent)).toEqual([
 			"Motivation Viewpoint22 elements · 10 relationships",
 			"Stakeholder Viewpoint6 elements · 4 relationships",
+			"BPMN 流程：批准或驳回发布并打 release 标签12 elements · 12 relationships",
+			"上下文映射图3 elements · 2 relationships",
 		]);
 		expect(screen.getByText(en["views.pick"])).toBeInTheDocument();
 	});
 
-	it("groups declared views, ArchiMate viewpoints and C4 viewpoints, and says when a model has none", async () => {
+	it("groups by notation, a declared view in its notation's group first, and says when a model has none", async () => {
 		renderPage(liveClient({ listViews: async () => MIXED }));
 		const model = await screen.findByRole("region", { name: "订单" });
 		expect(within(model).getAllByRole("heading", { level: 3 }).map((h) => h.textContent)).toEqual([
-			en["views.group.declared"],
 			en["views.group.archimate"],
 			en["views.group.c4"],
 		]);
-		expect(within(model).getByRole("button", { name: /探针视图/ })).toHaveTextContent("Layered Viewpoint · 3 members");
+		expect(within(model).getAllByRole("button")[0]).toHaveTextContent(`探针视图${en["views.group.declared"]} · Layered Viewpoint · 3 members`);
 		expect(within(model).getByRole("button", { name: /系统上下文图：订单管理系统/ })).toHaveTextContent("3 elements · 2 relationships");
 		expect(within(model).getByRole("button", { name: /部署图：Production/ })).toBeInTheDocument();
 		expect(within(screen.getByRole("region", { name: "空模型" })).getByText(en["views.modelEmpty"])).toBeInTheDocument();
@@ -160,6 +173,73 @@ describe("AisepViewsPage list", () => {
 		renderPage(liveClient({ listViews: async () => Promise.reject(other) }));
 		expect(await screen.findByRole("alert")).toHaveTextContent("Unknown tool: model_query");
 		expect(screen.queryByText(en["views.fallbackNotice"])).toBeNull();
+	});
+});
+
+describe("AisepViewsPage notations", () => {
+	it("groups the recorded procurement views as ArchiMate, BPMN, UML, DDD, in that order", async () => {
+		renderPage();
+		const procurement = await screen.findByRole("region", { name: "采购" });
+		expect(within(procurement).getAllByRole("heading", { level: 3 }).map((h) => h.textContent)).toEqual([
+			en["views.group.archimate"],
+			en["views.group.bpmn"],
+			en["views.group.uml"],
+			en["views.group.ddd"],
+		]);
+		expect(within(procurement).getByRole("button", { name: /BPMN 流程：报价审批流程/ })).toHaveTextContent("6 elements · 6 relationships");
+		expect(within(procurement).getByRole("button", { name: /UML 类图/ })).toHaveTextContent("1 elements · 0 relationships");
+		expect(within(procurement).getByRole("button", { name: /聚合图：报价上下文/ })).toBeInTheDocument();
+	});
+
+	it("puts a declared UML view in the UML group", async () => {
+		const uml: ViewsResult = {
+			...MIXED,
+			models: [
+				{
+					...MIXED.models[0],
+					views: [
+						{ ...MIXED.models[0].views[0], iri: "https://aisep.example/model/t/view-uml", label: "UML 声明视图", notation: "uml",
+							viewpointLabel: "UML 类图", render: { view: "https://aisep.example/model/t/view-uml" } },
+					],
+				},
+			],
+		};
+		renderPage(liveClient({ listViews: async () => uml }));
+		const model = await screen.findByRole("region", { name: "订单" });
+		expect(within(model).getAllByRole("heading", { level: 3 }).map((h) => h.textContent)).toEqual([
+			en["views.group.archimate"],
+			en["views.group.c4"],
+			en["views.group.uml"],
+		]);
+	});
+
+	it("hands a BPMN process's XML to the BPMN viewer, not to an <img>", async () => {
+		const calls: unknown[] = [];
+		renderPage(liveClient({ renderView: async (input) => (calls.push(input), fixtureClient.renderView(input)) }));
+		await open(/BPMN 流程：报价审批流程/);
+		const stub = await screen.findByTestId("bpmn-viewer-stub");
+		expect(stub).toHaveTextContent(String(bpmnQuote.content.length));
+		expect(stub).toHaveAttribute("data-title", "报价审批流程");
+		expect(calls).toEqual([{ process: "https://aisep.example/model/procurement/bpmnQuoteApproval" }]);
+		expect(screen.queryByRole("img")).toBeNull();
+		expect(screen.getByRole("heading", { level: 2, name: "报价审批流程" })).toBeInTheDocument();
+	});
+
+	it("shows a DDD context map as an <img> of the server's SVG", async () => {
+		const { container } = renderPage();
+		const procurement = await screen.findByRole("region", { name: "采购" });
+		await userEvent.click(within(procurement).getByRole("button", { name: /上下文映射图/ }));
+		const image = await screen.findByRole("img", { name: contextMap.title });
+		expect(image.tagName).toBe("IMG");
+		expect(image).toHaveAttribute("src", svgDataUrl(contextMap.svg));
+		expect(container.innerHTML).not.toContain("<svg xmlns");
+	});
+
+	it("treats a result without format (servers before aisep #193) as SVG", async () => {
+		const { format: _format, ...old } = layered;
+		renderPage(liveClient({ renderView: async () => old as RenderedView }));
+		await open(/Layered Viewpoint/);
+		expect(await screen.findByRole("img", { name: "Layered Viewpoint" })).toHaveAttribute("src", svgDataUrl(layered.svg));
 	});
 });
 

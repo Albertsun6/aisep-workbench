@@ -27,7 +27,13 @@ import findingsFixture from "./fixtures/findings.json";
 import gateFixture from "./fixtures/gate.json";
 import pendingQuery from "./fixtures/pending-query.json";
 import quotationImpact from "./fixtures/impact-quotation.json";
+import viewProcurementBpmnQuoteApproval from "./fixtures/view-procurement-bpmn-quote-approval.json";
+import viewProcurementDddAggregateQuotation from "./fixtures/view-procurement-ddd-aggregate-quotation.json";
+import viewProcurementDddContextMap from "./fixtures/view-procurement-ddd-context-map.json";
 import viewProcurementLayered from "./fixtures/view-procurement-layered.json";
+import viewProcurementUmlClass from "./fixtures/view-procurement-uml-class.json";
+import viewWorkbenchBpmnReleaseApproval from "./fixtures/view-workbench-bpmn-release-approval.json";
+import viewWorkbenchDddContextMap from "./fixtures/view-workbench-ddd-context-map.json";
 import viewWorkbenchMotivation from "./fixtures/view-workbench-motivation.json";
 import viewWorkbenchStakeholder from "./fixtures/view-workbench-stakeholder.json";
 import viewsList from "./fixtures/views-list.json";
@@ -37,18 +43,25 @@ const impacts: Record<Iri, ImpactResult> = {
 };
 
 /**
- * Views recorded off aisep PR #174's server on the real models (not the procurement-only test repo): the SVGs are
- * byte-identical to `tools/aisep.py diagram`. Keyed by renderKey of the item's `render`.
+ * Views recorded off aisep PR #193's server on the real models (not the procurement-only test repo): the SVGs and the
+ * BPMN XML are byte-identical to `tools/aisep.py diagram`. Keyed by renderKey of the item's `render`.
  */
 const renderedViews: Record<string, RenderedView> = {
 	"viewpoint=LayeredViewpoint&model=procurement": viewProcurementLayered as RenderedView,
 	"viewpoint=MotivationViewpoint&model=workbench": viewWorkbenchMotivation as RenderedView,
 	"viewpoint=StakeholderViewpoint&model=workbench": viewWorkbenchStakeholder as RenderedView,
+	"process=https://aisep.example/model/procurement/bpmnQuoteApproval": viewProcurementBpmnQuoteApproval as RenderedView,
+	"process=https://aisep.example/model/workbench/bpmnReleaseApproval": viewWorkbenchBpmnReleaseApproval as RenderedView,
+	"umldiagram=ClassDiagram&model=procurement": viewProcurementUmlClass as RenderedView,
+	"dddviewpoint=ContextMap&model=procurement": viewProcurementDddContextMap as RenderedView,
+	"dddviewpoint=AggregateDiagram&of=https://aisep.example/model/procurement/quotationBC":
+		viewProcurementDddAggregateQuotation as RenderedView,
+	"dddviewpoint=ContextMap&model=workbench": viewWorkbenchDddContextMap as RenderedView,
 };
 
 /** A stable key for one model_render_view input. */
 export function renderKey(input: RenderViewInput): string {
-	return (["view", "viewpoint", "c4viewpoint", "of", "model"] as const)
+	return (["view", "viewpoint", "c4viewpoint", "umldiagram", "dddviewpoint", "process", "of", "model"] as const)
 		.flatMap((field) => (input[field] === undefined ? [] : [`${field}=${input[field]}`]))
 		.join("&");
 }

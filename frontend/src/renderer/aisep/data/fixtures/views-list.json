@@ -203,6 +203,53 @@
 						"viewpoint": "TechnologyViewpoint",
 						"model": "procurement"
 					}
+				},
+				{
+					"notation": "bpmn",
+					"viewpoint": "Process",
+					"label": "BPMN 流程",
+					"scope": "https://aisep.example/model/procurement/bpmnQuoteApproval",
+					"scopeLabel": "报价审批流程",
+					"elementCount": 6,
+					"relationshipCount": 6,
+					"render": {
+						"process": "https://aisep.example/model/procurement/bpmnQuoteApproval"
+					}
+				},
+				{
+					"notation": "uml",
+					"viewpoint": "ClassDiagram",
+					"label": "UML 类图",
+					"elementCount": 1,
+					"relationshipCount": 0,
+					"render": {
+						"umldiagram": "ClassDiagram",
+						"model": "procurement"
+					}
+				},
+				{
+					"notation": "ddd",
+					"viewpoint": "ContextMap",
+					"label": "上下文映射图",
+					"elementCount": 2,
+					"relationshipCount": 1,
+					"render": {
+						"dddviewpoint": "ContextMap",
+						"model": "procurement"
+					}
+				},
+				{
+					"notation": "ddd",
+					"viewpoint": "AggregateDiagram",
+					"label": "聚合图",
+					"scope": "https://aisep.example/model/procurement/quotationBC",
+					"scopeLabel": "报价上下文",
+					"elementCount": 2,
+					"relationshipCount": 2,
+					"render": {
+						"dddviewpoint": "AggregateDiagram",
+						"of": "https://aisep.example/model/procurement/quotationBC"
+					}
 				}
 			]
 		},
@@ -429,6 +476,41 @@
 					"relationshipCount": 0,
 					"render": {
 						"viewpoint": "ValueStreamViewpoint",
+						"model": "workbench"
+					}
+				},
+				{
+					"notation": "bpmn",
+					"viewpoint": "Process",
+					"label": "BPMN 流程",
+					"scope": "https://aisep.example/model/workbench/bpmnApproverSelection",
+					"scopeLabel": "关口页选批准人并批准",
+					"elementCount": 8,
+					"relationshipCount": 8,
+					"render": {
+						"process": "https://aisep.example/model/workbench/bpmnApproverSelection"
+					}
+				},
+				{
+					"notation": "bpmn",
+					"viewpoint": "Process",
+					"label": "BPMN 流程",
+					"scope": "https://aisep.example/model/workbench/bpmnReleaseApproval",
+					"scopeLabel": "批准或驳回发布并打 release 标签",
+					"elementCount": 12,
+					"relationshipCount": 12,
+					"render": {
+						"process": "https://aisep.example/model/workbench/bpmnReleaseApproval"
+					}
+				},
+				{
+					"notation": "ddd",
+					"viewpoint": "ContextMap",
+					"label": "上下文映射图",
+					"elementCount": 3,
+					"relationshipCount": 2,
+					"render": {
+						"dddviewpoint": "ContextMap",
 						"model": "workbench"
 					}
 				}

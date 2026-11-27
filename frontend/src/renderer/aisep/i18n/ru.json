@@ -191,6 +191,9 @@
 	"views.group.declared": "Объявленные представления",
 	"views.group.archimate": "Точки зрения ArchiMate",
 	"views.group.c4": "Точки зрения C4",
+	"views.group.bpmn": "Процессы BPMN",
+	"views.group.uml": "UML",
+	"views.group.ddd": "DDD",
 	"views.counts": "Элементов: {{elements}} · связей: {{relationships}}",
 	"views.members": "Участников: {{count}}",
 	"views.pick": "Выберите представление слева.",
@@ -206,5 +209,9 @@
 	"views.fit": "По размеру окна",
 	"views.actualSize": "Реальный размер",
 	"views.download": "Скачать SVG",
-	"views.downloadError": "Не удалось сохранить SVG: {{message}}"
+	"views.downloadError": "Не удалось сохранить SVG: {{message}}",
+	"views.downloadBpmn": "Скачать BPMN",
+	"views.downloadBpmnError": "Не удалось сохранить файл BPMN: {{message}}",
+	"views.bpmnError": "Просмотрщик BPMN не смог показать этот процесс: {{message}}",
+	"views.bpmnViewer": "Диаграмма процесса BPMN (только чтение)"
 }
