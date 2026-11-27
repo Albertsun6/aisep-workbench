@@ -1,12 +1,12 @@
 import { useNavigate, useRouterState } from "@tanstack/react-router";
 import type { ReactNode } from "react";
-import { ScrollText, Workflow, Zap } from "@/components/app-icons";
+import { LayoutGrid, ScrollText, Workflow, Zap } from "@/components/app-icons";
 import { SidebarMenuItem } from "@/components/ui/sidebar";
 import { SidebarTopNavRow } from "../components/Sidebar";
 import { useAisepT, type AisepMessageKey } from "./i18n";
 
 /** Pages with their own sidebar row; every other /aisep path (home, gate pages) belongs to the AISEP row. */
-const SUBPAGES = ["calls", "actions"] as const;
+const SUBPAGES = ["views", "calls", "actions"] as const;
 
 /** AISEP's sidebar rows. Mounted by one line in the upstream Sidebar. */
 export function AisepSidebarItems({ isCollapsed }: { isCollapsed: boolean }) {
@@ -16,6 +16,7 @@ export function AisepSidebarItems({ isCollapsed }: { isCollapsed: boolean }) {
 	return (
 		<>
 			<AisepRow splat="" labelKey="nav.title" icon={<Workflow aria-hidden="true" />} active={inAisep && !subpage} isCollapsed={isCollapsed} />
+			<AisepRow splat="views" labelKey="nav.views" icon={<LayoutGrid aria-hidden="true" />} active={subpage === "views"} isCollapsed={isCollapsed} />
 			<AisepRow splat="calls" labelKey="nav.callLog" icon={<ScrollText aria-hidden="true" />} active={subpage === "calls"} isCollapsed={isCollapsed} />
 			<AisepRow splat="actions" labelKey="nav.actions" icon={<Zap aria-hidden="true" />} active={subpage === "actions"} isCollapsed={isCollapsed} />
 		</>

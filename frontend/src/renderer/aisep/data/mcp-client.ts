@@ -19,7 +19,10 @@ import {
 	type Iri,
 	type ListActionsResult,
 	type QueryResult,
+	type RenderViewInput,
+	type RenderedView,
 	type Target,
+	type ViewsResult,
 } from "./client";
 
 export const MCP_PROTOCOL_VERSION = "2026-07-28";
@@ -202,5 +205,13 @@ export class McpModelClient implements AisepModelClient {
 
 	listActions(options?: CallOptions): Promise<ListActionsResult> {
 		return this.call("model_list_actions", {}, options);
+	}
+
+	listViews(target: Target & { model?: string } = {}, options?: CallOptions): Promise<ViewsResult> {
+		return this.call("model_list_views", { ...target }, options);
+	}
+
+	renderView(input: RenderViewInput & Target, options?: CallOptions): Promise<RenderedView> {
+		return this.call("model_render_view", { ...input }, options);
 	}
 }
