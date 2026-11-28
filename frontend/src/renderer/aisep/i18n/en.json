@@ -230,5 +230,6 @@
 	"views.element.definition": "Definition",
 	"views.element.model": "Model",
 	"views.element.views": "In views",
-	"views.element.noViews": "Not in any declared view."
+	"views.element.noViews": "Not in any declared view.",
+	"views.element.iri": "IRI"
 }

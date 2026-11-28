@@ -230,5 +230,6 @@
 	"views.element.definition": "정의",
 	"views.element.model": "모델",
 	"views.element.views": "포함된 뷰",
-	"views.element.noViews": "선언된 뷰에 없습니다."
+	"views.element.noViews": "선언된 뷰에 없습니다.",
+	"views.element.iri": "IRI"
 }

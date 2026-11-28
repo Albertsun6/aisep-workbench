@@ -230,5 +230,6 @@
 	"views.element.definition": "定義",
 	"views.element.model": "モデル",
 	"views.element.views": "含まれるビュー",
-	"views.element.noViews": "宣言ビューに含まれていません。"
+	"views.element.noViews": "宣言ビューに含まれていません。",
+	"views.element.iri": "IRI"
 }

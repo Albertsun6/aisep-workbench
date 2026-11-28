@@ -627,7 +627,7 @@ function ElementPanel({
 			</div>
 			<dl className="flex flex-col gap-2">
 				<div>
-					<dt className="text-muted-foreground">IRI</dt>
+					<dt className="text-muted-foreground">{t("views.element.iri")}</dt>
 					<dd className="font-mono break-all text-foreground">{iri}</dd>
 				</div>
 				{details.isLoading ? <p className="text-muted-foreground">{t("views.element.loading")}</p> : null}

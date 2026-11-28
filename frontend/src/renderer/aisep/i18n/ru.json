@@ -230,5 +230,6 @@
 	"views.element.definition": "Определение",
 	"views.element.model": "Модель",
 	"views.element.views": "В представлениях",
-	"views.element.noViews": "Нет ни в одном объявленном представлении."
+	"views.element.noViews": "Нет ни в одном объявленном представлении.",
+	"views.element.iri": "IRI"
 }

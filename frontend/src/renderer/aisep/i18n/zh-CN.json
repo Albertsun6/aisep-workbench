@@ -230,5 +230,6 @@
 	"views.element.definition": "定义",
 	"views.element.model": "所属模型",
 	"views.element.views": "所在视图",
-	"views.element.noViews": "不在任何声明视图里。"
+	"views.element.noViews": "不在任何声明视图里。",
+	"views.element.iri": "IRI"
 }

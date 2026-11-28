@@ -230,5 +230,6 @@
 	"views.element.definition": "Definição",
 	"views.element.model": "Modelo",
 	"views.element.views": "Nas visões",
-	"views.element.noViews": "Não está em nenhuma visão declarada."
+	"views.element.noViews": "Não está em nenhuma visão declarada.",
+	"views.element.iri": "IRI"
 }
