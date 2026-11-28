@@ -142,6 +142,43 @@ node scripts/aisep-dev.mjs refresh
 
 **选批准人**：下拉会列出所有模型里带中文标签的 Stakeholder，默认选中第一行，可能是 procurement 的「首席架构师」。批准新模型时要选新模型的「项目负责人」。预检的列表会写出每个人所属的模型。
 
+## 不用脚本，手动连真实服务看视图
+
+视图页（`#/aisep/views`）连上真实服务后，顶部不再出现「使用示例数据」提示条，能点选图上的节点、在右栏看 IRI、详情与「所在视图」，并切换读取版本（服务的当前检出、主分支、本地分支、批准记录的 headCommit）。点选依赖 aisep 服务端的命中框（`model_render_view` 的 `hits`，aisep `docs/mcp-interface.md` §5.16），服务端版本早于它时图照常显示、只是点不了。
+
+下面 `<aisep 只读检出>` 是 aisep 仓库登记的一个游离 worktree（同上「专用检出」，不在里面提交），`<python>` 是装了 aisep `requirements.txt` 的解释器。
+
+1. 只读检出装好出图依赖（Node ≥ 20）：
+
+   ```bash
+   npm ci --prefix <aisep 只读检出>/tools/elk --ignore-scripts --no-audit --no-fund
+   ```
+
+2. 起只读服务（`workbench` 画像，不加批准用的 allow-root；端口避开上面表里的默认值时，两处端口要一致）：
+
+   ```bash
+   cd <aisep 只读检出>
+   <python> -m aisep.server --transport http --profile workbench --port 18791 \
+     --repo <aisep 只读检出> --allow-root <aisep 只读检出> \
+     --allow-origin http://localhost:15191 --allow-origin http://127.0.0.1:15191
+   ```
+
+3. 在工作台检出的 `frontend/.env.local`（已被 `frontend/.gitignore` 忽略，不提交）写一行：
+
+   ```text
+   VITE_AISEP_MCP_URL=http://127.0.0.1:18791/mcp
+   ```
+
+4. 起网页版并打开 `http://localhost:15191/#/aisep/views`：
+
+   ```bash
+   AO_DEV_API_TARGET=http://127.0.0.1:9 node frontend/scripts/dev-web.mjs --port 15191 --strictPort
+   ```
+
+5. 用完按启动时记下的 PID 停掉两个进程（`kill <PID>`），不要按名字批量杀。
+
+切到别的读取版本时，服务端每次调用都按那个提交 `git archive` 出快照再解析（§3.3），第一次要几秒到十几秒。看还没合入 main 的视图数据，可以把只读检出 `git checkout --detach` 到数据分支的提交，或者在页面上把读取版本切到那个分支。
+
 ## 网页模式下没有数据的栏目
 
 - **「AI 进行中」**一直显示 Loading。这一栏读 AO 守护进程的 `GET /api/v1/sessions`，网页版把 `/api` 代理到 `--ao-api`。默认指向不监听的 `127.0.0.1:9`，免得连到本机 3001 上别的会话的守护进程。首页唯一能点进关口页的链接也在这一栏，所以关口页只能直接输地址。

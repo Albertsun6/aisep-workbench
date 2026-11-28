@@ -213,5 +213,22 @@
 	"views.downloadBpmn": "Baixar BPMN",
 	"views.downloadBpmnError": "Não foi possível salvar o arquivo BPMN: {{message}}",
 	"views.bpmnError": "O visualizador BPMN não conseguiu mostrar este processo: {{message}}",
-	"views.bpmnViewer": "Diagrama de processo BPMN (somente leitura)"
+	"views.bpmnViewer": "Diagrama de processo BPMN (somente leitura)",
+	"views.hit": "Selecionar {{iri}}",
+	"views.ref.label": "Ler em",
+	"views.ref.worktree": "Checkout do servidor",
+	"views.ref.main": "Branch principal ({{ref}})",
+	"views.ref.branch": "Branch {{branch}}",
+	"views.ref.approval": "Aprovação: {{label}} ({{commit}})",
+	"views.element.label": "Elemento selecionado",
+	"views.element.close": "Fechar",
+	"views.element.loading": "Carregando…",
+	"views.element.error": "Não foi possível ler: {{message}}",
+	"views.element.type": "Tipo",
+	"views.element.prefLabel": "Nome",
+	"views.element.altLabel": "Nome alternativo",
+	"views.element.definition": "Definição",
+	"views.element.model": "Modelo",
+	"views.element.views": "Nas visões",
+	"views.element.noViews": "Não está em nenhuma visão declarada."
 }

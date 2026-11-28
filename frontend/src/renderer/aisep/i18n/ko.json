@@ -213,5 +213,22 @@
 	"views.downloadBpmn": "BPMN 다운로드",
 	"views.downloadBpmnError": "BPMN 파일을 저장하지 못했습니다: {{message}}",
 	"views.bpmnError": "BPMN 뷰어가 이 프로세스를 표시하지 못했습니다: {{message}}",
-	"views.bpmnViewer": "BPMN 프로세스 다이어그램(읽기 전용)"
+	"views.bpmnViewer": "BPMN 프로세스 다이어그램(읽기 전용)",
+	"views.hit": "{{iri}} 선택",
+	"views.ref.label": "읽을 버전",
+	"views.ref.worktree": "서버의 체크아웃",
+	"views.ref.main": "메인 브랜치({{ref}})",
+	"views.ref.branch": "브랜치 {{branch}}",
+	"views.ref.approval": "승인: {{label}} ({{commit}})",
+	"views.element.label": "선택한 요소",
+	"views.element.close": "닫기",
+	"views.element.loading": "읽는 중…",
+	"views.element.error": "읽지 못했습니다: {{message}}",
+	"views.element.type": "유형",
+	"views.element.prefLabel": "이름",
+	"views.element.altLabel": "별칭",
+	"views.element.definition": "정의",
+	"views.element.model": "모델",
+	"views.element.views": "포함된 뷰",
+	"views.element.noViews": "선언된 뷰에 없습니다."
 }

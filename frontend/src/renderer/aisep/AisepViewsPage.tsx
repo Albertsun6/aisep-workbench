@@ -2,11 +2,15 @@
 // notation (ArchiMate, C4, BPMN, UML, DDD), and look at one. Read-only: writing views is not in this version (§1). An
 // SVG is never put into the DOM as markup: it is shown as an <img> of a data: URL, where scripts never run and its
 // <style> and ids stay inside the image. A BPMN process (BPMN 2.0 XML) goes to bpmn-js's read-only viewer.
+// Clicking a shape (ADR-032 P1a exit ⑦): the <img> has no DOM to click on, so the server's hit boxes (§5.16 `hits`) are
+// laid over it as transparent buttons; the side panel shows the IRI, details and the declared views it is in. The ref
+// picker reads everything on main, another branch, or the commit an approval was given on.
 import { useQuery } from "@tanstack/react-query";
-import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type PointerEvent } from "react";
+import { lazy, Suspense, useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type PointerEvent } from "react";
 import { Download, LayoutGrid, Maximize2, ZoomIn, ZoomOut } from "@/components/app-icons";
 import { Button } from "@/components/ui/button";
 import { Pressable } from "@/components/ui/pressable";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { PageTopbar, PageTopbarTitle } from "../components/PageTopbar";
 import { aoBridge } from "../lib/bridge";
 import { aisepErrorMessage } from "./AisepApprovalProgress";
@@ -17,10 +21,21 @@ import {
 	type ModelViews,
 	type RenderViewInput,
 	type ViewNotation,
+	type ViewHit,
 	type ViewsResult,
 } from "./data/client";
 import { FixtureClient, fixtureClient, renderKey } from "./data/fixture-client";
 import { McpProtocolError, shouldRetryAisep } from "./data/mcp-client";
+import {
+	APPROVAL_COMMITS_QUERY,
+	approvalCommits,
+	elementDetails,
+	elementDetailsQuery,
+	elementViews,
+	elementViewsQuery,
+	isSparqlIri,
+	type Text,
+} from "./data/view-element";
 import { useAisepT, type AisepMessageKey, type AisepT } from "./i18n";
 
 /** bpmn-js is large: loaded only when a BPMN process is opened. */
@@ -90,13 +105,27 @@ interface Selected {
 	render: RenderViewInput;
 }
 
+/** The ref picker's value for "no ref": the server's own checkout (§3.3), as the page read it before. */
+const WORKTREE = "worktree";
+
+/** The ref to send: undefined reads the server's checkout. */
+function refOf(value: string): string | undefined {
+	return value === WORKTREE ? undefined : value;
+}
+
+function localName(iri: string): string {
+	return iri.replace(/^.*[#/](?=[^#/]+$)/, "");
+}
+
 export function AisepViewsPage({ client = modelClient }: { client?: AisepModelClient }) {
 	const t = useAisepT();
+	const [refValue, setRefValue] = useState(WORKTREE);
+	const ref = refOf(refValue);
 	const listing = useQuery({
-		queryKey: ["aisep", "views", "list"],
+		queryKey: ["aisep", "views", "list", refValue],
 		queryFn: async ({ signal }): Promise<ViewsListing> => {
 			try {
-				return { result: await client.listViews({}, { signal }), fallback: false };
+				return { result: await client.listViews(ref === undefined ? {} : { ref }, { signal }), fallback: false };
 			} catch (error) {
 				if (hasNoViewTools(error)) {
 					return { result: await fixtureClient.listViews(), fallback: true };
@@ -109,6 +138,15 @@ export function AisepViewsPage({ client = modelClient }: { client?: AisepModelCl
 	const examples = client instanceof FixtureClient || listing.data?.fallback === true;
 	const source = listing.data?.fallback ? fixtureClient : client;
 	const [selected, setSelected] = useState<Selected>();
+	const [picked, setPicked] = useState<string>();
+	/** A declared view named in the side panel opens like one picked from the list. */
+	const openView = (iri: string) => {
+		for (const model of listing.data?.result.models ?? []) {
+			const view = model.views.find((v) => v.iri === iri);
+			if (view) setSelected({ key: `${model.slug}|${renderKey(view.render)}`, render: view.render });
+		}
+	};
+	const listed = new Set(listing.data?.result.models.flatMap((model) => model.views.map((view) => view.iri)) ?? []);
 
 	return (
 		<div className="flex min-h-0 flex-1 flex-col bg-background">
@@ -119,6 +157,7 @@ export function AisepViewsPage({ client = modelClient }: { client?: AisepModelCl
 					</PageTopbarTitle>
 				}
 			/>
+			{examples ? null : <RefPicker client={client} value={refValue} onChange={setRefValue} t={t} />}
 			{examples ? (
 				<p role="note" className="border-b border-border px-6 py-2 text-xs text-muted-foreground">
 					{t(listing.data?.fallback ? "views.fallbackNotice" : "views.fixtureNotice")}
@@ -141,11 +180,22 @@ export function AisepViewsPage({ client = modelClient }: { client?: AisepModelCl
 				</nav>
 				<main className="flex min-w-0 flex-1 flex-col">
 					{selected ? (
-						<ViewPane client={source} selected={selected} t={t} />
+						<ViewPane client={source} selected={selected} refValue={refValue} picked={picked} onPick={setPicked} t={t} />
 					) : (
 						<p className="px-6 pt-6 text-xs text-muted-foreground">{t("views.pick")}</p>
 					)}
 				</main>
+				{picked ? (
+					<ElementPanel
+						client={source}
+						iri={picked}
+						refValue={refValue}
+						listed={listed}
+						onOpenView={openView}
+						onClose={() => setPicked(undefined)}
+						t={t}
+					/>
+				) : null}
 			</div>
 		</div>
 	);
@@ -216,10 +266,25 @@ function ModelGroup({
 	);
 }
 
-function ViewPane({ client, selected, t }: { client: AisepModelClient; selected: Selected; t: AisepT }) {
+function ViewPane({
+	client,
+	selected,
+	refValue,
+	picked,
+	onPick,
+	t,
+}: {
+	client: AisepModelClient;
+	selected: Selected;
+	refValue: string;
+	picked?: string;
+	onPick: (iri: string) => void;
+	t: AisepT;
+}) {
+	const ref = refOf(refValue);
 	const view = useQuery({
-		queryKey: ["aisep", "views", "render", selected.key],
-		queryFn: ({ signal }) => client.renderView(selected.render, { signal }),
+		queryKey: ["aisep", "views", "render", selected.key, refValue],
+		queryFn: ({ signal }) => client.renderView(ref === undefined ? selected.render : { ...selected.render, ref }, { signal }),
 		retry: shouldRetryAisep,
 	});
 	if (view.isLoading) return <p className="px-6 pt-6 text-xs text-muted-foreground">{t("views.rendering")}</p>;
@@ -259,7 +324,15 @@ function ViewPane({ client, selected, t }: { client: AisepModelClient; selected:
 					<AisepBpmnViewer key={selected.key} xml={view.data.content} title={title} t={t} />
 				</Suspense>
 			) : (
-				<SvgViewer key={selected.key} svg={view.data.svg} title={title} t={t} />
+				<SvgViewer
+					key={selected.key}
+					svg={view.data.svg}
+					hits={view.data.hits ?? []}
+					picked={picked}
+					onPick={onPick}
+					title={title}
+					t={t}
+				/>
 			)}
 		</>
 	);
@@ -269,7 +342,21 @@ function ViewPane({ client, selected, t }: { client: AisepModelClient; selected:
  * Zoom with the buttons, pan by dragging; opens fitted to the pane and stays fitted when the window or the panes are
  * resized, until the user zooms or pans (fit goes back to that).
  */
-function SvgViewer({ svg, title, t }: { svg: string; title: string; t: AisepT }) {
+function SvgViewer({
+	svg,
+	hits,
+	picked,
+	onPick,
+	title,
+	t,
+}: {
+	svg: string;
+	hits: ViewHit[];
+	picked?: string;
+	onPick: (iri: string) => void;
+	title: string;
+	t: AisepT;
+}) {
 	const viewport = useRef<HTMLDivElement>(null);
 	// Computed once per SVG, not on every drag move (a large SVG is hundreds of KB to encode).
 	const size = useMemo(() => svgSize(svg), [svg]);
@@ -277,6 +364,8 @@ function SvgViewer({ svg, title, t }: { svg: string; title: string; t: AisepT })
 	const [scale, setScale] = useState(1);
 	const [offset, setOffset] = useState({ x: 0, y: 0 });
 	const drag = useRef<{ x: number; y: number; ox: number; oy: number } | undefined>(undefined);
+	/** The last press moved the picture: its click is the end of a pan, not a pick. */
+	const panned = useRef(false);
 	/** The user zoomed or panned: a resize must not undo that. */
 	const adjusted = useRef(false);
 	const [downloadError, setDownloadError] = useState("");
@@ -320,10 +409,12 @@ function SvgViewer({ svg, title, t }: { svg: string; title: string; t: AisepT })
 	}, []);
 	const onPointerDown = (event: PointerEvent<HTMLDivElement>) => {
 		drag.current = { x: event.clientX, y: event.clientY, ox: offset.x, oy: offset.y };
+		panned.current = false;
 	};
 	const onPointerMove = (event: PointerEvent<HTMLDivElement>) => {
 		const d = drag.current;
 		if (!d) return;
+		if (Math.abs(event.clientX - d.x) + Math.abs(event.clientY - d.y) > 3) panned.current = true;
 		adjusted.current = true;
 		setOffset({ x: d.ox + event.clientX - d.x, y: d.oy + event.clientY - d.y });
 	};
@@ -332,6 +423,7 @@ function SvgViewer({ svg, title, t }: { svg: string; title: string; t: AisepT })
 	 * downloads are: the desktop window blocks navigation, so a data: link may not download there. The file is the
 	 * server's SVG byte for byte.
 	 */
+	const transform = `translate(${offset.x}px, ${offset.y}px) scale(${scale})`;
 	const download = async () => {
 		setDownloadError("");
 		try {
@@ -395,11 +487,205 @@ function SvgViewer({ svg, title, t }: { svg: string; title: string; t: AisepT })
 							top: 0,
 							maxWidth: "none",
 							transformOrigin: "0 0",
-							transform: `translate(${offset.x}px, ${offset.y}px) scale(${scale})`,
+							transform,
 						}}
 					/>
+					{/*
+					  The hit layer: one transparent button per server hit box, in the SVG's own units under the same
+					  transform as the <img>. Drawing order is DOM order, so the innermost shape is on top (§5.16).
+					*/}
+					{hits.length > 0 ? (
+						<div
+							data-testid="aisep-view-hits"
+							style={{ position: "absolute", left: 0, top: 0, width: size.width, height: size.height, transformOrigin: "0 0", transform }}
+						>
+							{hits.map((hit, i) => (
+								<button
+									key={`${i}:${hit.iri}`}
+									type="button"
+									aria-label={t("views.hit", { iri: hit.iri })}
+									aria-pressed={picked === hit.iri}
+									data-iri={hit.iri}
+									onClick={() => {
+										if (!panned.current) onPick(hit.iri);
+									}}
+									className="absolute cursor-pointer rounded-sm bg-transparent outline-none hover:ring-2 hover:ring-ring/40 focus-visible:ring-2 focus-visible:ring-ring aria-pressed:ring-2 aria-pressed:ring-primary"
+									style={{ left: hit.x, top: hit.y, width: hit.width, height: hit.height }}
+								/>
+							))}
+						</div>
+					) : null}
 				</div>
 			</div>
+		</div>
+	);
+}
+
+/** main, the other local branches, and the commits approvals were given on (aisep:evidence = headCommit, EG26). */
+function RefPicker({
+	client,
+	value,
+	onChange,
+	t,
+}: {
+	client: AisepModelClient;
+	value: string;
+	onChange: (value: string) => void;
+	t: AisepT;
+}) {
+	const id = useId();
+	const branches = useQuery({
+		queryKey: ["aisep", "views", "refs", "branches"],
+		queryFn: ({ signal }) => client.branches({}, { signal }),
+		retry: false,
+	});
+	const approvals = useQuery({
+		queryKey: ["aisep", "views", "refs", "approvals"],
+		queryFn: async ({ signal }) => approvalCommits(await client.query(APPROVAL_COMMITS_QUERY, { limit: 200 }, { signal })),
+		retry: false,
+	});
+	const main = branches.data?.main.ref ?? "main";
+	// The server resolves main to the remote-tracking branch first (§3.3): "refs/remotes/origin/main" is local "main".
+	const mainName = main.replace(/^refs\/(heads|remotes\/[^/]+)\//, "");
+	const options = [
+		{ value: WORKTREE, label: t("views.ref.worktree") },
+		{ value: main, label: t("views.ref.main", { ref: main }) },
+		...(branches.data?.branches ?? [])
+			.filter((b) => b.branch !== mainName)
+			.map((b) => ({ value: b.branch, label: t("views.ref.branch", { branch: b.branch }) })),
+		...(approvals.data ?? []).map((a) => ({
+			value: a.commit,
+			label: t("views.ref.approval", { label: a.label, commit: a.commit.slice(0, 7) }),
+		})),
+	].filter((option, i, all) => all.findIndex((o) => o.value === option.value) === i);
+	return (
+		<div className="flex items-center gap-2 border-b border-border px-6 py-2 text-xs">
+			<span id={id} className="text-muted-foreground">
+				{t("views.ref.label")}
+			</span>
+			<Select value={value} onValueChange={onChange}>
+				<SelectTrigger size="sm" aria-labelledby={id} className="min-w-48 max-w-[32rem]">
+					<SelectValue />
+				</SelectTrigger>
+				<SelectContent>
+					{options.map((option) => (
+						<SelectItem key={option.value} value={option.value}>
+							{option.label}
+						</SelectItem>
+					))}
+				</SelectContent>
+			</Select>
+		</div>
+	);
+}
+
+function texts(items: Text[]): string {
+	return items.map((item) => (item.lang ? `${item.value}（${item.lang}）` : item.value)).join("；");
+}
+
+/** The picked shape: its IRI, what the model says about it, and the declared views it is in, on the picked ref. */
+function ElementPanel({
+	client,
+	iri,
+	refValue,
+	listed,
+	onOpenView,
+	onClose,
+	t,
+}: {
+	client: AisepModelClient;
+	iri: string;
+	refValue: string;
+	listed: Set<string>;
+	onOpenView: (iri: string) => void;
+	onClose: () => void;
+	t: AisepT;
+}) {
+	const ref = refOf(refValue);
+	const target = ref === undefined ? {} : { ref };
+	const safe = isSparqlIri(iri);
+	const details = useQuery({
+		queryKey: ["aisep", "views", "element", iri, refValue],
+		queryFn: async ({ signal }) => elementDetails(await client.query(elementDetailsQuery(iri), target, { signal })),
+		enabled: safe,
+		retry: shouldRetryAisep,
+	});
+	const views = useQuery({
+		queryKey: ["aisep", "views", "element-views", iri, refValue],
+		queryFn: async ({ signal }) => elementViews(await client.query(elementViewsQuery(iri), target, { signal })),
+		enabled: safe,
+		retry: shouldRetryAisep,
+	});
+	const d = details.data;
+	return (
+		<aside aria-label={t("views.element.label")} className="flex w-80 shrink-0 flex-col gap-3 overflow-y-auto border-l border-border px-4 py-3 text-xs">
+			<div className="flex items-start justify-between gap-2">
+				<h2 className="text-sm font-semibold text-foreground">{d?.prefLabels[0]?.value ?? localName(iri)}</h2>
+				<Button variant="ghost" size="sm" onClick={onClose}>
+					{t("views.element.close")}
+				</Button>
+			</div>
+			<dl className="flex flex-col gap-2">
+				<div>
+					<dt className="text-muted-foreground">IRI</dt>
+					<dd className="font-mono break-all text-foreground">{iri}</dd>
+				</div>
+				{details.isLoading ? <p className="text-muted-foreground">{t("views.element.loading")}</p> : null}
+				{details.isError ? (
+					<p role="alert" className="text-destructive">
+						{t("views.element.error", { message: aisepErrorMessage(details.error) })}
+					</p>
+				) : null}
+				{d ? (
+					<>
+						<Field label={t("views.element.type")} value={d.types.map(localName).join("、")} />
+						<Field label={t("views.element.prefLabel")} value={texts(d.prefLabels)} />
+						<Field label={t("views.element.altLabel")} value={texts(d.altLabels)} />
+						<Field label={t("views.element.definition")} value={texts(d.definitions)} />
+						<Field label={t("views.element.model")} value={d.models.join("、")} mono />
+					</>
+				) : null}
+			</dl>
+			<section aria-label={t("views.element.views")}>
+				<h3 className="pb-1 font-semibold text-foreground">{t("views.element.views")}</h3>
+				{views.isLoading ? <p className="text-muted-foreground">{t("views.element.loading")}</p> : null}
+				{views.isError ? (
+					<p role="alert" className="text-destructive">
+						{t("views.element.error", { message: aisepErrorMessage(views.error) })}
+					</p>
+				) : null}
+				{views.data && views.data.length === 0 ? <p className="text-muted-foreground">{t("views.element.noViews")}</p> : null}
+				<ul className="flex flex-col gap-1">
+					{views.data?.map((view) => (
+						<li key={view.iri}>
+							{listed.has(view.iri) ? (
+								<Pressable
+									onClick={() => onOpenView(view.iri)}
+									className="flex w-full flex-col rounded-md px-2 py-1 text-left hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring/60"
+								>
+									<span className="text-foreground">{view.label ?? localName(view.iri)}</span>
+									<span className="font-mono break-all text-caption text-muted-foreground">{view.iri}</span>
+								</Pressable>
+							) : (
+								<div className="flex flex-col px-2 py-1">
+									<span className="text-foreground">{view.label ?? localName(view.iri)}</span>
+									<span className="font-mono break-all text-caption text-muted-foreground">{view.iri}</span>
+								</div>
+							)}
+						</li>
+					))}
+				</ul>
+			</section>
+		</aside>
+	);
+}
+
+function Field({ label, value, mono = false }: { label: string; value: string; mono?: boolean }) {
+	if (!value) return null;
+	return (
+		<div>
+			<dt className="text-muted-foreground">{label}</dt>
+			<dd className={`break-all text-foreground${mono ? " font-mono" : ""}`}>{value}</dd>
 		</div>
 	);
 }
