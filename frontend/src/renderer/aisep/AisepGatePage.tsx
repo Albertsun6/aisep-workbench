@@ -10,6 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { PageTopbar, PageTopbarTitle } from "../components/PageTopbar";
 import { APPROVAL_STAGE_TEXT, AisepApprovalProgress, aisepErrorMessage, approvalProgressKey } from "./AisepApprovalProgress";
 import { DEFAULT_MAIN_REF, approvalCoverage, approvalProgress, coveringRecords, isCovered } from "./data/approval-progress";
+import { iriModel } from "./AisepViewComparePage";
 import { modelClient, releaseCommitPrefix } from "./AisepWorkbenchPage";
 import {
 	AisepToolError,
@@ -213,7 +214,7 @@ export function AisepGatePage({ branch, client = modelClient }: { branch: string
 								{t("gate.commits", { head: head.slice(0, 7), base: diff.data.base.commit.slice(0, 7) })}
 							</p>
 							<AisepApprovalProgress client={client} branch={branch} mainRef={diff.data.base.mainRef} />
-							<DiffSection diff={diff.data} />
+							<DiffSection diff={diff.data} branch={branch} head={head} />
 							<CheckSection client={client} commit={head} />
 							<ApprovalSection client={client} branch={branch} diff={diff.data} commit={head} />
 						</>
@@ -237,15 +238,18 @@ function GateSection({ titleKey, children }: { titleKey: AisepMessageKey; childr
 	);
 }
 
-function DiffSection({ diff }: { diff: DiffResult }) {
+function DiffSection({ diff, branch, head }: { diff: DiffResult; branch: string; head: string }) {
 	const t = useAisepT();
-	const items = diff.items ?? [];
+	const all = diff.items ?? [];
+	// ADR-032 P1b: views are listed on their own; they are never approved on their own (R4-5).
+	const items = all.filter((item) => item.kind !== "view");
+	const views = all.filter((item) => item.kind === "view");
 	return (
 		<GateSection titleKey="gate.diff.title">
-			{diff.truncated ? <p role="note" className="text-caption text-warning">{t("section.truncated", { count: items.length })}</p> : null}
-			{items.length === 0 ? (
+			{diff.truncated ? <p role="note" className="text-caption text-warning">{t("section.truncated", { count: all.length })}</p> : null}
+			{all.length === 0 ? (
 				<p className="text-xs text-muted-foreground">{t("gate.diff.empty")}</p>
-			) : (
+			) : items.length === 0 ? null : (
 				<Table className="text-xs">
 					<TableHeader>
 						<TableRow>
@@ -271,7 +275,51 @@ function DiffSection({ diff }: { diff: DiffResult }) {
 					</TableBody>
 				</Table>
 			)}
+			{views.length > 0 ? <ViewChanges views={views} branch={branch} base={diff.base.commit} head={head} /> : null}
 		</GateSection>
+	);
+}
+
+/** The view page that compares one view's members on two commits (ADR-032 P1b). */
+export function viewCompareHref(view: Iri, base: string, head: string, branch: string): string {
+	const search = new URLSearchParams({ view, base, head, branch });
+	return `#/aisep/views/compare?${search.toString()}`;
+}
+
+function ViewChanges({ views, branch, base, head }: { views: DiffItem[]; branch: string; base: string; head: string }) {
+	const t = useAisepT();
+	const headingId = useId();
+	return (
+		<section aria-labelledby={headingId} className="flex flex-col gap-1">
+			<h3 id={headingId} className="text-xs font-medium text-foreground">
+				{t("gate.views.title", { count: views.length })}
+			</h3>
+			<p role="note" className="text-caption text-muted-foreground">{t("gate.views.note")}</p>
+			<Table className="text-xs">
+				<TableHeader>
+					<TableRow>
+						<TableHead>{t("gate.diff.column.change")}</TableHead>
+						<TableHead>{t("gate.diff.column.name")}</TableHead>
+						<TableHead>{t("gate.views.column.model")}</TableHead>
+						<TableHead>{t("gate.views.column.members")}</TableHead>
+					</TableRow>
+				</TableHeader>
+				<TableBody>
+					{views.map((item) => (
+						<TableRow key={item.iri}>
+							<TableCell className={CHANGE_CLASS[item.change]}>{t(CHANGE_TEXT[item.change])}</TableCell>
+							<TableCell title={item.iri}>{item.label ?? localName(item.iri)}</TableCell>
+							<TableCell>{iriModel(item.iri) ?? modelSlug(item.files.head[0] ?? item.files.base[0]) ?? ""}</TableCell>
+							<TableCell>
+								<a href={viewCompareHref(item.iri, base, head, branch)} className={`${buttonVariants({ variant: "link" })} h-auto p-0 text-xs`}>
+									{t("gate.views.compare")}
+								</a>
+							</TableCell>
+						</TableRow>
+					))}
+				</TableBody>
+			</Table>
+		</section>
 	);
 }
 
