@@ -24,6 +24,7 @@ import gateApproval from "./data/fixtures/gate-approval.json";
 import gateApprovers from "./data/fixtures/gate-approvers.json";
 import gateCheck from "./data/fixtures/gate-check.json";
 import gateDiff from "./data/fixtures/gate-diff.json";
+import gateDiffViews from "./data/fixtures/gate-diff-views.json";
 import gateFail from "./data/fixtures/gate-fail.json";
 import gateNotApprovable from "./data/fixtures/gate-not-approvable.json";
 import { aisepCatalogs } from "./i18n";
@@ -32,6 +33,8 @@ const en = aisepCatalogs.en;
 const M = "https://aisep.example/model/procurement/";
 const BRANCH = "feat/approve";
 const diff = gateDiff as DiffResult;
+/** A branch that only changes arch:inView (model_diff on a real probe branch of the procurement model). */
+const viewsDiff = gateDiffViews as DiffResult;
 const head = diff.head.kind === "ref" ? diff.head.commit : "";
 
 /** Before approving no ref holds a record (nothing pushed: origin/<branch> missing); after it the branch tip added one. */
@@ -442,6 +445,53 @@ describe("approvalCandidates", () => {
 		const byModel = approvalCandidates({ ...diff, items }, notApprovable);
 		expect([...byModel.keys()]).toEqual(["procurement", "sales"]);
 		expect(byModel.get("procurement")?.map((i) => i.iri)).toEqual([`${M}quotationLine`]);
+	});
+
+	// ADR-032 P1b exit ③ (R4-5): a view can never be approved on its own, so no view IRI is ever a candidate.
+	it("never offers a view: not a changed one, an added one, nor one next to element changes", () => {
+		const viewItem = (viewsDiff.items ?? [])[0];
+		expect(viewItem.kind).toBe("view");
+		const items = [
+			...(diff.items ?? []),
+			viewItem,
+			{ ...viewItem, iri: `${M}view-new`, change: "added" as const, files: { base: [], head: ["models/procurement/views/new.ttl"] } },
+		];
+		const candidates = [...approvalCandidates({ ...diff, items }, new Set()).values()].flat().map((i) => i.iri);
+		expect(candidates).toContain(`${M}quotationLine`);
+		expect(candidates.filter((iri) => items.some((i) => i.kind === "view" && i.iri === iri))).toEqual([]);
+		// A branch that only moves members in and out of a view (arch:inView, real model_diff output) offers nothing.
+		expect(approvalCandidates(viewsDiff, new Set()).size).toBe(0);
+	});
+});
+
+// ADR-032 P1b exit ③ on the page: a view change never reaches the approval form; a model Approved on main is offered
+// as a whole (the view is looked at with its model), never the view.
+describe("AisepGatePage on a branch that only changes a view's members", () => {
+	const VIEW = `${M}view-quote-approval-app-usage`;
+
+	it("offers nothing to approve when the model is not Approved on main", async () => {
+		const { client, calls } = gateClient({ diff: async () => viewsDiff });
+		renderGate(client);
+		const approval = await screen.findByRole("region", { name: en["gate.approval.title"] });
+		await waitFor(() => expect(calls.query.length).toBeGreaterThanOrEqual(3));
+		expect(within(approval).queryByRole("checkbox")).toBeNull();
+		expect(within(approval).queryByTitle(VIEW)).toBeNull();
+	});
+
+	it("offers the whole model, never the view, when the model is Approved on main", async () => {
+		const { client, calls } = approvedOnMainClient([M], viewsDiff);
+		renderGate(client);
+		const approval = await screen.findByRole("region", { name: en["gate.approval.title"] });
+		const whole = await within(approval).findByRole("checkbox", { name: en["gate.approval.wholeModel"].replace("{{model}}", "procurement") });
+		expect(whole).toBeChecked();
+		expect(within(approval).getAllByRole("checkbox")).toHaveLength(1);
+		expect(within(approval).queryByTitle(VIEW)).toBeNull();
+		await chooseApprover(approval, "评审人");
+		const approve = screen.getByRole("button", { name: en["gate.approval.approve"] });
+		await waitFor(() => expect(approve).toBeEnabled());
+		await userEvent.click(approve);
+		await waitFor(() => expect(calls.approve).toHaveLength(1));
+		expect(calls.approve[0].approves).toEqual([M]);
 	});
 });
 

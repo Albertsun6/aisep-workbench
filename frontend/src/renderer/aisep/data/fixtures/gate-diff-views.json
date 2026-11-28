@@ -1,0 +1,77 @@
+{
+	"base": {
+		"ref": null,
+		"commit": "8f184ea559625aaa41dcdf967de1b62556ff90da",
+		"viaMergeBase": true,
+		"mainRef": "refs/heads/main"
+	},
+	"head": {
+		"kind": "ref",
+		"ref": "feat/view-members",
+		"commit": "78068baa7461362e81850970fd6d4aee799e4462"
+	},
+	"incomplete": false,
+	"failedFiles": [],
+	"indeterminate": [],
+	"counts": {
+		"element": {
+			"added": 0,
+			"modified": 0,
+			"removed": 0
+		},
+		"relationship": {
+			"added": 0,
+			"modified": 0,
+			"removed": 0
+		},
+		"view": {
+			"added": 0,
+			"modified": 1,
+			"removed": 0
+		},
+		"governance": {
+			"added": 0,
+			"modified": 0,
+			"removed": 0
+		},
+		"schema": {
+			"added": 0,
+			"modified": 0,
+			"removed": 0
+		},
+		"other": {
+			"added": 0,
+			"modified": 0,
+			"removed": 0
+		}
+	},
+	"changedElementCount": 0,
+	"touchedElementCount": 0,
+	"items": [
+		{
+			"iri": "https://aisep.example/model/procurement/view-quote-approval-app-usage",
+			"kind": "view",
+			"change": "modified",
+			"types": [
+				"https://meta.linked.archi/core#Diagram"
+			],
+			"label": "报价审批的应用使用",
+			"files": {
+				"base": [
+					"models/procurement/views/quote-approval-app-usage.ttl"
+				],
+				"head": [
+					"models/procurement/views/quote-approval-app-usage.ttl"
+				]
+			},
+			"changedPredicates": [
+				"https://meta.linked.archi/core#inView"
+			]
+		}
+	],
+	"touchedElements": [],
+	"moves": [],
+	"truncated": false,
+	"baseHasModels": true,
+	"headHasModels": true
+}
