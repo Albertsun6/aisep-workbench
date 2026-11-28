@@ -16,7 +16,7 @@ vi.mock("./AisepBpmnViewer", () => ({
 }));
 import { aoBridge } from "../lib/bridge";
 import { AisepViewsPage, svgDataUrl, svgSize } from "./AisepViewsPage";
-import { AisepToolError, type AisepModelClient, type RenderedView, type ViewsResult } from "./data/client";
+import { AisepToolError, type AisepModelClient, type QueryResult, type RenderedView, type ViewsResult } from "./data/client";
 import { fixtureClient } from "./data/fixture-client";
 import unknownViewpoint from "./data/fixtures/error-unknown-viewpoint.json";
 import bpmnQuote from "./data/fixtures/view-procurement-bpmn-quote-approval.json";
@@ -391,6 +391,167 @@ describe("AisepViewsPage viewer", () => {
 		const alert = await screen.findByRole("alert");
 		expect(alert).toHaveTextContent("Could not draw this view: 没有 ArchiMate 视点 'Nope'");
 		expect(alert).not.toHaveTextContent(en["views.rendererUnavailable"]);
+	});
+});
+
+describe("AisepViewsPage picking a shape (ADR-032 P1a exit ⑦)", () => {
+	const M = "https://aisep.example/model/procurement/";
+	const VIEW = `${M}view-quoteApprovalAppUsage`;
+	const LIST: ViewsResult = {
+		models: [
+			{
+				model: M,
+				slug: "procurement",
+				label: "采购",
+				views: [
+					{
+						iri: VIEW,
+						label: "报价审批应用使用视图",
+						notation: "archimate",
+						viewpoint: "https://meta.linked.archi/archimate4/viewpoints#ApplicationUsageViewpoint",
+						viewpointLabel: "Application Usage",
+						memberCount: 2,
+						render: { view: VIEW },
+					},
+				],
+				projections: [],
+			},
+		],
+		source: { repo: "/fixture/repo", ref: null, commit: null },
+	};
+	/** Two boxes: an outer one drawn first, then one inside it (on top). */
+	const HITS = [
+		{ iri: `${M}procurementSystem`, kind: "boundary", x: 10, y: 10, width: 300, height: 200 },
+		{ iri: `${M}quoteApp`, kind: "element", x: 40, y: 40, width: 120, height: 60 },
+	];
+	function sparqlRows(sparql: string): QueryResult {
+		if (sparql.includes("arch:inView")) {
+			return { kind: "select" as const, variables: ["view", "label"], truncated: false, rows: [
+				{ view: { type: "iri" as const, value: VIEW }, label: { type: "literal" as const, value: "报价审批应用使用视图", lang: "zh" } },
+				{ view: { type: "iri" as const, value: `${M}view-elsewhere` } },
+			] };
+		}
+		if (sparql.includes("aisep:ApprovalRecord")) {
+			return { kind: "select" as const, variables: ["record", "label", "commit"], truncated: false, rows: [
+				{ record: { type: "iri" as const, value: `${M}approval-1` }, label: { type: "literal" as const, value: "架构基线" },
+					commit: { type: "literal" as const, value: "1cac09cbec36a695311081f4876677f73a41229c" } },
+			] };
+		}
+		return { kind: "select" as const, variables: ["type", "prefLabel"], truncated: false, rows: [
+			{ type: { type: "iri" as const, value: "https://meta.linked.archi/archimate4/onto#ApplicationComponent" } },
+			{ prefLabel: { type: "literal" as const, value: "报价应用", lang: "zh" } },
+		] };
+	}
+	function client(calls: { list: unknown[]; render: unknown[]; query: [string, unknown][] }) {
+		return liveClient({
+			listViews: async (target) => (calls.list.push(target), LIST),
+			renderView: async (input) => (calls.render.push(input), { ...(layered as RenderedView), hits: HITS }),
+			query: async (sparql, target) => (calls.query.push([sparql, target]), sparqlRows(sparql)),
+			branches: async () => ({
+				branches: [
+					{ branch: "main", head: "a".repeat(40), remoteHead: null, unpushed: false, mergedIntoMain: true, hasModelChanges: false },
+					{ branch: "claude/p1a-views", head: "b".repeat(40), remoteHead: null, unpushed: false, mergedIntoMain: false, hasModelChanges: true },
+				],
+				main: { ref: "refs/remotes/origin/main", commit: "a".repeat(40) },
+			}),
+		});
+	}
+
+	it("lays the server's hit boxes over the <img>, innermost on top, and shows IRI, details and 所在视图", async () => {
+		const calls = { list: [] as unknown[], render: [] as unknown[], query: [] as [string, unknown][] };
+		renderPage(client(calls));
+		await open(/报价审批应用使用视图/);
+		await screen.findByRole("img", { name: "Layered Viewpoint" });
+		const layer = screen.getByTestId("aisep-view-hits");
+		// The SVG is still an <img>; the layer is buttons, in drawing order, under the image's own transform.
+		expect(layer.querySelectorAll("button")).toHaveLength(2);
+		expect([...layer.querySelectorAll("button")].map((b) => b.getAttribute("data-iri"))).toEqual(HITS.map((h) => h.iri));
+		expect(layer.style.transform).toBe(screen.getByRole("img", { name: "Layered Viewpoint" }).style.transform);
+		const app = screen.getByRole("button", { name: `Select ${M}quoteApp` });
+		expect(app.style.left).toBe("40px");
+		expect(app.style.width).toBe("120px");
+		await userEvent.click(app);
+		expect(app).toHaveAttribute("aria-pressed", "true");
+		const panel = screen.getByRole("complementary", { name: en["views.element.label"] });
+		expect(within(panel).getByText(`${M}quoteApp`)).toBeInTheDocument();
+		expect(await within(panel).findByRole("heading", { level: 2, name: "报价应用" })).toBeInTheDocument();
+		expect(within(panel).getByText("ApplicationComponent")).toBeInTheDocument();
+		const views = within(panel).getByRole("region", { name: en["views.element.views"] });
+		// A listed declared view opens; one the list does not have is shown, not a button.
+		expect(await within(views).findByRole("button", { name: /报价审批应用使用视图/ })).toBeInTheDocument();
+		expect(within(views).getByText(`${M}view-elsewhere`)).toBeInTheDocument();
+		expect(within(views).getAllByRole("button")).toHaveLength(1);
+		// The element queries name the clicked IRI and read the same content as the view (no ref here).
+		expect(calls.query.filter(([q]) => q.includes(`<${M}quoteApp>`)).map(([, target]) => target)).toEqual([{}, {}]);
+	});
+
+	it("does not pick when the press was a pan", async () => {
+		renderPage(client({ list: [], render: [], query: [] }));
+		await open(/报价审批应用使用视图/);
+		const app = await screen.findByRole("button", { name: `Select ${M}quoteApp` });
+		fireEvent.pointerDown(app, { clientX: 50, clientY: 50 });
+		fireEvent.pointerMove(app, { clientX: 90, clientY: 50 });
+		fireEvent.pointerUp(window);
+		fireEvent.click(app, { detail: 1 });
+		expect(screen.queryByRole("complementary", { name: en["views.element.label"] })).toBeNull();
+		// The keyboard never goes through pointerdown: Enter on the focused shape still picks after a pan.
+		app.focus();
+		await userEvent.keyboard("{Enter}");
+		expect(app).toHaveAttribute("aria-pressed", "true");
+		expect(screen.getByRole("complementary", { name: en["views.element.label"] })).toBeInTheDocument();
+	});
+
+	it("switches the ref: main, a branch, an approval's headCommit; list, view and details all read it", async () => {
+		const calls = { list: [] as unknown[], render: [] as unknown[], query: [] as [string, unknown][] };
+		renderPage(client(calls));
+		await open(/报价审批应用使用视图/);
+		await userEvent.click(await screen.findByRole("button", { name: `Select ${M}quoteApp` }));
+		expect(calls.list).toEqual([{}]);
+		const picker = screen.getByRole("combobox", { name: en["views.ref.label"] });
+		await userEvent.click(picker);
+		expect((await screen.findAllByRole("option")).map((o) => o.textContent)).toEqual([
+			en["views.ref.worktree"],
+			"Main branch (refs/remotes/origin/main)",
+			"Branch claude/p1a-views",
+			"Approval: 架构基线 (1cac09c)",
+		]);
+		await userEvent.click(screen.getByRole("option", { name: "Approval: 架构基线 (1cac09c)" }));
+		const head = "1cac09cbec36a695311081f4876677f73a41229c";
+		await vi.waitFor(() => expect(calls.list.at(-1)).toEqual({ ref: head }));
+		await vi.waitFor(() => expect(calls.render.at(-1)).toEqual({ view: VIEW, ref: head }));
+		await vi.waitFor(() =>
+			expect(calls.query.filter(([q]) => q.includes(`<${M}quoteApp>`)).slice(-2).map(([, t]) => t)).toEqual([{ ref: head }, { ref: head }]),
+		);
+		await userEvent.click(picker);
+		await userEvent.click(await screen.findByRole("option", { name: "Branch claude/p1a-views" }));
+		await vi.waitFor(() => expect(calls.render.at(-1)).toEqual({ view: VIEW, ref: "claude/p1a-views" }));
+	});
+
+	it("a hostile SVG stays an inert <img>; a hostile hit IRI is never spliced into SPARQL (exit ④)", async () => {
+		const hostile =
+			'<svg xmlns="http://www.w3.org/2000/svg" width="100" height="80" onload="window.__pwned=1"><script>window.__pwned=2</script>' +
+			'<foreignObject><iframe src="javascript:window.__pwned=3"></iframe></foreignObject><a href="javascript:window.__pwned=4"><rect width="9" height="9"/></a></svg>';
+		const evil = `${M}x> } ; DROP <y`;
+		const query = vi.fn(async (sparql: string) => sparqlRows(sparql));
+		const { container } = renderPage(
+			liveClient({
+				listViews: async () => LIST,
+				renderView: async () => ({ ...(layered as RenderedView), svg: hostile, hits: [{ iri: evil, kind: "element", x: 1, y: 1, width: 10, height: 10 }] }),
+				query,
+				branches: async () => Promise.reject(new Error("no branches")),
+			}),
+		);
+		await open(/报价审批应用使用视图/);
+		const image = await screen.findByRole("img", { name: "Layered Viewpoint" });
+		expect(image.tagName).toBe("IMG");
+		expect(image).toHaveAttribute("src", svgDataUrl(hostile));
+		expect(container.querySelector("script, foreignObject, iframe, svg[onload]")).toBeNull();
+		// Only inside the image's (percent-encoded) data: URL, nowhere as markup.
+		expect(container.innerHTML.split(svgDataUrl(hostile)).join("")).not.toContain("__pwned");
+		expect((window as unknown as { __pwned?: number }).__pwned).toBeUndefined();
+		await userEvent.click(screen.getByRole("button", { name: `Select ${evil}` }));
+		expect(within(screen.getByRole("complementary", { name: en["views.element.label"] })).getByText(evil)).toBeInTheDocument();
+		expect(query.mock.calls.filter(([q]) => q.includes("DROP"))).toEqual([]);
 	});
 });
 

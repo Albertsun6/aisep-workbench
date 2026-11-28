@@ -377,10 +377,23 @@ interface RenderedViewBase {
 	warnings: string[];
 	source: Source;
 }
-/** An SVG; `format` is absent on servers before the BPMN/UML/DDD views (aisep PR #193). */
+/**
+ * A shape of the SVG that names a model IRI, with its box in SVG user units (§5.16 "命中框", aisep PR #201), in
+ * drawing order: a later one is drawn over an earlier one (a boundary comes before what it contains).
+ */
+export interface ViewHit {
+	iri: Iri;
+	kind: string;
+	x: number;
+	y: number;
+	width: number;
+	height: number;
+}
+/** An SVG; `format` is absent on servers before the BPMN/UML/DDD views (aisep PR #193), `hits` before aisep PR #201. */
 export interface RenderedSvgView extends RenderedViewBase {
 	format?: "svg";
 	svg: string;
+	hits?: ViewHit[];
 }
 /** A BPMN process as BPMN 2.0 XML with BPMNDI, for a BPMN viewer (bpmn-js). */
 export interface RenderedBpmnView extends RenderedViewBase {
