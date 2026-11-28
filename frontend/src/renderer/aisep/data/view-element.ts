@@ -8,7 +8,7 @@ import { asSelect, type Iri, type QueryResult, type Sha } from "./client";
  * still checked here before being spliced in (the SPARQL IRIREF production excludes these characters).
  */
 export function isSparqlIri(iri: string): boolean {
-	return /^[A-Za-z][A-Za-z0-9+.-]*:[^\s<>"{}|\\^`]*$/.test(iri);
+	return /^[A-Za-z][A-Za-z0-9+.-]*:[^\x00-\x20<>"{}|\\^`]*$/.test(iri);
 }
 
 export function elementDetailsQuery(iri: Iri): string {

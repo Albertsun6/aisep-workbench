@@ -105,8 +105,11 @@ interface Selected {
 	render: RenderViewInput;
 }
 
-/** The ref picker's value for "no ref": the server's own checkout (§3.3), as the page read it before. */
-const WORKTREE = "worktree";
+/**
+ * The ref picker's value for "no ref": the server's own checkout (§3.3), as the page read it before. A colon is not
+ * allowed in a Git ref name and is not hex, so no branch or commit can collide with it (Radix Select rejects "").
+ */
+const WORKTREE = ":worktree";
 
 /** The ref to send: undefined reads the server's checkout. */
 function refOf(value: string): string | undefined {
@@ -506,8 +509,9 @@ function SvgViewer({
 									aria-label={t("views.hit", { iri: hit.iri })}
 									aria-pressed={picked === hit.iri}
 									data-iri={hit.iri}
-									onClick={() => {
-										if (!panned.current) onPick(hit.iri);
+									onClick={(event) => {
+										// detail 0: activated from the keyboard, which never goes through pointerdown.
+										if (event.detail === 0 || !panned.current) onPick(hit.iri);
 									}}
 									className="absolute cursor-pointer rounded-sm bg-transparent outline-none hover:ring-2 hover:ring-ring/40 focus-visible:ring-2 focus-visible:ring-ring aria-pressed:ring-2 aria-pressed:ring-primary"
 									style={{ left: hit.x, top: hit.y, width: hit.width, height: hit.height }}

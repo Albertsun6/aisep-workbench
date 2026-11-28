@@ -154,7 +154,7 @@ node scripts/aisep-dev.mjs refresh
    npm ci --prefix <aisep 只读检出>/tools/elk --ignore-scripts --no-audit --no-fund
    ```
 
-2. 起只读服务（`workbench` 画像，不加批准用的 allow-root；端口避开上面表里的默认值时，两处端口要一致）：
+2. 起只读服务（`workbench` 画像，只给只读检出这一个 allow-root，不开批准服务；端口避开上面表里的默认值时，两处端口要一致）：
 
    ```bash
    cd <aisep 只读检出>

@@ -492,8 +492,13 @@ describe("AisepViewsPage picking a shape (ADR-032 P1a exit ⑦)", () => {
 		fireEvent.pointerDown(app, { clientX: 50, clientY: 50 });
 		fireEvent.pointerMove(app, { clientX: 90, clientY: 50 });
 		fireEvent.pointerUp(window);
-		fireEvent.click(app);
+		fireEvent.click(app, { detail: 1 });
 		expect(screen.queryByRole("complementary", { name: en["views.element.label"] })).toBeNull();
+		// The keyboard never goes through pointerdown: Enter on the focused shape still picks after a pan.
+		app.focus();
+		await userEvent.keyboard("{Enter}");
+		expect(app).toHaveAttribute("aria-pressed", "true");
+		expect(screen.getByRole("complementary", { name: en["views.element.label"] })).toBeInTheDocument();
 	});
 
 	it("switches the ref: main, a branch, an approval's headCommit; list, view and details all read it", async () => {
