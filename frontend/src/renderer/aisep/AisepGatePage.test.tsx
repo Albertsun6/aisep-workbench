@@ -469,6 +469,35 @@ describe("approvalCandidates", () => {
 describe("AisepGatePage on a branch that only changes a view's members", () => {
 	const VIEW = `${M}view-quote-approval-app-usage`;
 
+	it("lists view changes in their own group, says they are not approved alone, and links to the member comparison", async () => {
+		const items = [...(diff.items ?? []), ...(viewsDiff.items ?? [])];
+		renderGate(gateClient({ diff: async () => ({ ...diff, items }) }).client);
+		const changes = await screen.findByRole("region", { name: en["gate.diff.title"] });
+		const group = within(changes).getByRole("region", { name: en["gate.views.title"].replace("{{count}}", "1") });
+		expect(within(group).getByRole("note")).toHaveTextContent(en["gate.views.note"]);
+		const row = within(group).getByText("报价审批的应用使用").closest("tr") as HTMLElement;
+		expect(within(row).getAllByRole("cell").map((c) => c.textContent)).toEqual([
+			en["gate.change.modified"], "报价审批的应用使用", "procurement", en["gate.views.compare"],
+		]);
+		const href = within(row).getByRole("link", { name: en["gate.views.compare"] }).getAttribute("href") ?? "";
+		expect(href.startsWith("#/aisep/views/compare?")).toBe(true);
+		expect(Object.fromEntries(new URLSearchParams(href.slice(href.indexOf("?") + 1)))).toEqual({
+			view: VIEW, base: diff.base.commit, head, branch: BRANCH,
+		});
+		// The element table above no longer carries the view row.
+		const tables = within(changes).getAllByRole("table");
+		expect(within(tables[0]).queryByText("报价审批的应用使用")).toBeNull();
+		expect(within(tables[0]).getByText("报价行")).toBeInTheDocument();
+	});
+
+	it("shows only the view group when the branch changes nothing else", async () => {
+		renderGate(gateClient({ diff: async () => viewsDiff }).client);
+		const changes = await screen.findByRole("region", { name: en["gate.diff.title"] });
+		expect(within(changes).getAllByRole("table")).toHaveLength(1);
+		expect(within(changes).queryByText(en["gate.diff.empty"])).toBeNull();
+		expect(within(changes).getByRole("region", { name: en["gate.views.title"].replace("{{count}}", "1") })).toBeInTheDocument();
+	});
+
 	it("offers nothing to approve when the model is not Approved on main", async () => {
 		const { client, calls } = gateClient({ diff: async () => viewsDiff });
 		renderGate(client);
