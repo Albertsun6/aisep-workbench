@@ -10,6 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { PageTopbar, PageTopbarTitle } from "../components/PageTopbar";
 import { APPROVAL_STAGE_TEXT, AisepApprovalProgress, aisepErrorMessage, approvalProgressKey } from "./AisepApprovalProgress";
 import { DEFAULT_MAIN_REF, approvalCoverage, approvalProgress, coveringRecords, isCovered } from "./data/approval-progress";
+import { iriModel } from "./AisepViewComparePage";
 import { modelClient, releaseCommitPrefix } from "./AisepWorkbenchPage";
 import {
 	AisepToolError,
@@ -308,7 +309,7 @@ function ViewChanges({ views, branch, base, head }: { views: DiffItem[]; branch:
 						<TableRow key={item.iri}>
 							<TableCell className={CHANGE_CLASS[item.change]}>{t(CHANGE_TEXT[item.change])}</TableCell>
 							<TableCell title={item.iri}>{item.label ?? localName(item.iri)}</TableCell>
-							<TableCell>{modelSlug(item.files.head[0] ?? item.files.base[0]) ?? ""}</TableCell>
+							<TableCell>{iriModel(item.iri) ?? modelSlug(item.files.head[0] ?? item.files.base[0]) ?? ""}</TableCell>
 							<TableCell>
 								<a href={viewCompareHref(item.iri, base, head, branch)} className={`${buttonVariants({ variant: "link" })} h-auto p-0 text-xs`}>
 									{t("gate.views.compare")}

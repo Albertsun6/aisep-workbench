@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { cleanup, render, screen, within } from "@testing-library/react";
+import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import { Store as OxStore } from "oxigraph";
 import { afterEach, describe, expect, it } from "vitest";
 import { AisepViewComparePage, memberChanges, viewMembersQuery } from "./AisepViewComparePage";
@@ -15,9 +15,13 @@ const BASE = "8f184ea559625aaa41dcdf967de1b62556ff90da";
 const HEAD = "78068baa7461362e81850970fd6d4aee799e4462";
 const OLD = "0000000000000000000000000000000000000000";
 const EMPTY = "1111111111111111111111111111111111111111";
+const SUBTYPE = "2222222222222222222222222222222222222222";
+const CATALOG = "3333333333333333333333333333333333333333";
+const CROSS = "4444444444444444444444444444444444444444";
 
 const PREFIXES = `@prefix arch: <https://meta.linked.archi/core#> .
 @prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
 @prefix : <${P}> .
 `;
 // The probe branch of ADR-032 P1b exit ①: only arch:inView changes (reqTwoLevelApproval out, submitQuotation in).
@@ -34,13 +38,24 @@ const SNAPSHOTS: Record<string, string> = {
 	[OLD]: `${PREFIXES}:quotation skos:prefLabel "报价"@zh .`,
 	// The view with no members.
 	[EMPTY]: `${PREFIXES}:view-quote-approval-app-usage a arch:Diagram .`,
+	// A view typed by a subclass of arch:Diagram (as vendor di:Diagram is), its label tagged zh-CN.
+	[SUBTYPE]: `${PREFIXES}<https://example.org/di#Diagram> rdfs:subClassOf arch:Diagram .
+:view-quote-approval-app-usage a <https://example.org/di#Diagram> .
+:quotation arch:inView :view-quote-approval-app-usage ; skos:prefLabel "报价"@zh-CN .`,
+	// A catalog view (aisep/diff.py VIEW_TYPES).
+	[CATALOG]: `${PREFIXES}:view-quote-approval-app-usage a arch:Catalog .
+:quotation arch:inView :view-quote-approval-app-usage .`,
+	// HEAD plus a member from another model, written by hand (ADR-032 §4).
+	[CROSS]: `${PREFIXES}${COMMON}:submitQuotation arch:inView :view-quote-approval-app-usage .
+<https://aisep.example/model/workbench/reqApproverPerGate> arch:inView :view-quote-approval-app-usage ; skos:prefLabel "按关口分配批准人"@zh .`,
 };
 
 /** Runs the page's SPARQL on an oxigraph store per commit, with the server's prefixes (aisep core.NS). */
 function snapshotQuery(sparql: string, ref: string): QueryResult {
 	const store = new OxStore();
 	store.load(SNAPSHOTS[ref], { format: "text/turtle" });
-	const prefixes = "PREFIX arch: <https://meta.linked.archi/core#>\nPREFIX skos: <http://www.w3.org/2004/02/skos/core#>\n";
+	const prefixes =
+		"PREFIX arch: <https://meta.linked.archi/core#>\nPREFIX skos: <http://www.w3.org/2004/02/skos/core#>\nPREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>\n";
 	const bindings = store.query(prefixes + sparql) as Map<string, { termType: string; value: string; language?: string }>[];
 	return {
 		kind: "select",
@@ -57,13 +72,13 @@ function snapshotQuery(sparql: string, ref: string): QueryResult {
 	};
 }
 
-function compareClient() {
+function compareClient(rendered: RenderedView = layered as RenderedView) {
 	const calls = { query: [] as [string, unknown][], render: [] as unknown[] };
 	const client = Object.assign(Object.create(fixtureClient) as AisepModelClient, {
 		query: async (sparql: string, target: Target & { limit?: number }) => (
 			calls.query.push([sparql, target]), snapshotQuery(sparql, target.ref as string)
 		),
-		renderView: async (input: RenderViewInput & Target) => (calls.render.push(input), layered as RenderedView),
+		renderView: async (input: RenderViewInput & Target) => (calls.render.push(input), rendered),
 	});
 	return { client, calls };
 }
@@ -82,8 +97,19 @@ afterEach(cleanup);
 describe("viewMembersQuery", () => {
 	it("refuses anything that is not a plain IRI (it comes from the address bar)", () => {
 		expect(() => viewMembersQuery(`${VIEW}> } ; DROP ALL ; <x`)).toThrow();
+		// No whitespace: only the excluded characters can stop it from leaving the <>.
+		for (const char of [">", "<", '"', "{", "}", "|", "\\", "^", "`"]) {
+			expect(() => viewMembersQuery(`https://x/a${char}}UNION{?member<p>?o}#`)).toThrow();
+		}
 		expect(() => viewMembersQuery("view-quote-approval-app-usage")).toThrow();
-		expect(viewMembersQuery(VIEW)).toContain(`<${VIEW}> a arch:Diagram`);
+		expect(viewMembersQuery(VIEW)).toContain(`<${VIEW}> a/rdfs:subClassOf* ?viewType`);
+	});
+
+	it("finds a view typed by a subclass of arch:Diagram, or typed arch:Catalog, and a zh-CN label", () => {
+		expect(rows(snapshotQuery(viewMembersQuery(VIEW), SUBTYPE))).toEqual([
+			{ member: { type: "iri", value: `${P}quotation` }, label: { type: "literal", value: "报价" } },
+		]);
+		expect(rows(snapshotQuery(viewMembersQuery(VIEW), CATALOG))).toEqual([{ member: { type: "iri", value: `${P}quotation` } }]);
 	});
 
 	it("answers no rows for a commit without the view, one empty row for a view without members", () => {
@@ -139,6 +165,30 @@ describe("AisepViewComparePage", () => {
 		expect(within(added).getAllByRole("listitem")).toHaveLength(3);
 		expect(await screen.findByText(en["gate.compare.absent"])).toBeInTheDocument();
 		expect(calls.render).toEqual([{ view: VIEW, ref: HEAD }]);
+	});
+
+	it("marks a member from another model and says the drawing leaves it out (ADR-032 §4)", async () => {
+		const { client } = compareClient();
+		renderCompare(client, { head: CROSS });
+		const added = await screen.findByRole("region", { name: en["gate.compare.added"].replace("{{count}}", "2") });
+		const other = within(added).getByText("按关口分配批准人");
+		expect(other).toHaveTextContent(en["gate.compare.otherModel"].replace("{{model}}", "workbench"));
+		expect(within(added).getByText("提交报价")).not.toHaveTextContent("workbench");
+		expect(screen.getByRole("note")).toHaveTextContent(en["gate.compare.otherModelNote"].replace("{{model}}", "procurement"));
+	});
+
+	it("has no note when every member is in the view's model", async () => {
+		const { client } = compareClient();
+		renderCompare(client);
+		await screen.findByRole("region", { name: en["gate.compare.added"].replace("{{count}}", "1") });
+		expect(screen.queryByRole("note")).toBeNull();
+	});
+
+	it("says the view does not draw as SVG instead of rendering forever", async () => {
+		const { client } = compareClient({ ...layered, format: "bpmn-xml", content: "<definitions/>" } as unknown as RenderedView);
+		renderCompare(client);
+		await waitFor(() => expect(screen.getAllByText(en["gate.compare.noSvg"])).toHaveLength(2));
+		expect(screen.queryByText(en["views.rendering"])).toBeNull();
 	});
 
 	it("refuses a link without a usable view IRI or commit, and asks the server nothing", () => {

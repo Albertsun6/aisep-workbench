@@ -18,13 +18,21 @@ import { useAisepT, type AisepT } from "./i18n";
 const SAFE_IRI = /^https?:\/\/[^\s<>"{}|\\^`]+$/;
 const COMMIT = /^[0-9a-f]{7,64}$/;
 
-/** Rows: none when `view` is not an arch:Diagram on that commit; one with no ?member when it has no members. */
+/**
+ * Rows: none when `view` is not a view on that commit; one with no ?member when it has no members. A view is what
+ * aisep/diff.py calls kind=view: typed arch:Diagram, arch:Catalog or arch:Matrix, directly or through rdfs:subClassOf.
+ */
 export function viewMembersQuery(view: Iri): string {
 	if (!SAFE_IRI.test(view)) throw new Error(`not an IRI: ${view}`);
 	return `SELECT ?member ?label WHERE {
-  <${view}> a arch:Diagram .
-  OPTIONAL { ?member arch:inView <${view}> OPTIONAL { ?member skos:prefLabel ?label FILTER(lang(?label) = "zh") } }
+  FILTER EXISTS { VALUES ?viewType { arch:Diagram arch:Catalog arch:Matrix } <${view}> a/rdfs:subClassOf* ?viewType }
+  OPTIONAL { ?member arch:inView <${view}> OPTIONAL { ?member skos:prefLabel ?label FILTER(langMatches(lang(?label), "zh")) } }
 }`;
+}
+
+/** The model slug in an IRI under the model base (`…/model/<slug>/…`), if any. */
+export function iriModel(iri: Iri): string | undefined {
+	return iri.match(/\/model\/([^/#]+)[/#]/)?.[1];
 }
 
 export interface ViewMembers {
@@ -120,10 +128,16 @@ function Compare({ client, view, base, head, t }: { client: AisepModelClient; vi
 			) : !changes ? (
 				<p role="status" className="text-xs text-muted-foreground">{t("section.loading")}</p>
 			) : (
-				<div className="grid grid-cols-1 gap-4 text-xs md:grid-cols-2">
-					<MemberList title={t("gate.compare.added", { count: changes.added.length })} members={changes.added} className="text-success" t={t} />
-					<MemberList title={t("gate.compare.removed", { count: changes.removed.length })} members={changes.removed} className="text-destructive" t={t} />
-				</div>
+				<>
+					{/* ADR-032 §4: a hand-written arch:inView from another model is legal, but the drawing leaves it out. */}
+					{[...changes.added, ...changes.removed].some(([iri]) => iriModel(iri) !== iriModel(view)) ? (
+						<p role="note" className="text-caption text-warning">{t("gate.compare.otherModelNote", { model: iriModel(view) ?? "" })}</p>
+					) : null}
+					<div className="grid grid-cols-1 gap-4 text-xs md:grid-cols-2">
+						<MemberList title={t("gate.compare.added", { count: changes.added.length })} members={changes.added} model={iriModel(view)} className="text-success" t={t} />
+						<MemberList title={t("gate.compare.removed", { count: changes.removed.length })} members={changes.removed} model={iriModel(view)} className="text-destructive" t={t} />
+					</div>
+				</>
 			)}
 			<div className="grid grid-cols-1 gap-4 md:grid-cols-2">
 				<Drawing client={client} view={view} commit={base} exists={before.data?.exists} title={t("gate.compare.base", { commit: base.slice(0, 7) })} t={t} />
@@ -133,7 +147,20 @@ function Compare({ client, view, base, head, t }: { client: AisepModelClient; vi
 	);
 }
 
-function MemberList({ title, members, className, t }: { title: string; members: [Iri, string][]; className: string; t: AisepT }) {
+function MemberList({
+	title,
+	members,
+	model,
+	className,
+	t,
+}: {
+	title: string;
+	members: [Iri, string][];
+	/** The view's model: members from any other model are marked. */
+	model: string | undefined;
+	className: string;
+	t: AisepT;
+}) {
 	return (
 		<section aria-label={title} className="flex flex-col gap-1">
 			<h2 className="font-medium text-foreground">{title}</h2>
@@ -141,11 +168,17 @@ function MemberList({ title, members, className, t }: { title: string; members: 
 				<p className="text-muted-foreground">{t("gate.compare.none")}</p>
 			) : (
 				<ul className="flex flex-col gap-0.5">
-					{members.map(([iri, label]) => (
-						<li key={iri} title={iri} className={className}>
-							{label}
-						</li>
-					))}
+					{members.map(([iri, label]) => {
+						const other = iriModel(iri);
+						return (
+							<li key={iri} title={iri} className={className}>
+								{label}
+								{other !== model ? (
+									<span className="ms-1 text-muted-foreground">{t("gate.compare.otherModel", { model: other ?? "?" })}</span>
+								) : null}
+							</li>
+						);
+					})}
 				</ul>
 			)}
 		</section>
@@ -183,6 +216,8 @@ function Drawing({
 				<p className="text-xs text-muted-foreground">{t("gate.compare.absent")}</p>
 			) : drawing.isError ? (
 				<p role="alert" className="text-xs text-destructive">{t("views.renderError", { message: aisepErrorMessage(drawing.error) })}</p>
+			) : drawing.data && !svg ? (
+				<p className="text-xs text-muted-foreground">{t("gate.compare.noSvg")}</p>
 			) : src ? (
 				// White in both themes, as on the views page: the notations are drawn for a light background.
 				<div className="overflow-auto rounded-md border border-border bg-white p-2">
